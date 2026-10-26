@@ -11,7 +11,7 @@ const GRAVITY = 5.2;
 const RADIUS = 0.035;
 const VISUAL_WIDTH = 0.55;
 const SPLASH_RADIUS = 0.45;
-const HIT_INTERVAL = 0.1;
+const HIT_INTERVAL = 0.16;
 const MAX_PARCELS = 360;
 const MAX_DROPS = 160;
 const SIDES = 8;
@@ -19,7 +19,7 @@ const UP = new THREE.Vector3(0, 1, 0);
 
 // Flight, rendering, and damage all use the same parcels of liquid. Once a
 // parcel leaves the emitter, turning the character cannot redirect it.
-export function createLiquidStream(scene, city, onHit, { scale = 1, refraction = true } = {}) {
+export function createLiquidStream(scene, city, onHit, { scale = 1, refraction = true, getHitTime = null } = {}) {
   const radius = RADIUS * scale;
   // Tune the appearance separately from the collision and aiming radius.
   const visualRadius = radius * VISUAL_WIDTH;
@@ -45,6 +45,8 @@ export function createLiquidStream(scene, city, onHit, { scale = 1, refraction =
   let time = 0, accumulator = 0, emission = 0, sequence = 0, batch = 0;
   let heldTime = 0, speed = MIN_SPEED, lift = MIN_LIFT;
   let wasFiring = false, nextSplash = 0, nextRipple = 0;
+  // Battery side streams start later, but must share the centre jet's cooldown.
+  const hitTime = getHitTime ?? (() => time);
 
   const material = new THREE.MeshPhysicalMaterial({
     color: '#ffd34c', roughness: 0.12, metalness: 0,
@@ -166,21 +168,28 @@ export function createLiquidStream(scene, city, onHit, { scale = 1, refraction =
     return t >= 0 && t <= 1 ? t : Infinity;
   }
 
-  function damageEnemy(enemy, velocity) {
-    if (!enemy.alive || time < (enemy.nextJetHit ?? 0)) return;
-    enemy.nextJetHit = time + HIT_INTERVAL;
+  function damageEnemy(enemy, velocity, charge, groundSplash = false) {
+    const now = hitTime();
+    if (!enemy.alive || now < (enemy.nextJetHit ?? 0)) return;
+    enemy.nextJetHit = now + HIT_INTERVAL;
     delta.copy(velocity).setY(0).normalize();
-    onHit(enemy, delta);
+    const pressure = THREE.MathUtils.smoothstep(charge, 0, 1);
+    const strength = groundSplash ? .6 : 1;
+    onHit(enemy, delta, {
+      charge, groundSplash,
+      damage: THREE.MathUtils.lerp(1.5, 3, pressure) * strength,
+      knockback: THREE.MathUtils.lerp(.14, .42, pressure) * strength,
+    });
   }
 
-  function damageGroundSplash(point, velocity, enemies) {
+  function damageGroundSplash(point, velocity, charge, enemies) {
     for (const enemy of enemies) {
-      if (!enemy.alive || time < (enemy.nextJetHit ?? 0)) continue;
+      if (!enemy.alive || hitTime() < (enemy.nextJetHit ?? 0)) continue;
       const reach = SPLASH_RADIUS + radius + enemy.size;
       if ((enemy.x - point.x) ** 2 + (enemy.z - point.z) ** 2 > reach * reach) continue;
       targetPosition.set(enemy.x, enemy.hitHeight, enemy.z);
       if (!city.lineClear3D(point, targetPosition, 0.02)) continue;
-      damageEnemy(enemy, velocity);
+      damageEnemy(enemy, velocity, charge, true);
     }
   }
 
@@ -216,8 +225,8 @@ export function createLiquidStream(scene, city, onHit, { scale = 1, refraction =
       if (contact !== Infinity) {
         impact.lerpVectors(parcel.previous, parcel.position, contact);
         splash(impact, parcel.velocity, ground);
-        if (target) damageEnemy(target, parcel.velocity);
-        else if (ground) damageGroundSplash(impact, parcel.velocity, enemies);
+        if (target) damageEnemy(target, parcel.velocity, parcel.charge);
+        else if (ground) damageGroundSplash(impact, parcel.velocity, parcel.charge, enemies);
         parcels.splice(i, 1);
       } else if (parcel.age > 2) parcels.splice(i, 1);
     }
@@ -242,12 +251,12 @@ export function createLiquidStream(scene, city, onHit, { scale = 1, refraction =
 
   function render(firing) {
     let ring = 0, indexCount = 0, dropCount = 0, previous = null;
-    function addRing(position, velocity, age, id, batchId) {
+    function addRing(position, velocity, age, id, batchId, charge) {
       tangent.copy(velocity).normalize();
       side.crossVectors(tangent, UP).normalize();
       normal.crossVectors(side, tangent).normalize();
       const pulse = 1 + 0.12 * Math.sin(id * 1.8 - time * 9) + 0.07 * Math.sin(id * 0.6 + time * 17);
-      const ringRadius = visualRadius * pulse * (1 + age * 0.3);
+      const ringRadius = visualRadius * (.85 + charge * .65) * pulse * (1 + age * 0.3);
       for (let j = 0; j < SIDES; j++) {
         const angle = j / SIDES * Math.PI * 2;
         radial.copy(side).multiplyScalar(Math.cos(angle)).addScaledVector(normal, Math.sin(angle));
@@ -269,15 +278,15 @@ export function createLiquidStream(scene, city, onHit, { scale = 1, refraction =
       ring++;
     }
     for (const parcel of parcels) {
-      if (parcel.age < parcel.breakupTime) addRing(parcel.position, parcel.velocity, parcel.age, parcel.id, parcel.batch);
+      if (parcel.age < parcel.breakupTime) addRing(parcel.position, parcel.velocity, parcel.age, parcel.id, parcel.batch, parcel.charge);
       else {
-        const dropRadius = visualRadius * (0.7 + Math.sin(parcel.id * 2.1) * 0.18);
+        const dropRadius = visualRadius * (.85 + parcel.charge * .65) * (0.7 + Math.sin(parcel.id * 2.1) * 0.18);
         drawDrop(parcel.position, parcel.velocity, dropRadius, dropCount++, 1.9);
       }
     }
     // The newest ring follows the actual emitter, even between physics steps.
     if (firing) {
-      addRing(origin, launchVelocity, 0, sequence + 1, batch);
+      addRing(origin, launchVelocity, 0, sequence + 1, batch, state.charge);
     }
     for (const drop of splashes) drawDrop(drop.position, drop.velocity, drop.radius * (1 - drop.age / drop.life * 0.5), dropCount++);
     geometry.setDrawRange(0, indexCount);
@@ -324,7 +333,7 @@ export function createLiquidStream(scene, city, onHit, { scale = 1, refraction =
           velocity.y -= GRAVITY * age;
           if (parcels.length >= MAX_PARCELS) parcels.shift();
           const breakupTime = Math.max(0.18, flightTime(emissionOrigin.y, lift) * 0.78);
-          parcels.push({ position, previous: position.clone(), velocity, age, id: ++sequence, batch, breakupTime });
+          parcels.push({ position, previous: position.clone(), velocity, charge: state.charge, age, id: ++sequence, batch, breakupTime });
         }
       }
       accumulator -= STEP;

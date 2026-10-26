@@ -47,7 +47,7 @@ const toast = document.querySelector('#toast');
 const sprayRange = document.querySelector('#spray-range');
 const pressureFill = document.querySelector('#pressure-fill');
 const controlsDialog = document.querySelector('#controls-dialog');
-const controlsButton = document.querySelector('#open-controls');
+const rangeHud = document.querySelector('.range-hud');
 const mouseSupported = typeof canvas.requestPointerLock === 'function' && window.matchMedia('(any-pointer: fine)').matches;
 const aimRay = new THREE.Raycaster();
 const aimScreen = new THREE.Vector2();
@@ -62,7 +62,7 @@ const mouseAim = createMouseAim({
     lastMouseUnlock = performance.now();
     if (playing) pauseGame();
   },
-  onError() { showToast('Mouse capture unavailable. Use arrows or Shift to aim.'); }
+  onError() { showToast('Mouse unavailable'); }
 });
 const touchControls = createTouchControls({
   zone: document.querySelector('#joystick-zone'),
@@ -132,14 +132,14 @@ player.root.add(player.body);
 player.root.position.set(player.x, 0, player.z);
 scene.add(player.root);
 
-function hitEnemy(enemy, direction) {
-  enemy.hp -= 2;
+function hitEnemy(enemy, direction, impact) {
+  enemy.hp -= impact.damage;
   enemy.hit = 0.18;
-  city.move(enemy, direction.x * 0.38, direction.z * 0.38, enemy.size);
+  city.move(enemy, direction.x * impact.knockback, direction.z * impact.knockback, enemy.size);
   enemy.root.position.set(enemy.x, 0, enemy.z);
   if (enemy.hp <= 0) removeEnemy(enemy, true);
 }
-const streamOptions = { scale: HERO_HEIGHT / 2.25, refraction: !window.matchMedia('(pointer: coarse)').matches };
+const streamOptions = { scale: HERO_HEIGHT / 2.25, refraction: !window.matchMedia('(pointer: coarse)').matches, getHitTime: () => gameTime };
 const stream = createLiquidStream(scene, city, hitEnemy, streamOptions);
 // Battery power adds two side streams that fan out from the centre stream.
 const sideStreams = [createLiquidStream(scene, city, hitEnemy, streamOptions), createLiquidStream(scene, city, hitEnemy, streamOptions)];
@@ -437,7 +437,8 @@ function update(dt) {
   player.powerTimer = Math.max(0, player.powerTimer - dt);
   updateSpread(dt, firing);
   pressureFill.style.transform = `scaleX(${spray.charge})`;
-  sprayRange.textContent = spray.blocked ? 'BLOCKED' : `${spray.range.toFixed(1)} m`;
+  sprayRange.textContent = spray.blocked ? '×' : `${spray.range.toFixed(1)} m`;
+  rangeHud.setAttribute('aria-label', spray.blocked ? 'Spray blocked' : `Spray range ${spray.range.toFixed(1)} metres`);
   player.fireTimer -= dt;
   if (firing && player.fireTimer <= 0) {
     blip(180 + Math.random() * 35, 0.035);
@@ -644,7 +645,7 @@ function startGame() {
   }
   spawnWave(1);
   playing = true;
-  controlsButton.hidden = false;
+  rangeHud.hidden = false;
   touchControls.setEnabled(true);
   startScreen.classList.add('hidden');
   endScreen.classList.add('hidden');
@@ -677,7 +678,7 @@ function endGame() {
   playing = false;
   syncMouseAim();
   resetAimAssist();
-  controlsButton.hidden = true;
+  rangeHud.hidden = true;
   touchControls.setEnabled(false);
   stream.clear();
   player.tapTimer = 0;
@@ -738,18 +739,14 @@ function syncControlMode() {
     checkbox.disabled = false;
   }
   syncMouseAim();
-  document.querySelector('#movement-description').textContent = direct ? 'move in screen directions' : 'forward/back · turn the character';
-  const movementHint = direct ? 'ARROWS / WASD move & face screen directions' : '↑ ↓ / W S forward/back · ← → / A D turn';
-  document.querySelector('.controls-hint').textContent = `${movementHint} · SHIFT fine aim${mouseSupported && mouseAimEnabled ? ' · MOUSE aim helper' : ''} · CLICK / SPACE spray · ESC pause`;
   for (const hint of document.querySelectorAll('[data-keyboard-aim-hint]')) {
     hint.textContent = direct
-      ? 'Arrows / WASD move and face screen directions. Shift + ← / → turns precisely.'
-      : '↑ / ↓ forward/back · ← / → turn · Shift for finer turns.';
-    if (mouseSupported && mouseAimEnabled) hint.textContent += ' Move the mouse to help aim. Keyboard turns take priority. Esc releases the mouse and pauses.';
+      ? 'Arrows / WASD move · Shift aims · Click / Space sprays'
+      : '↑↓ move · ←→ turn · Shift aims · Click / Space sprays';
   }
   document.querySelector('.touch-instructions').textContent = direct
-    ? 'Drag on the left in the direction you want to move on screen. The character turns to face that direction. Tap SPRAY near, hold far.'
-    : 'Drag up to walk where the character is facing; down to walk backward. Drag left/right to turn the character. Tap SPRAY near, hold far.';
+    ? 'Drag to move & aim'
+    : 'Drag ↑↓ to move · ←→ to turn';
 }
 
 for (const checkbox of document.querySelectorAll('[data-mouse-aim]')) {
@@ -784,7 +781,6 @@ function pauseGame() {
   if (!controlsDialog.open) controlsDialog.showModal();
   syncMouseAim();
 }
-controlsButton.addEventListener('click', pauseGame);
 controlsDialog.addEventListener('close', () => {
   resetInput();
   if (playing) canvas.focus({ preventScroll: true });
@@ -810,7 +806,7 @@ window.addEventListener('keydown', (event) => {
   }
   if (controlsDialog.open) return;
   if (!mouseAim.locked && event.target instanceof Element && event.target.closest('select, input')) return;
-  if (!playing && event.target instanceof Element && event.target.closest('button')) return;
+  if (!playing && event.target instanceof Element && event.target.closest('button, summary, a')) return;
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code)) event.preventDefault();
   keys.add(event.code);
   if (event.code === 'Space' && !event.repeat && playing) beginSpray();
