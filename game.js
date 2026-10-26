@@ -19,11 +19,12 @@ const CAMERA_HEIGHT = 10;
 const CAMERA_DISTANCE = 12;
 const CAMERA_LOOK_HEIGHT = HERO_HEIGHT * 0.4;
 const keys = new Set();
-let controlMode = 'direct';
+let controlMode = 'tank';
 let aimAssistEnabled = true;
 let mouseAimEnabled = true;
 try {
-  if (localStorage.getItem('golden-blast-controls') === 'tank') controlMode = 'tank';
+  const savedMode = localStorage.getItem('golden-blast-controls');
+  if (savedMode === 'direct' || savedMode === 'tank') controlMode = savedMode;
   aimAssistEnabled = localStorage.getItem('golden-blast-aim-assist') !== 'false';
   mouseAimEnabled = localStorage.getItem('golden-blast-mouse-aim') !== 'false';
 } catch { /* Settings still work when browser storage is unavailable. */ }
@@ -621,6 +622,7 @@ function startGame() {
   startScreen.classList.add('hidden');
   endScreen.classList.add('hidden');
   keys.clear();
+  canvas.focus({ preventScroll: true });
   syncMouseAim();
 }
 
@@ -759,11 +761,16 @@ function pauseGame() {
   syncMouseAim();
 }
 controlsButton.addEventListener('click', pauseGame);
-controlsDialog.addEventListener('close', () => { resetInput(); syncMouseAim(); });
+controlsDialog.addEventListener('close', () => {
+  resetInput();
+  if (playing) canvas.focus({ preventScroll: true });
+  syncMouseAim();
+});
 controlsDialog.querySelector('form').addEventListener('submit', event => {
   event.preventDefault();
   controlsDialog.close();
   resetInput();
+  canvas.focus({ preventScroll: true });
   requestMouseAim();
 });
 
@@ -777,7 +784,8 @@ window.addEventListener('keydown', (event) => {
     }
     return;
   }
-  if (controlsDialog.open || (event.target instanceof Element && event.target.closest('select, input'))) return;
+  if (controlsDialog.open) return;
+  if (!mouseAim.locked && event.target instanceof Element && event.target.closest('select, input')) return;
   if (!playing && event.target instanceof Element && event.target.closest('button')) return;
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code)) event.preventDefault();
   keys.add(event.code);

@@ -8,7 +8,11 @@ function setup() {
   const doc = document;
   const reticle = { hidden: true, style: {} };
   let requests = 0, unlocks = 0, errors = 0;
-  const canvas = { clientWidth: 800, clientHeight: 600, requestPointerLock() { requests++; } };
+  const canvas = {
+    clientWidth: 800, clientHeight: 600,
+    requestPointerLock() { requests++; },
+    focus() { doc.activeElement = canvas; }
+  };
   function lock(value = canvas) {
     doc.pointerLockElement = value;
     doc.dispatchEvent(new Event('pointerlockchange'));
@@ -37,6 +41,13 @@ test('mouse capture needs enabling, deduplicates requests and starts along the c
   assert.equal(mouse.locked, true);
   assert.equal(reticle.hidden, false);
   assert.deepEqual(mouse.position, { x: 400, y: 200 });
+});
+
+test('capturing the mouse transfers keyboard focus from settings to the game', () => {
+  const { mouse, canvas, lock } = setup();
+  document.activeElement = { tagName: 'INPUT' };
+  mouse.setEnabled(true); lock();
+  assert.equal(document.activeElement, canvas);
 });
 
 test('locked mouse deltas move the crosshair in both axes and keep it inside the game', () => {
