@@ -11,17 +11,19 @@
         "imports": {
           "three": "./vendor/three-0.180.0/build/three.module.min.js",
           "three/addons/": "./vendor/three-0.180.0/examples/jsm/",
-          "game": "./game.js?v=20261026-steering1",
+          "game": "./game.js?v=20261026-harbor1",
+          "./enemy-pressure.js": "./enemy-pressure.js?v=20261026-harbor1",
+          "./city-scenery.js": "./city-scenery.js?v=20261026-harbor1",
           "./movement.js": "./movement.js?v=20261026-steering1",
           "./mouse-aim.js": "./mouse-aim.js?v=20261026-steering1",
           "./aim-assist.js": "./aim-assist.js?v=20261026-assist1",
           "./touch-controls.js": "./touch-controls.js?v=20261026-precision1",
           "./hero.js": "./hero.js?v=20261025-medkits1",
-          "./city.js": "./city.js?v=20261026-slugs-sign1",
+          "./city.js": "./city.js?v=20261026-harbor1",
           "./enemies.js": "./enemies.js?v=20261026-slugs-sign1",
           "./liquid.js": "./liquid.js?v=20261026-slugs-sign1",
           "./bites.js": "./bites.js?v=20261025-medkits1",
-          "./medkits.js": "./medkits.js?v=20261025-medkits1"
+          "./medkits.js": "./medkits.js?v=20261026-harbor1"
         }
       }
     </script>
@@ -60,7 +62,7 @@
           <div id="load-status" class="load-status" role="status">Loading models…</div>
           <button id="start" class="primary-button" type="button" disabled>LOADING…</button>
           <button id="retry-load" class="primary-button" type="button" hidden>RETRY LOADING</button>
-          <small>Tap near, hold far. Aim with the ground ring. Green-cross medkits restore health. Rare green batteries from slugs turn the stream neon and split it into three.</small>
+          <small>Tap near, hold far. Search behind buildings for medkits and Battery cans that turn the stream neon and split it into three. Keep fighting: avoiding kills brings more enemies.</small>
           <a class="credits-link" href="./credits.html" target="_blank" rel="noopener">Models & credits ↗</a>
         </div>
       </section>

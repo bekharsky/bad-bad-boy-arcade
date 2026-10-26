@@ -10,6 +10,7 @@ import { createTouchControls } from './touch-controls.js';
 import { movePlayer } from './movement.js';
 import { createAimAssist } from './aim-assist.js';
 import { createMouseAim } from './mouse-aim.js';
+import { createEnemyPressure } from './enemy-pressure.js';
 
 const MODEL_URL = './assets/bad-bad-boy.glb?v=20261025-opt1';
 // Match the map's third-floor windows rather than the sculpture's real size.
@@ -81,9 +82,9 @@ renderer.toneMappingExposure = 1.12;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#7c929f');
-scene.fog = new THREE.Fog('#7c929f', 25, 65);
+scene.fog = new THREE.Fog('#7c929f', 40, 100);
 
-const camera = new THREE.PerspectiveCamera(47, 1, 0.1, 100);
+const camera = new THREE.PerspectiveCamera(47, 1, 0.1, 150);
 camera.position.set(0, CAMERA_HEIGHT, CAMERA_DISTANCE);
 camera.lookAt(0, CAMERA_LOOK_HEIGHT, 0);
 
@@ -92,12 +93,12 @@ const keyLight = new THREE.DirectionalLight(0xffdfad, 2.6);
 keyLight.position.set(-12, 25, 10);
 keyLight.castShadow = true;
 keyLight.shadow.mapSize.set(2048, 2048);
-keyLight.shadow.camera.left = -28;
-keyLight.shadow.camera.right = 28;
-keyLight.shadow.camera.top = 28;
-keyLight.shadow.camera.bottom = -28;
+keyLight.shadow.camera.left = -38;
+keyLight.shadow.camera.right = 38;
+keyLight.shadow.camera.top = 38;
+keyLight.shadow.camera.bottom = -38;
 keyLight.shadow.normalBias = 0.035;
-keyLight.shadow.camera.far = 70;
+keyLight.shadow.camera.far = 100;
 scene.add(keyLight);
 const city = createCity(scene);
 
@@ -143,6 +144,7 @@ const stream = createLiquidStream(scene, city, hitEnemy, streamOptions);
 const sideStreams = [createLiquidStream(scene, city, hitEnemy, streamOptions), createLiquidStream(scene, city, hitEnemy, streamOptions)];
 
 const enemies = [];
+const enemyPressure = createEnemyPressure();
 const aimAssist = createAimAssist((origin, enemy) => city.lineClear(origin.x, origin.z, enemy.x, enemy.z, .12));
 const assistMarker = new THREE.Mesh(
   new THREE.RingGeometry(.88, 1, 32),
@@ -154,8 +156,7 @@ scene.add(assistMarker);
 const effects = [];
 const biteEffects = createBiteEffects(scene);
 const medkits = createMedkits(scene, city);
-// Slugs sometimes drop a Battery. Walking over it turns the stream neon and splits it into three.
-const BATTERY_DROP_CHANCE = 0.3;
+// Battery cans are hidden in back courtyards. Exploration powers up the spray.
 const POWER_TIME = 8;
 const SPREAD_ANGLE = 0.22;
 const STREAM_COLOR = '#ffd34c';
@@ -273,6 +274,7 @@ function makeEnemy(x, z, level, kind) {
 }
 
 function spawnWave(level) {
+  enemyPressure.reset();
   wave = level;
   waveLabel.textContent = String(wave).padStart(2, '0');
   city.routeTo(player.x, player.z);
@@ -290,7 +292,7 @@ function removeEnemy(enemy, pop = false) {
   disposeEnemy(enemy);
   if (pop) {
     score += 150;
-    if (enemy.kind === 'slug' && Math.random() < BATTERY_DROP_CHANCE) dropBattery(enemy.x, enemy.z);
+    enemyPressure.onKill();
     scoreLabel.textContent = String(score).padStart(4, '0');
     burst(enemy.x, enemy.hitHeight, enemy.z, 0xffd34e, 10);
     blip(440 + Math.random() * 280, 0.045);
@@ -410,6 +412,7 @@ function update(dt) {
   // Finish the final bite's splash even after the round ends.
   biteEffects.update(dt);
   if (!playing) return;
+  if (city.update(dt, [player, ...enemies])) showToast('TRAM 9 · JÄTKÄSAARI');
 
   const firing = keys.has('Space') || keys.has('Fire') || touchControls.input.firing || player.tapTimer > 0;
   const moving = updateMovement(dt, firing);
@@ -509,7 +512,17 @@ function update(dt) {
       pendingWave = 0;
       spawnWave(wave + 1);
     }
-  } else pendingWave = 0;
+  } else {
+    pendingWave = 0;
+    if (playing) {
+      const count = enemyPressure.update(dt, enemies.length);
+      for (let i = 0; i < count; i++) {
+        const point = city.spawnPoint(player, i, count);
+        makeEnemy(point.x, point.z, wave, i % 3 === 0 ? 'slug' : 'snail');
+      }
+      if (count) showToast(`REINFORCEMENTS +${count} · KEEP FIGHTING!`);
+    }
+  }
 
   const assistedTarget = aimAssist.target;
   assistMarker.visible = !!assistedTarget?.alive;
@@ -546,7 +559,7 @@ function updateHeroHp() {
   heroHud.style.transform = `translate(${x - 32}px, ${y}px)`;
 }
 
-function dropBattery(x, z) {
+function placeBattery(x, z) {
   const mesh = new THREE.Mesh(batteryGeometry, batteryMaterials);
   mesh.position.set(x, 0.3, z);
   scene.add(mesh);
@@ -558,6 +571,7 @@ function updateBatteries(dt) {
     const battery = batteries[i];
     battery.mesh.rotation.y += dt * 2;
     if (Math.hypot(player.x - battery.x, player.z - battery.z) > player.radius + 0.4) continue;
+    if (!city.lineClear(player.x, player.z, battery.x, battery.z, .12)) continue;
     scene.remove(battery.mesh);
     batteries.splice(i, 1);
     player.powerTimer += POWER_TIME;
@@ -621,7 +635,12 @@ function startGame() {
   animateHero(player.rig, 0, 0);
   scoreLabel.textContent = '0000';
   updateHealth();
+  city.reset();
   medkits.reset(player);
+  for (let i = 4; i < 8; i++) {
+    const point = city.pickupPoint(i, player.radius + .12);
+    if (point) placeBattery(point.x, point.z);
+  }
   spawnWave(1);
   playing = true;
   controlsButton.hidden = false;
