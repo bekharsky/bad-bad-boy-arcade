@@ -11,9 +11,9 @@
         "imports": {
           "three": "./vendor/three-0.180.0/build/three.module.min.js",
           "three/addons/": "./vendor/three-0.180.0/examples/jsm/",
-          "game": "./game.js?v=20261026-focus1",
-          "./movement.js": "./movement.js?v=20261026-mouse1",
-          "./mouse-aim.js": "./mouse-aim.js?v=20261026-focus1",
+          "game": "./game.js?v=20261026-steering1",
+          "./movement.js": "./movement.js?v=20261026-steering1",
+          "./mouse-aim.js": "./mouse-aim.js?v=20261026-steering1",
           "./aim-assist.js": "./aim-assist.js?v=20261026-assist1",
           "./touch-controls.js": "./touch-controls.js?v=20261026-precision1",
           "./hero.js": "./hero.js?v=20261025-medkits1",
@@ -53,9 +53,9 @@
             </div>
           </fieldset>
           <label class="assist-setting"><input type="checkbox" data-aim-assist checked /><span class="assist-switch" aria-hidden="true"></span><span class="assist-copy"><strong>Aim assist</strong><span>Tracks enemies ahead while firing · Direct only</span></span></label>
-          <label class="assist-setting" hidden><input type="checkbox" data-mouse-aim checked /><span class="assist-switch" aria-hidden="true"></span><span class="assist-copy"><strong>Mouse aim</strong><span>Move with arrows · Aim with mouse · Esc releases · Direct only</span></span></label>
+          <label class="assist-setting" hidden><input type="checkbox" data-mouse-aim checked /><span class="assist-switch" aria-hidden="true"></span><span class="assist-copy"><strong>Mouse aim</strong><span>Mouse helps aim · Keyboard steering takes priority · Esc releases</span></span></label>
           <div class="keys"><kbd>ARROWS / WASD</kbd><span id="movement-description">forward/back · turn the character</span><kbd>SHIFT</kbd><span>fine aim</span><kbd>CLICK / SPACE</kbd><span>spray</span></div>
-          <p class="keyboard-aim-hint" data-keyboard-aim-hint>Hold Shift for slower movement and quick, smooth turning, even while firing.</p>
+          <p class="keyboard-aim-hint" data-keyboard-aim-hint>Hold Shift for slower movement and more precise turns.</p>
           <p class="touch-instructions">Drag up to walk where the character is facing; down to walk backward. Drag left/right to turn the character. Tap SPRAY near, hold far.</p>
           <div id="load-status" class="load-status" role="status">Loading models…</div>
           <button id="start" class="primary-button" type="button" disabled>LOADING…</button>
@@ -87,8 +87,8 @@
           </div>
         </fieldset>
         <label class="assist-setting"><input type="checkbox" data-aim-assist checked /><span class="assist-switch" aria-hidden="true"></span><span class="assist-copy"><strong>Aim assist</strong><span>Tracks enemies ahead while firing · Direct only</span></span></label>
-        <label class="assist-setting" hidden><input type="checkbox" data-mouse-aim checked /><span class="assist-switch" aria-hidden="true"></span><span class="assist-copy"><strong>Mouse aim</strong><span>Move with arrows · Aim with mouse · Esc releases · Direct only</span></span></label>
-        <p class="keyboard-aim-hint" data-keyboard-aim-hint>Hold Shift for slower movement and quick, smooth turning, even while firing.</p>
+        <label class="assist-setting" hidden><input type="checkbox" data-mouse-aim checked /><span class="assist-switch" aria-hidden="true"></span><span class="assist-copy"><strong>Mouse aim</strong><span>Mouse helps aim · Keyboard steering takes priority · Esc releases</span></span></label>
+        <p class="keyboard-aim-hint" data-keyboard-aim-hint>Hold Shift for slower movement and more precise turns.</p>
         <form method="dialog"><button class="primary-button" type="submit">RESUME GAME</button></form>
         <small>Esc to pause or resume</small>
       </dialog>

@@ -355,7 +355,8 @@ function blip(frequency, duration) {
 }
 
 function updateMovement(dt, firing) {
-  const assisted = controlMode === 'direct' && aimAssistEnabled && firing && !mouseAim.locked && !keys.has('ShiftLeft') && !keys.has('ShiftRight');
+  if (keyboardSteering() || touchControls.input.x || touchControls.input.z) mouseAim.resetAim();
+  const assisted = controlMode === 'direct' && aimAssistEnabled && firing && !mouseAim.aiming && !keys.has('ShiftLeft') && !keys.has('ShiftRight');
   if (!assisted) resetAimAssist();
   return movePlayer(player, city, {
     keys, touch: touchControls.input, mode: controlMode, dt, firing, height: HERO_HEIGHT,
@@ -364,22 +365,28 @@ function updateMovement(dt, firing) {
   });
 }
 
+function keyboardSteering() {
+  return keys.has('ArrowLeft') || keys.has('ArrowRight') || keys.has('KeyA') || keys.has('KeyD')
+    || keys.has('ShiftLeft') || keys.has('ShiftRight')
+    || (controlMode === 'direct' && (keys.has('ArrowUp') || keys.has('ArrowDown') || keys.has('KeyW') || keys.has('KeyS')));
+}
+
 function aimCursorPosition() {
   aimPoint.set(player.x + Math.sin(player.heading) * 4, 0, player.z + Math.cos(player.heading) * 4).project(camera);
   return { x: (aimPoint.x + 1) * canvas.clientWidth / 2, y: (1 - aimPoint.y) * canvas.clientHeight / 2 };
 }
 
 function mouseHeading() {
-  if (!mouseAim.locked || controlMode !== 'direct') return null;
+  if (!mouseAim.aiming) return null;
   aimScreen.set(mouseAim.position.x / canvas.clientWidth * 2 - 1, 1 - mouseAim.position.y / canvas.clientHeight * 2);
   aimRay.setFromCamera(aimScreen, camera);
-  if (!aimRay.ray.intersectPlane(aimGround, aimPoint)) return player.targetHeading;
+  if (!aimRay.ray.intersectPlane(aimGround, aimPoint)) return player.heading;
   const dx = aimPoint.x - player.x, dz = aimPoint.z - player.z;
-  return dx * dx + dz * dz > .01 ? Math.atan2(dx, dz) : player.targetHeading;
+  return dx * dx + dz * dz > .01 ? Math.atan2(dx, dz) : player.heading;
 }
 
 function syncMouseAim() {
-  mouseAim.setEnabled(mouseSupported && mouseAimEnabled && controlMode === 'direct' && playing && !controlsDialog.open);
+  mouseAim.setEnabled(mouseSupported && mouseAimEnabled && playing && !controlsDialog.open);
 }
 
 function requestMouseAim() {
@@ -406,7 +413,7 @@ function update(dt) {
 
   const firing = keys.has('Space') || keys.has('Fire') || touchControls.input.firing || player.tapTimer > 0;
   const moving = updateMovement(dt, firing);
-  if (mouseAim.locked && (keys.has('ShiftLeft') || keys.has('ShiftRight'))) {
+  if (mouseAim.locked && !mouseAim.aiming) {
     const cursor = aimCursorPosition();
     mouseAim.setPosition(cursor.x, cursor.y);
   }
@@ -687,6 +694,7 @@ function beginSpray() {
 
 function resetInput() {
   resetAimAssist();
+  mouseAim.resetAim();
   keys.clear();
   touchControls.reset();
   player.tapTimer = 0;
@@ -707,21 +715,17 @@ function syncControlMode() {
   for (const checkbox of document.querySelectorAll('[data-mouse-aim]')) {
     checkbox.closest('label').hidden = !mouseSupported;
     checkbox.checked = mouseAimEnabled;
-    checkbox.disabled = !direct;
+    checkbox.disabled = false;
   }
   syncMouseAim();
   document.querySelector('#movement-description').textContent = direct ? 'move in screen directions' : 'forward/back · turn the character';
-  document.querySelector('.controls-hint').textContent = direct
-    ? mouseSupported && mouseAimEnabled
-      ? 'ARROWS / WASD move · CLICK GAME capture mouse · MOUSE aim · CLICK / SPACE spray · ESC pause & release mouse'
-      : 'ARROWS / WASD move in screen directions · SHIFT + ← → fine aim · CLICK / SPACE spray · ESC pause'
-    : '↑ ↓ / W S forward/back · ← → / A D turn · SHIFT fine aim · SPACE spray · ESC pause';
+  const movementHint = direct ? 'ARROWS / WASD move & face screen directions' : '↑ ↓ / W S forward/back · ← → / A D turn';
+  document.querySelector('.controls-hint').textContent = `${movementHint} · SHIFT fine aim${mouseSupported && mouseAimEnabled ? ' · MOUSE aim helper' : ''} · CLICK / SPACE spray · ESC pause`;
   for (const hint of document.querySelectorAll('[data-keyboard-aim-hint]')) {
     hint.textContent = direct
-      ? mouseSupported && mouseAimEnabled
-        ? 'Move with arrows / WASD; aim independently with the mouse crosshair. Click the game to capture the mouse. Esc releases it and pauses. Mouse aim overrides aim assist; Shift + ← / → turns manually.'
-        : 'Hold Shift + ← / → (or A / D) to turn quickly and smoothly. Shift + ↑ / ↓ moves slowly along your aim. Shift overrides aim assist.'
-      : 'Hold Shift for slower movement and quick, smooth turning, even while firing. Release left/right to hold your aim.';
+      ? 'Arrows / WASD move and face screen directions. Shift + ← / → turns precisely.'
+      : '↑ / ↓ forward/back · ← / → turn · Shift for finer turns.';
+    if (mouseSupported && mouseAimEnabled) hint.textContent += ' Move the mouse to help aim. Keyboard turns take priority. Esc releases the mouse and pauses.';
   }
   document.querySelector('.touch-instructions').textContent = direct
     ? 'Drag on the left in the direction you want to move on screen. The character turns to face that direction. Tap SPRAY near, hold far.'
@@ -800,7 +804,7 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('resize', resize);
 canvas.addEventListener('pointerdown', (event) => {
   if (event.pointerType === 'mouse' && event.button === 0 && playing && !controlsDialog.open) {
-    if (mouseSupported && mouseAimEnabled && controlMode === 'direct' && !mouseAim.locked) requestMouseAim();
+    if (mouseSupported && mouseAimEnabled && !mouseAim.locked) requestMouseAim();
     else { keys.add('Fire'); beginSpray(); }
   }
 });

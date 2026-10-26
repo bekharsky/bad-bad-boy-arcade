@@ -176,7 +176,7 @@ test('Shift turning accelerates smoothly, reverses promptly and stops without dr
     step();
     assert.ok(-player.heading - firstTurn > firstTurn, 'Turning accelerates instead of snapping to full speed');
     step(28);
-    assert.ok(player.heading < -1.3, 'The smooth turn still responds quickly');
+    assert.ok(player.heading < (mode === 'tank' ? -.4 : -1.3), 'Shift keeps a responsive, smooth turn');
     const beforeReverse = player.heading;
     input.keys = new Set(['ShiftLeft', 'ArrowLeft']);
     step();
@@ -214,15 +214,15 @@ test('tank joystick can steer and move at the same time', () => {
   assert.ok(Math.hypot(player.x, player.z) > 0);
 });
 
-test('mouse aim is independent of Direct travel, including diagonal movement while firing', () => {
-  for (const codes of [['ArrowUp'], ['ArrowDown'], ['KeyW', 'KeyD']]) {
-    const { player, input, step } = setup({ codes, firing: true });
-    input.aimHeading = .37;
-    step(60);
-    assert.ok(Math.abs(player.heading - .37) < 1e-10);
-    assert.equal(player.targetHeading, .37);
-    assert.ok(codes.includes('ArrowDown') ? player.z > 0 : player.z < 0);
-    assert.ok(codes.includes('KeyD') ? player.x > 0 : player.x === 0);
+test('Direct keyboard movement and facing stay identical to controls without a mouse', () => {
+  for (const codes of [['ArrowUp'], ['ArrowDown'], ['ArrowLeft'], ['ArrowRight'], ['KeyW', 'KeyD']]) {
+    const keyboard = setup({ codes, firing: true });
+    const mouse = setup({ codes, firing: true });
+    mouse.input.aimHeading = .37;
+    keyboard.step(60); mouse.step(60);
+    assert.equal(mouse.player.heading, keyboard.player.heading);
+    assert.equal(mouse.player.x, keyboard.player.x);
+    assert.equal(mouse.player.z, keyboard.player.z);
   }
 });
 
@@ -239,7 +239,7 @@ test('mouse aim works while stationary and normal keyboard aiming returns when c
   assert.equal(player.heading, Math.PI / 2);
 });
 
-test('Shift, joystick and Tank keep their own direction controls when mouse aim is supplied', () => {
+test('Shift, joystick and Tank steering keys take priority over a mouse target', () => {
   for (const options of [
     { codes: ['ShiftLeft', 'ArrowRight'] },
     { touch: { x: 0, z: -1 } },
@@ -248,6 +248,46 @@ test('Shift, joystick and Tank keep their own direction controls when mouse aim 
     const { player, input, step } = setup(options);
     input.aimHeading = .37; step(30);
     assert.ok(Math.abs(player.heading - .37) > .1);
+  }
+});
+
+test('Tank turning and forward/backward movement remain unchanged while the mouse helps aim', () => {
+  for (const firing of [false, true]) for (const codes of [['ArrowLeft'], ['ArrowRight'], ['ArrowUp', 'ArrowLeft'], ['ArrowDown', 'ArrowRight'], ['ShiftLeft', 'ArrowRight']]) {
+    const keyboard = setup({ mode: 'tank', codes, firing });
+    const mouse = setup({ mode: 'tank', codes, firing });
+    mouse.input.aimHeading = .37;
+    keyboard.step(60); mouse.step(60);
+    assert.equal(mouse.player.heading, keyboard.player.heading);
+    assert.equal(mouse.player.x, keyboard.player.x);
+    assert.equal(mouse.player.z, keyboard.player.z);
+  }
+});
+
+test('Shift makes Tank turns more precise with and without spraying, independent of frame rate', () => {
+  for (const firing of [false, true]) {
+    const headings = [];
+    for (const fps of [30, 60, 120]) {
+      const regular = setup({ mode: 'tank', codes: ['ArrowRight'], firing });
+      const precise = setup({ mode: 'tank', codes: ['ShiftLeft', 'ArrowRight'], firing });
+      regular.input.dt = precise.input.dt = 1 / fps;
+      regular.step(fps / 2); precise.step(fps / 2);
+      assert.ok(Math.abs(precise.player.heading) < Math.abs(regular.player.heading) * .7);
+      assert.ok(Math.abs(precise.player.heading) > .4, 'Fine turns stay responsive');
+      headings.push(precise.player.heading);
+    }
+    assert.ok(Math.max(...headings) - Math.min(...headings) < 1e-10);
+  }
+});
+
+test('mouse aiming also helps Tank players while stopped or moving forward along their facing', () => {
+  for (const codes of [[], ['ArrowUp'], ['ArrowDown']]) {
+    const { player, input, step } = setup({ mode: 'tank', codes });
+    input.aimHeading = .37; step(60);
+    assert.ok(Math.abs(player.heading - .37) < 1e-10);
+    if (codes.length) {
+      const forward = player.x * Math.sin(.37) + player.z * Math.cos(.37);
+      assert.ok(codes[0] === 'ArrowUp' ? forward > 0 : forward < 0);
+    } else assert.equal(Math.hypot(player.x, player.z), 0);
   }
 });
 

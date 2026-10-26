@@ -4,6 +4,7 @@ export function createMouseAim({ canvas, reticle, getInitialPosition, onUnlock, 
   let enabled = false;
   let locked = false;
   let pending = false;
+  let aiming = false;
 
   function setPosition(x, y) {
     position.x = Math.max(12, Math.min(canvas.clientWidth - 12, x));
@@ -15,6 +16,7 @@ export function createMouseAim({ canvas, reticle, getInitialPosition, onUnlock, 
   function fail() {
     if (!pending) return;
     pending = false;
+    aiming = false;
     if (enabled) onError();
   }
 
@@ -22,6 +24,7 @@ export function createMouseAim({ canvas, reticle, getInitialPosition, onUnlock, 
     const wasLocked = locked;
     locked = document.pointerLockElement === canvas;
     pending = false;
+    aiming = false;
     if (locked && !enabled) {
       locked = false;
       document.exitPointerLock();
@@ -36,7 +39,10 @@ export function createMouseAim({ canvas, reticle, getInitialPosition, onUnlock, 
   });
   document.addEventListener('pointerlockerror', fail);
   document.addEventListener('mousemove', event => {
-    if (locked && enabled) setPosition(position.x + event.movementX, position.y + event.movementY);
+    if (locked && enabled && (event.movementX || event.movementY)) {
+      setPosition(position.x + event.movementX, position.y + event.movementY);
+      aiming = true;
+    }
   });
   window.addEventListener('resize', () => setPosition(position.x, position.y));
 
@@ -44,9 +50,12 @@ export function createMouseAim({ canvas, reticle, getInitialPosition, onUnlock, 
     position,
     setPosition,
     get locked() { return locked; },
+    get aiming() { return locked && aiming; },
+    resetAim() { aiming = false; },
     setEnabled(value) {
       enabled = value;
       if (!enabled) {
+        aiming = false;
         pending = false;
         reticle.hidden = true;
         if (document.pointerLockElement === canvas) document.exitPointerLock();

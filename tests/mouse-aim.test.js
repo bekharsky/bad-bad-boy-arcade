@@ -50,6 +50,22 @@ test('capturing the mouse transfers keyboard focus from settings to the game', (
   assert.equal(document.activeElement, canvas);
 });
 
+test('capture alone never steers; keyboard steering cancels the helper until fresh mouse movement', () => {
+  const { mouse, lock, move } = setup();
+  mouse.setEnabled(true); lock();
+  assert.equal(mouse.aiming, false);
+  move(12, -3);
+  assert.equal(mouse.aiming, true);
+  mouse.resetAim();
+  assert.equal(mouse.aiming, false);
+  move(0, 0);
+  assert.equal(mouse.aiming, false);
+  move(.1, 0);
+  assert.equal(mouse.aiming, true);
+  lock(null); lock();
+  assert.equal(mouse.aiming, false);
+});
+
 test('locked mouse deltas move the crosshair in both axes and keep it inside the game', () => {
   const { mouse, lock, move } = setup();
   mouse.setEnabled(true); lock();
