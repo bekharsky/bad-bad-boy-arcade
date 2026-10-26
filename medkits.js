@@ -69,7 +69,7 @@ export function createMedkits(scene, city) {
     time = 0;
     for (let i = 0; i < KIT_COUNT; i++) {
       // One emergency kit on the square; the other four reward exploration.
-      const point = i === 0 ? { x: -6.5, z: -5.5 } : city.pickupPoint(i - 1, player.radius + .12);
+      const point = i === 0 ? { x: 3.5, z: 9.5 } : city.pickupPoint(i - 1, player.radius + .12);
       if (point && city.canStandAt(point.x, point.z, player.radius + .12)) kits.push({ ...point, active: true, phase: Math.random() * Math.PI * 2 });
     }
     render();

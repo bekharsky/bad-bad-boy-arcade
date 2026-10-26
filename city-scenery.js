@@ -7,6 +7,8 @@ function model(name) {
   group.name = name;
   const batches = new Map();
   function geometry(color, piece) {
+    // Extruded silhouettes and indexed primitives can share a colour batch.
+    if (!piece.index) piece.setIndex(Array.from({ length: piece.attributes.position.count }, (_, i) => i));
     if (!batches.has(color)) batches.set(color, []);
     batches.get(color).push(piece);
   }
@@ -38,7 +40,7 @@ function destination(text, width, height) {
   return new THREE.Mesh(new THREE.PlaneGeometry(width, height), new THREE.MeshStandardMaterial({ map: texture, emissiveMap: texture, emissive: '#ffffff', emissiveIntensity: .3 }));
 }
 
-export function createTram(scene) {
+export function createTram(scene, { z: routeZ = 0 } = {}) {
   const tram = model('Helsinki tram');
   const { box } = tram;
   const green = '#26734a', yellow = '#edc74f', glass = '#294b50';
@@ -76,11 +78,11 @@ export function createTram(scene) {
   root.rotation.y = Math.PI / 2;
   scene.add(root);
   let wait = 8, direction = 1;
-  const collider = { minX: 0, maxX: 0, minZ: -.94, maxZ: .94, height: 2.8 };
+  const collider = { minX: 0, maxX: 0, minZ: routeZ - .94, maxZ: routeZ + .94, height: 2.8 };
 
   function reset() {
     wait = 8; direction = 1;
-    root.position.set(-37, 0, 0);
+    root.position.set(-37, 0, routeZ);
     root.visible = false;
   }
   function update(dt) {
@@ -107,6 +109,21 @@ export function createTram(scene) {
 }
 
 export function createHarbor(scene) {
+  // Slim dock cranes give the waterfront an industrial silhouette while
+  // leaving the promenade and the gaps between the warehouses walkable.
+  const cranes = model('Harbor cranes');
+  for (const x of [-26, 9, 26]) {
+    for (const side of [-1, 1]) cranes.box('#667c77', x + side * .65, 2.7, -26.6, .16, 5.4, .6);
+    cranes.box('#506965', x, 5.2, -26.6, 1.7, .3, 1.3);
+    cranes.box('#7c9790', x + 1.9, 7.3, -26.6, .18, 6.3, .18, -.62);
+    cranes.box('#4c6763', x + 1.6, 6, -26.6, 5, .16, .18);
+    cranes.box('#314d50', x + 3.68, 5.7, -26.6, .035, 4.4, .035);
+    cranes.box('#314d50', x + 3.68, 3.5, -26.6, .3, .15, .16);
+    cranes.box('#bc8b59', x - .15, 5.65, -26.6, 1.1, .85, 1);
+    cranes.box('#355c65', x - .15, 5.85, -26.06, .8, .4, .04);
+  }
+  scene.add(cranes.finish());
+  createCathedral(scene);
   const water = new THREE.Mesh(new THREE.PlaneGeometry(140, 58), new THREE.MeshStandardMaterial({ color: '#376b7c', metalness: .35, roughness: .3 }));
   water.name = 'Baltic harbor water';
   water.rotation.x = -Math.PI / 2;
@@ -172,4 +189,47 @@ export function createHarbor(scene) {
       rippleRoot.position.x = Math.sin(time * .25) * .2;
     }
   };
+}
+
+// A deliberately miniature Helsinki Cathedral anchors the inland end of the
+// harbour. It is scenery beyond the boundary, rather than literal geography.
+function createCathedral(scene) {
+  const church = model('Helsinki Cathedral');
+  const { box, geometry } = church;
+  const white = '#eee8d5', green = '#668a77', stone = '#b6b4a8';
+  for (let step = 0; step < 4; step++) box(stone, 0, .12 + step * .18, 0, 13 - step * .8, .2, 10 - step * .75);
+  box(white, 0, 2.9, 0, 8.8, 4.7, 5.8);
+  box(white, 0, 3.3, 0, 5.7, 5.5, 8.2);
+  box('#d3d6c8', 0, 5.5, 0, 9.2, .25, 6.2);
+  box('#c7d0c3', 0, 6, 0, 6.2, .2, 8.5);
+  // Portico, columns and the triangular classical pediment.
+  for (let x = -3; x <= 3; x += 1.2) {
+    geometry(white, new THREE.CylinderGeometry(.22, .25, 3.6, 12).translate(x, 2.75, 4.3));
+    box(white, x, .94, 4.3, .6, .2, .6);
+    box(white, x, 4.57, 4.3, .6, .2, .6);
+  }
+  box(white, 0, 4.85, 4.3, 7.4, .35, 1.2);
+  const triangle = new THREE.Shape();
+  triangle.moveTo(-3.8, 5); triangle.lineTo(3.8, 5); triangle.lineTo(0, 6.5); triangle.closePath();
+  geometry(white, new THREE.ExtrudeGeometry(triangle, { depth: .35, bevelEnabled: false }).translate(0, 0, 4.65));
+  box('#3d605d', 0, 1.95, 4.12, 1.15, 2.6, .06);
+  for (const x of [-3, -1.5, 1.5, 3]) box('#58756f', x, 3, 2.94, .55, 1.2, .04);
+  geometry(white, new THREE.CylinderGeometry(1.45, 1.6, 2.1, 16).translate(0, 6.9, 0));
+  for (let n = 0; n < 12; n++) {
+    const angle = n * Math.PI / 6;
+    geometry('#47635f', new THREE.CylinderGeometry(.12, .12, .8, 8).translate(Math.sin(angle) * 1.48, 7, Math.cos(angle) * 1.48));
+  }
+  const dome = new THREE.LatheGeometry([[0, 0], [1.55, .05], [1.58, .5], [1.3, 1.35], [.7, 2.1], [.18, 2.5], [.12, 2.7]].map(([x, y]) => new THREE.Vector2(x, y)), 24);
+  geometry(green, dome.translate(0, 7.95, 0));
+  box('#d3b467', 0, 11.05, 0, .09, .8, .09);
+  box('#d3b467', 0, 11.14, 0, .48, .09, .09);
+  for (const x of [-3.6, 3.6]) for (const z of [-2.3, 2.3]) {
+    geometry(white, new THREE.CylinderGeometry(.55, .65, 1.1, 12).translate(x, 5.95, z));
+    geometry(green, new THREE.SphereGeometry(.7, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2).translate(x, 6.5, z));
+    box('#d3b467', x, 7.3, z, .06, .5, .06);
+    box('#d3b467', x, 7.35, z, .28, .06, .06);
+  }
+  const cathedral = church.finish();
+  cathedral.position.set(-36, 0, -18);
+  scene.add(cathedral);
 }
