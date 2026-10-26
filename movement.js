@@ -12,7 +12,7 @@ function turnPlayer(player, targetSpeed, dt) {
   player.turnSpeed = targetSpeed + (player.turnSpeed - targetSpeed) * decay;
 }
 
-export function movePlayer(player, city, { keys, touch, mode, dt, firing, height, resolveAim = null }) {
+export function movePlayer(player, city, { keys, touch, mode, dt, firing, height, resolveAim = null, aimHeading = null }) {
   const touchStrength = Math.hypot(touch.x, touch.z);
   const x = touchStrength ? touch.x : Number(keys.has('KeyD') || keys.has('ArrowRight')) - Number(keys.has('KeyA') || keys.has('ArrowLeft'));
   const z = touchStrength ? touch.z : Number(keys.has('KeyS') || keys.has('ArrowDown')) - Number(keys.has('KeyW') || keys.has('ArrowUp'));
@@ -40,9 +40,10 @@ export function movePlayer(player, city, { keys, touch, mode, dt, firing, height
       const length = Math.hypot(x, z);
       player.moveX = x / length;
       player.moveZ = z / length;
-      player.targetHeading = Math.atan2(x, z);
+      if (aimHeading === null || touchStrength) player.targetHeading = Math.atan2(x, z);
       throttle = Math.min(1, length);
     }
+    if (aimHeading !== null && !touchStrength) player.targetHeading = aimHeading;
     const requested = player.targetHeading ?? player.heading;
     const target = resolveAim?.(requested, dt) ?? requested;
     const angle = Math.atan2(Math.sin(target - player.heading), Math.cos(target - player.heading));

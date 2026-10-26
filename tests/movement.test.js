@@ -214,6 +214,43 @@ test('tank joystick can steer and move at the same time', () => {
   assert.ok(Math.hypot(player.x, player.z) > 0);
 });
 
+test('mouse aim is independent of Direct travel, including diagonal movement while firing', () => {
+  for (const codes of [['ArrowUp'], ['ArrowDown'], ['KeyW', 'KeyD']]) {
+    const { player, input, step } = setup({ codes, firing: true });
+    input.aimHeading = .37;
+    step(60);
+    assert.ok(Math.abs(player.heading - .37) < 1e-10);
+    assert.equal(player.targetHeading, .37);
+    assert.ok(codes.includes('ArrowDown') ? player.z > 0 : player.z < 0);
+    assert.ok(codes.includes('KeyD') ? player.x > 0 : player.x === 0);
+  }
+});
+
+test('mouse aim works while stationary and normal keyboard aiming returns when capture ends', () => {
+  const { player, input, step } = setup();
+  input.aimHeading = -1.23;
+  step(30);
+  assert.ok(Math.abs(player.heading + 1.23) < 1e-10);
+  assert.equal(player.x, 0); assert.equal(player.z, 0);
+  input.aimHeading = null;
+  step(30);
+  assert.ok(Math.abs(player.heading + 1.23) < 1e-10);
+  input.keys.add('ArrowRight'); step(30);
+  assert.equal(player.heading, Math.PI / 2);
+});
+
+test('Shift, joystick and Tank keep their own direction controls when mouse aim is supplied', () => {
+  for (const options of [
+    { codes: ['ShiftLeft', 'ArrowRight'] },
+    { touch: { x: 0, z: -1 } },
+    { mode: 'tank', codes: ['ArrowRight'] }
+  ]) {
+    const { player, input, step } = setup(options);
+    input.aimHeading = .37; step(30);
+    assert.ok(Math.abs(player.heading - .37) > .1);
+  }
+});
+
 test('releasing input brakes to rest and both modes still use city collisions', () => {
   for (const mode of ['direct', 'tank']) {
     const { player, city, input, step } = setup({ mode, codes: ['KeyW'] });
