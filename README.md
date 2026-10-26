@@ -55,14 +55,20 @@ On devices with a coarse primary pointer, the stream keeps its glossy coating an
 
 ## City and enemies
 
-The game takes place in a small neighbourhood with a cobbled square, pedestrian crossings, tram tracks, cafes, trees, and parked cars. Buildings and street furniture have collision boundaries. Enemies navigate around obstacles using a shared navigation grid. The stream cannot pass through obstacles.
+The harbour neighbourhood has a 22 × 18 metre cobbled square and a playable area spanning 55.6 metres in each direction. Pedestrian crossings, cafes, trees, benches, and parked cars surround the square, and the red Verkkopaukka rooftop sign remains on its northeast corner shop. Beyond the northern quay, a white cruise ferry sits on Baltic water.
+
+A green-and-yellow articulated Helsinki tram crosses the middle of the square from east to west, then returns in the opposite direction. The first service departs after eight seconds; subsequent services wait 22–34 seconds between trips. Its body blocks walking and the liquid stream, gently nudges actors off the tracks, and updates the enemies' navigation grid as it moves. Buildings and street furniture also have collision boundaries. Enemies navigate around obstacles using a shared navigation grid. The stream cannot pass through obstacles.
 Buildings smoothly fade to 12% opacity when they overlap the character's feet, body, shoulders, or head along the camera's line of sight. Walls, roofs, windows, and signs fade together and return to full opacity once the view is clear.
 
 Waves contain snails and Spanish slugs. Each enemy is worth 150 points. Both enemy models are free and openly licensed: Snail by Poly by Google (CC BY 3.0) and Slug by Poly by Google (CC BY 3.0). Sources, licences, and modifications are listed in [CREDITS.md](./CREDITS.md) and the in-game Models & credits page.
 
+Going 18 seconds without a kill brings two reinforcements. Further arrivals come after eight seconds, then six, then every four, with groups gradually growing to six enemies. Any kill resets this pressure and grants another 18 seconds; clearing a wave also resets it. The crowd is capped at 48 living enemies. Pausing freezes the timer.
+
 Successful enemy bites emit a red splash from the animated shin nearest the attacker. Eighteen droplets fly outward, fall, flatten briefly on the pavement, and shrink away. The effect triggers only when health is lost, continues after a fatal bite, and resets when restarting. A shared instanced mesh caps the droplets at 64 and renders them in one draw call.
 
-Five medkits are scattered across the square and the four main streets each round. Look for floating white cases with green crosses and a green ground ring. Walk over one to restore up to two health points. They remain available at full health, are consumed once per round, and return when restarting. Placement leaves clearance for the player; pickups require a clear path. All five kits share three instanced meshes.
+Five medkits appear each round: one emergency kit on the square and four hidden in courtyards behind houses. Look for floating white cases with green crosses and a green ground ring. Walk over one to restore up to two health points. They remain available at full health, are consumed once per round, and return when restarting. Placement leaves clearance for the player; pickups require a clear path. All five kits share three instanced meshes.
+
+Four Battery energy drinks are hidden behind the outer houses instead of dropping from enemies. Each can turns the stream neon green and splits it into three for eight seconds; collecting more adds time. They return when restarting. All hidden rewards are reachable by walking around the buildings, and cannot be collected through walls.
 
 ## Files
 
@@ -76,11 +82,13 @@ Five medkits are scattered across the square and the four main streets each roun
 - `aim-assist.js`: Direct-mode target selection, stable locks, bounded aim correction, and batched obstruction checks.
 - `mouse-aim.js`: pointer lock, virtual crosshair, capture lifecycle, and safe keyboard fallback.
 - `city.js`: environment, collisions, and navigation.
+- `city-scenery.js`: animated Helsinki tram, cruise ferry, and harbour water.
+- `enemy-pressure.js`: kill-sensitive reinforcement timing and crowd limits.
 - `liquid.js`: ballistic liquid simulation, fluid surface, droplets, splashes, and hit detection.
 - `enemies.js`: loading and animating the snail and slug models.
 - `hero.js`: character rig, animation, and stream emitter.
 - `bites.js`: red droplets marking damaging snail and slug bites.
-- `medkits.js`: collectible health kits, street placement, and pickup handling.
+- `medkits.js`: collectible health kits, courtyard placement, and pickup handling.
 - `assets/bad-bad-boy.glb`: character without its stand: 30,000 triangles, 21,052 vertices, preserved UVs and a 1024 × 1024 JPEG colour atlas (1,015,852 bytes total).
 - `assets/enemies/`: original enemy GLBs with materials and animations.
 - `scripts/prepare-model.mjs`: prepare the game GLB from the source model.
