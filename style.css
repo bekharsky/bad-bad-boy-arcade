@@ -61,8 +61,14 @@ button { font: inherit; }
 .mouse-reticle::before, .mouse-reticle::after { content: ''; position: absolute; background: #fff0b0; box-shadow: 0 0 0 1px #20252c; }
 .mouse-reticle::before { width: 2px; height: 26px; left: 7px; top: -5px; }
 .mouse-reticle::after { width: 26px; height: 2px; top: 7px; left: -5px; }
-.icon-button { width: 34px; height: 34px; padding: 0; border: 1px solid #ffffff35; border-radius: 50%; color: var(--ink); background: #ffffff12; pointer-events: auto; cursor: pointer; }
 
+/* One primary action; preferences stay behind a secondary, labelled gear. */
+.settings-button { position: absolute; top: 16px; right: 16px; display: grid; place-items: center; width: 44px; height: 44px; padding: 10px; border: 1px solid #ffffff25; border-radius: 50%; color: #b9b6c1; background: #ffffff06; cursor: pointer; }
+.settings-button svg { display: block; width: 24px; height: 24px; }
+.settings-button:hover { color: var(--gold); border-color: #ffd34e66; background: #ffd34e0a; }
+.settings-button:focus-visible, .primary-button:focus-visible { outline: 2px solid var(--ink); outline-offset: 4px; }
+.game-shell:has(#start-screen:not(.hidden)) .hud { visibility: hidden; }
+#start { min-height: 48px; font-size: 16px; }
 .load-status { margin-bottom: 12px; color: var(--gold); font-size: 12px; line-height: 1.6; }
 .load-status.hidden { display: none; }
 .overlay { position: absolute; z-index: 4; inset: 0; display: grid; place-items: safe center; padding: 24px; overflow-y: auto; background: linear-gradient(90deg, #11131bcc, #11131b44 75%); transition: opacity .25s; }
@@ -103,9 +109,11 @@ h1 span { color: var(--gold); }
 .assist-setting input:checked + .assist-switch::after { transform: translateX(14px); background: var(--gold); }
 .assist-setting input:focus-visible + .assist-switch { outline: 2px solid var(--ink); outline-offset: 3px; }
 .assist-setting:has(input:disabled) { opacity: .45; cursor: default; }
-.card .keyboard-aim-hint { margin: 0 0 20px; color: #c5c2ce; font-size: 11px; line-height: 1.6; }
 .controls-card { margin: auto; max-height: calc(100dvh - 32px); overflow-y: auto; }
-.controls-card h2 { margin-bottom: 24px; font-size: clamp(34px, 8vw, 48px); }
+.controls-card h2 { margin: 0 0 20px; font-size: 36px; }
+.controls-card .control-setting { margin-bottom: 16px; }
+.controls-card .control-choice { min-height: 70px; gap: 5px; padding: 12px; }
+.controls-card .assist-setting { min-height: 44px; margin-bottom: 10px; padding: 10px 12px; }
 .controls-card::backdrop { background: #11131bd9; }
 .end-card { margin-right: 0; margin-left: 0; text-align: center; }
 .end-card h2 { font-size: 58px; }
@@ -115,39 +123,24 @@ h1 span { color: var(--gold); }
 .toast { position: absolute; z-index: 3; top: 82px; left: 50%; transform: translate(-50%, -10px); padding: 9px 15px; border: 1px solid #ffffff20; border-radius: 999px; color: var(--gold); background: #181925df; font: 700 12px/1 "Barlow Condensed", sans-serif; letter-spacing: .12em; opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; }
 .toast.visible { transform: translate(-50%, 0); opacity: 1; }
 .mobile-controls { display: none; }
-.card .touch-instructions { display: none; }
 .range-hud { position: absolute; z-index: 3; bottom: calc(var(--control-bottom) + 20px); left: 50%; transform: translateX(-50%); width: clamp(80px, calc(100vw - 264px), 148px); padding: 9px 10px; border: 1px solid #ffffff20; border-radius: 10px; background: #182029c9; text-align: center; pointer-events: none; }
 .range-hud strong { display: block; color: var(--gold); font: 800 16px/1 "Barlow Condensed", sans-serif; letter-spacing: .04em; }
 .pressure-track { height: 5px; margin-top: 8px; overflow: hidden; border-radius: 4px; background: #ffffff20; }
 .pressure-track span { display: block; height: 100%; transform: scaleX(0); transform-origin: left; background: linear-gradient(90deg, #fff0a1, #ffbd31); }
-.spray-guide { display: flex; justify-content: space-between; gap: 16px; margin: 24px 0; color: #c5c2ce; font-size: 12px; }
-.spray-guide strong { margin-right: 5px; color: var(--gold); font-size: 10px; letter-spacing: .06em; }
-.start-options { margin: 0 0 18px; color: var(--muted); font-size: 11px; }
-.start-options summary { width: fit-content; padding: 5px 0; cursor: pointer; }
-.option-list { display: grid; gap: 8px; margin-top: 10px; }
-.option-list .assist-setting { margin: 0; }
-#start-screen .card { width: min(390px, 100%); margin: 0; padding: 28px; }
-#start-screen h1 { font-size: 64px; }
-#start-screen .control-choice { min-height: 66px; gap: 5px; padding: 12px; }
-#start-screen .control-choice strong { font-size: 13px; }
-#start-screen .control-choice > span { font-size: 10px; }
-#start-screen .card .keyboard-aim-hint, #start-screen .card .touch-instructions { margin: 0 0 14px; font-size: 11px; line-height: 1.5; }
-#start-screen .credits-link { margin-top: 16px; }
+#start-screen .card { position: relative; width: min(360px, 100%); margin: 0; padding: 32px; }
+#start-screen h1 { margin: 24px 0 32px; font-size: 76px; line-height: .86; }
 
 @media (max-width: 680px) {
   .hud { gap: 8px; padding: max(14px, env(safe-area-inset-top)) 14px 14px; }
   .brand { font-size: clamp(13px, 3.8vw, 17px); letter-spacing: .04em; }
   .stat { min-width: 35px; }
   .stat strong { font-size: 18px; }
-  .icon-button { display: none; }
   .card { margin: 0; padding: 27px; }
   .controls-card { margin: auto; width: calc(100% - 32px); }
   h1 { font-size: 60px; }
 }
 
 @media (any-pointer: coarse), (max-width: 680px) {
-  .card .keyboard-aim-hint { display: none; }
-  .card .touch-instructions { display: block; color: #c5c2ce; }
   .mobile-controls.enabled { position: absolute; z-index: 3; inset: 0; display: block; pointer-events: none; }
   .joystick-zone { position: absolute; top: max(120px, env(safe-area-inset-top)); bottom: 0; left: 0; width: 62%; pointer-events: auto; touch-action: none; }
   .touch-control { display: grid; place-items: center; width: 88px; height: 88px; padding: 0; border: 1px solid #ffe37aaa; border-radius: 50%; color: #2b2518; background: linear-gradient(145deg, #ffe37a, #ffbf37); box-shadow: 0 6px 20px #0006; font-size: 12px; font-weight: 800; letter-spacing: .04em; }
@@ -168,16 +161,9 @@ h1 span { color: var(--gold); }
 @media (max-height: 560px) {
   #start-screen { padding: 12px; }
   #start-screen .card { width: min(440px, 100%); padding: 20px; }
-  #start-screen h1 { margin: 10px 0 0; font-size: 48px; line-height: .9; }
+  #start-screen h1 { margin: 28px 0 24px; font-size: 48px; line-height: .9; }
   #start-screen h1 br { display: none; }
   #start-screen h1 span::before { content: ' '; white-space: pre; }
-  #start-screen .spray-guide { margin: 16px 0; }
-  #start-screen .control-setting { margin-bottom: 12px; }
-  #start-screen .control-choice { min-height: 54px; padding: 10px 12px; }
-  #start-screen .control-option input { top: 11px; }
-  #start-screen .card .keyboard-aim-hint, #start-screen .card .touch-instructions { margin-bottom: 10px; }
-  #start-screen .start-options { margin-bottom: 10px; }
-  #start-screen .credits-link { margin-top: 10px; }
   .controls-card { padding: 18px; }
   .controls-card h2 { margin: 8px 0 12px; font-size: 36px; }
   .controls-card .control-setting { margin-bottom: 12px; }

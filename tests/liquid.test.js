@@ -5,13 +5,14 @@ import test from 'node:test';
 // Resolve the browser import map's Three.js entry to the same bundled module.
 registerHooks({
   resolve(specifier, context, nextResolve) {
-    return nextResolve(specifier === 'three'
-      ? new URL('../vendor/three-0.180.0/build/three.module.min.js', import.meta.url).href
-      : specifier, context);
+    if (specifier === 'three') specifier = new URL('../vendor/three-0.180.0/build/three.module.min.js', import.meta.url).href;
+    if (specifier.startsWith('three/addons/')) specifier = new URL(`../vendor/three-0.180.0/examples/jsm/${specifier.slice(13)}`, import.meta.url).href;
+    return nextResolve(specifier, context);
   }
 });
 const THREE = await import('three');
 const { createLiquidStream } = await import('../liquid.js');
+const { ENEMY_HEALTH } = await import('../enemies.js');
 
 function setup(refraction = true, options = {}) {
   const scene = new THREE.Scene();
@@ -46,6 +47,23 @@ test('empty liquid stays hidden without scheduling empty buffer uploads', () => 
 });
 
 const target = (x, z, hp = 100) => ({ alive: true, x, z, hp, hitHeight: .3, size: .43 });
+
+test('snails survive more close bursts and charged hits than slugs', () => {
+  for (const charged of [false, true]) {
+    const hitsToKill = kind => {
+      const { advance, impacts } = setup();
+      const enemy = target(0, charged ? 7.5 : .7, ENEMY_HEALTH[kind]);
+      if (charged) advance(120, true);
+      for (let burst = 0; burst < 30 && enemy.alive; burst++) {
+        advance(5, true, [enemy]);
+        advance(5, charged, [enemy]);
+      }
+      assert.equal(enemy.alive, false, 'Both enemy types can be defeated');
+      return impacts.length;
+    };
+    assert.ok(hitsToKill('snail') > hitsToKill('slug'), charged ? 'Shells resist more full-pressure hits' : 'Shells require more close bursts');
+  }
+});
 
 test('one close tap hurts an enemy but no longer kills it immediately', () => {
   const { advance, impacts } = setup();
