@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#12151f" />
     <title>Golden Blast — Bad Bad Boy Arcade</title>
-    <link rel="stylesheet" href="./style.css?v=20261026-spray2" />
+    <link rel="stylesheet" href="./style.css?v=20261026-quickstart1" />
     <script type="importmap">
       {
         "imports": {
           "three": "./vendor/three-0.180.0/build/three.module.min.js",
           "three/addons/": "./vendor/three-0.180.0/examples/jsm/",
-          "game": "./game.js?v=20261026-spray2",
+          "game": "./game.js?v=20261026-quickstart1",
           "./enemy-pressure.js": "./enemy-pressure.js?v=20261026-harbor2",
           "./city-scenery.js": "./city-scenery.js?v=20261026-harbor2",
           "./movement.js": "./movement.js?v=20261026-steering1",
@@ -20,8 +20,8 @@
           "./touch-controls.js": "./touch-controls.js?v=20261026-precision1",
           "./hero.js": "./hero.js?v=20261025-medkits1",
           "./city.js": "./city.js?v=20261026-harbor2",
-          "./enemies.js": "./enemies.js?v=20261026-spray2",
-          "./liquid.js": "./liquid.js?v=20261026-spray2",
+          "./enemies.js": "./enemies.js?v=20261026-quickstart1",
+          "./liquid.js": "./liquid.js?v=20261026-quickstart1",
           "./bites.js": "./bites.js?v=20261025-medkits1",
           "./medkits.js": "./medkits.js?v=20261026-harbor2"
         }
@@ -39,34 +39,18 @@
         <div class="brand"><span class="brand-mark">✦</span> BAD BAD BOY · HELSINKI</div>
         <div class="stat"><span class="stat-label">WAVE</span><strong id="wave">1</strong></div>
         <div class="stat"><span class="stat-label">SCORE</span><strong id="score">0000</strong></div>
-        <button id="sound" class="icon-button" type="button" aria-label="Toggle sound">♪</button>
       </header>
 
       <section id="start-screen" class="overlay">
         <div class="card">
           <div class="eyebrow">HELSINKI</div>
           <h1>GOLDEN<br /><span>BLAST</span></h1>
-          <div class="spray-guide"><span><strong>TAP</strong> Near</span><span><strong>HOLD</strong> Far + strong</span></div>
-          <fieldset class="control-setting">
-            <legend>MOVEMENT</legend>
-            <div class="control-options">
-              <label class="control-option"><input type="radio" name="start-movement" value="direct" data-control-mode /><span class="control-choice"><strong>Direct</strong><span>Screen directions</span></span></label>
-              <label class="control-option"><input type="radio" name="start-movement" value="tank" data-control-mode checked /><span class="control-choice"><strong>Tank</strong><span>Move & turn</span></span></label>
-            </div>
-          </fieldset>
-          <p class="keyboard-aim-hint" data-keyboard-aim-hint>Arrows move · Click / Space sprays</p>
-          <p class="touch-instructions">Drag ↑↓ to move · ←→ to turn</p>
-          <details class="start-options">
-            <summary>Options</summary>
-            <div class="option-list">
-              <label class="assist-setting"><input type="checkbox" data-aim-assist checked /><span class="assist-switch" aria-hidden="true"></span><span class="assist-copy"><strong>Aim assist</strong><span>Direct only</span></span></label>
-              <label class="assist-setting" hidden><input type="checkbox" data-mouse-aim checked /><span class="assist-switch" aria-hidden="true"></span><span class="assist-copy"><strong>Mouse aim</strong></span></label>
-            </div>
-          </details>
           <div id="load-status" class="load-status" role="status">Loading models…</div>
           <button id="start" class="primary-button" type="button" disabled>LOADING…</button>
           <button id="retry-load" class="primary-button" type="button" hidden>RETRY LOADING</button>
-          <a class="credits-link" href="./credits.html" target="_blank" rel="noopener">Credits ↗</a>
+          <button id="open-settings" class="settings-button" type="button" aria-label="Settings" aria-haspopup="dialog" aria-controls="controls-dialog">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 3-.5 2.1-1.6.9-2.1-.6-2 3.4 1.6 1.5v1.9l-1.6 1.5 2 3.4 2.1-.6 1.6.9L9 20h4l.5-2.1 1.6-.9 2.1.6 2-3.4-1.6-1.5v-1.9l1.6-1.5-2-3.4-2.1.6-1.6-.9L13 3Z"/><circle cx="11" cy="11.5" r="3"/></svg>
+          </button>
         </div>
       </section>
 
@@ -81,8 +65,8 @@
       </section>
 
       <dialog id="controls-dialog" class="card controls-card" aria-labelledby="controls-title">
-        <div class="eyebrow">GAME PAUSED</div>
-        <h2 id="controls-title">PAUSED</h2>
+        <div id="settings-paused" class="eyebrow" hidden>PAUSED</div>
+        <h2 id="controls-title">SETTINGS</h2>
         <fieldset class="control-setting">
           <legend>MOVEMENT</legend>
           <div class="control-options">
@@ -92,9 +76,9 @@
         </fieldset>
         <label class="assist-setting"><input type="checkbox" data-aim-assist checked /><span class="assist-switch" aria-hidden="true"></span><span class="assist-copy"><strong>Aim assist</strong><span>Direct only</span></span></label>
         <label class="assist-setting" hidden><input type="checkbox" data-mouse-aim checked /><span class="assist-switch" aria-hidden="true"></span><span class="assist-copy"><strong>Mouse aim</strong></span></label>
-        <p class="keyboard-aim-hint" data-keyboard-aim-hint>Hold Shift for slower movement and more precise turns.</p>
-        <form method="dialog"><button class="primary-button" type="submit">RESUME GAME</button></form>
-        <small>Esc to pause or resume</small>
+        <label class="assist-setting"><input id="sound-setting" type="checkbox" /><span class="assist-switch" aria-hidden="true"></span><span class="assist-copy"><strong>Sound</strong></span></label>
+        <form method="dialog"><button id="settings-done" class="primary-button" type="submit">DONE</button></form>
+        <a class="credits-link" href="./credits.html" target="_blank" rel="noopener">Models & credits ↗</a>
       </dialog>
 
       <div class="range-hud" aria-label="Spray range" hidden>

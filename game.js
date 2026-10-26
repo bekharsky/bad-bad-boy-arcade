@@ -23,11 +23,13 @@ const keys = new Set();
 let controlMode = 'tank';
 let aimAssistEnabled = true;
 let mouseAimEnabled = true;
+let soundEnabled = false;
 try {
   const savedMode = localStorage.getItem('golden-blast-controls');
   if (savedMode === 'direct' || savedMode === 'tank') controlMode = savedMode;
   aimAssistEnabled = localStorage.getItem('golden-blast-aim-assist') !== 'false';
   mouseAimEnabled = localStorage.getItem('golden-blast-mouse-aim') !== 'false';
+  soundEnabled = localStorage.getItem('golden-blast-sound') === 'true';
 } catch { /* Settings still work when browser storage is unavailable. */ }
 
 const canvas = document.querySelector('#game');
@@ -47,6 +49,9 @@ const toast = document.querySelector('#toast');
 const sprayRange = document.querySelector('#spray-range');
 const pressureFill = document.querySelector('#pressure-fill');
 const controlsDialog = document.querySelector('#controls-dialog');
+const settingsButton = document.querySelector('#open-settings');
+const settingsDone = document.querySelector('#settings-done');
+const soundSetting = document.querySelector('#sound-setting');
 const rangeHud = document.querySelector('.range-hud');
 const mouseSupported = typeof canvas.requestPointerLock === 'function' && window.matchMedia('(any-pointer: fine)').matches;
 const aimRay = new THREE.Raycaster();
@@ -60,7 +65,7 @@ const mouseAim = createMouseAim({
   getInitialPosition: aimCursorPosition,
   onUnlock() {
     lastMouseUnlock = performance.now();
-    if (playing) pauseGame();
+    if (playing) openSettings();
   },
   onError() { showToast('Mouse unavailable'); }
 });
@@ -193,7 +198,6 @@ let gameTime = 0;
 let score = 0;
 let wave = 1;
 let pendingWave = 0;
-let soundEnabled = false;
 let audioContext = null;
 let frameTime = 0;
 
@@ -256,7 +260,8 @@ async function loadModels() {
     player.body.add(player.model);
     status.classList.add('hidden');
     startButton.disabled = false;
-    startButton.textContent = 'START GAME';
+    startButton.textContent = 'PLAY';
+    if (!controlsDialog.open && [document.body, canvas].includes(document.activeElement)) startButton.focus({ preventScroll: true });
     window.dispatchEvent(new Event('game:ready'));
   } catch (error) {
     console.error('Could not load game models:', error);
@@ -739,14 +744,6 @@ function syncControlMode() {
     checkbox.disabled = false;
   }
   syncMouseAim();
-  for (const hint of document.querySelectorAll('[data-keyboard-aim-hint]')) {
-    hint.textContent = direct
-      ? 'Arrows / WASD move · Shift aims · Click / Space sprays'
-      : '↑↓ move · ←→ turn · Shift aims · Click / Space sprays';
-  }
-  document.querySelector('.touch-instructions').textContent = direct
-    ? 'Drag to move & aim'
-    : 'Drag ↑↓ to move · ←→ to turn';
 }
 
 for (const checkbox of document.querySelectorAll('[data-mouse-aim]')) {
@@ -776,22 +773,27 @@ for (const radio of document.querySelectorAll('[data-control-mode]')) {
     syncControlMode();
   });
 }
-function pauseGame() {
+function openSettings() {
   resetInput();
+  document.querySelector('#settings-paused').hidden = !playing;
+  settingsDone.textContent = playing ? 'RESUME' : 'DONE';
   if (!controlsDialog.open) controlsDialog.showModal();
   syncMouseAim();
 }
+settingsButton.addEventListener('click', openSettings);
 controlsDialog.addEventListener('close', () => {
   resetInput();
-  if (playing) canvas.focus({ preventScroll: true });
+  (playing ? canvas : settingsButton).focus({ preventScroll: true });
   syncMouseAim();
 });
 controlsDialog.querySelector('form').addEventListener('submit', event => {
   event.preventDefault();
   controlsDialog.close();
   resetInput();
-  canvas.focus({ preventScroll: true });
-  requestMouseAim();
+  if (playing) {
+    canvas.focus({ preventScroll: true });
+    requestMouseAim();
+  }
 });
 
 window.addEventListener('keydown', (event) => {
@@ -800,22 +802,22 @@ window.addEventListener('keydown', (event) => {
     if (performance.now() - lastMouseUnlock < 200) return;
     if (!event.repeat) {
       if (controlsDialog.open) controlsDialog.close();
-      else pauseGame();
+      else openSettings();
     }
     return;
   }
   if (controlsDialog.open) return;
   if (!mouseAim.locked && event.target instanceof Element && event.target.closest('select, input')) return;
-  if (!playing && event.target instanceof Element && event.target.closest('button, summary, a')) return;
+  if (!playing && event.target instanceof Element && event.target.closest('button, a')) return;
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code)) event.preventDefault();
   keys.add(event.code);
   if (event.code === 'Space' && !event.repeat && playing) beginSpray();
   if (event.code === 'Enter' && !playing && !startScreen.classList.contains('hidden') && player.model) { startGame(); requestMouseAim(); }
 });
 window.addEventListener('keyup', (event) => keys.delete(event.code));
-window.addEventListener('blur', () => { resetInput(); if (mouseAim.locked && playing) pauseGame(); });
+window.addEventListener('blur', () => { resetInput(); if (mouseAim.locked && playing) openSettings(); });
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) { resetInput(); if (mouseAim.locked && playing) pauseGame(); }
+  if (document.hidden) { resetInput(); if (mouseAim.locked && playing) openSettings(); }
 });
 window.addEventListener('resize', resize);
 canvas.addEventListener('pointerdown', (event) => {
@@ -827,10 +829,10 @@ canvas.addEventListener('pointerdown', (event) => {
 window.addEventListener('pointerup', event => { if (event.pointerType === 'mouse') keys.delete('Fire'); });
 startButton.addEventListener('click', () => { startGame(); requestMouseAim(); });
 restartButton.addEventListener('click', () => { startGame(); requestMouseAim(); });
-document.querySelector('#sound').addEventListener('click', (event) => {
-  soundEnabled = !soundEnabled;
-  event.currentTarget.textContent = soundEnabled ? '♫' : '♪';
-  event.currentTarget.classList.toggle('sound-on', soundEnabled);
+soundSetting.checked = soundEnabled;
+soundSetting.addEventListener('change', () => {
+  soundEnabled = soundSetting.checked;
+  try { localStorage.setItem('golden-blast-sound', String(soundEnabled)); } catch { /* Storage is optional. */ }
   if (soundEnabled) blip(520, 0.05);
 });
 
