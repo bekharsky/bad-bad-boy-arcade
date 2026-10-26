@@ -55,9 +55,9 @@ On devices with a coarse primary pointer, the stream keeps its glossy coating an
 
 ## City and enemies
 
-The harbour neighbourhood has a 22 × 18 metre cobbled square and a playable area spanning 55.6 metres in each direction. Pedestrian crossings, cafes, trees, benches, and parked cars surround the square, and the red Verkkopaukka rooftop sign remains on its northeast corner shop. Beyond the northern quay, a white cruise ferry sits on Baltic water.
+The harbour neighbourhood has a 22 × 15 metre cobbled square and a playable area spanning 55.6 metres in each direction. The hero starts beside the silver Verkkopaukka department store and its red rooftop sign. A continuous road and tram corridor runs parallel to the shoreline along the edge of the square, with crossings connecting the neighbourhood to the waterfront. Red-brick warehouses, a glass ferry terminal, dock cranes, and a broad quay occupy the water side; homes, cafés, bakery windows, and outdoor tables line the inland side. A white cruise ferry sits on Baltic water beyond the quay, and a miniature white Helsinki Cathedral with green domes marks the western backdrop. This is a playful interpretation of the harbour rather than a scale reconstruction.
 
-A green-and-yellow articulated Helsinki tram crosses the middle of the square from east to west, then returns in the opposite direction. The first service departs after eight seconds; subsequent services wait 22–34 seconds between trips. Its body blocks walking and the liquid stream, gently nudges actors off the tracks, and updates the enemies' navigation grid as it moves. Buildings and street furniture also have collision boundaries. Enemies navigate around obstacles using a shared navigation grid. The stream cannot pass through obstacles.
+A green-and-yellow articulated Helsinki tram follows the boulevard from west to east, then returns in the opposite direction. Rails sit in a cobbled median between the asphalt traffic lanes, beneath contact wires and cross spans. The first service departs after eight seconds; subsequent services wait 22–34 seconds between trips. Its body blocks walking and the liquid stream, gently nudges actors off the tracks, and updates the enemies' navigation grid as it moves. Buildings and street furniture also have collision boundaries. Enemies navigate around obstacles using a shared navigation grid. The stream cannot pass through obstacles.
 Buildings smoothly fade to 12% opacity when they overlap the character's feet, body, shoulders, or head along the camera's line of sight. Walls, roofs, windows, and signs fade together and return to full opacity once the view is clear.
 
 Waves contain snails and Spanish slugs. Each enemy is worth 150 points. Both enemy models are free and openly licensed: Snail by Poly by Google (CC BY 3.0) and Slug by Poly by Google (CC BY 3.0). Sources, licences, and modifications are listed in [CREDITS.md](./CREDITS.md) and the in-game Models & credits page.
@@ -82,7 +82,7 @@ Four Battery energy drinks are hidden behind the outer houses instead of droppin
 - `aim-assist.js`: Direct-mode target selection, stable locks, bounded aim correction, and batched obstruction checks.
 - `mouse-aim.js`: pointer lock, virtual crosshair, capture lifecycle, and safe keyboard fallback.
 - `city.js`: environment, collisions, and navigation.
-- `city-scenery.js`: animated Helsinki tram, cruise ferry, and harbour water.
+- `city-scenery.js`: animated Helsinki tram, cruise ferry, harbour water, dock cranes, and miniature cathedral.
 - `enemy-pressure.js`: kill-sensitive reinforcement timing and crowd limits.
 - `liquid.js`: ballistic liquid simulation, fluid surface, droplets, splashes, and hit detection.
 - `enemies.js`: loading and animating the snail and slug models.

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createHero, animateHero, HERO_BASE_HEIGHT } from './hero.js';
-import { createCity, CITY_STOREY_HEIGHT } from './city.js';
+import { createCity, CITY_STOREY_HEIGHT, CITY_SPAWN } from './city.js';
 import { loadEnemyModels, createEnemy, animateEnemy, disposeEnemy } from './enemies.js';
 import { createLiquidStream } from './liquid.js';
 import { createBiteEffects } from './bites.js';
@@ -85,8 +85,8 @@ scene.background = new THREE.Color('#7c929f');
 scene.fog = new THREE.Fog('#7c929f', 40, 100);
 
 const camera = new THREE.PerspectiveCamera(47, 1, 0.1, 150);
-camera.position.set(0, CAMERA_HEIGHT, CAMERA_DISTANCE);
-camera.lookAt(0, CAMERA_LOOK_HEIGHT, 0);
+camera.position.set(CITY_SPAWN.x, CAMERA_HEIGHT, CITY_SPAWN.z + CAMERA_DISTANCE);
+camera.lookAt(CITY_SPAWN.x, CAMERA_LOOK_HEIGHT, CITY_SPAWN.z);
 
 scene.add(new THREE.HemisphereLight(0xd8e9ff, 0x757264, 2.3));
 const keyLight = new THREE.DirectionalLight(0xffdfad, 2.6);
@@ -107,8 +107,8 @@ const player = {
   body: new THREE.Group(),
   model: null,
   rig: null,
-  x: 0,
-  z: 0,
+  x: CITY_SPAWN.x,
+  z: CITY_SPAWN.z,
   dx: 0,
   dz: 1,
   heading: 0,
@@ -129,6 +129,7 @@ const player = {
   runBlend: 0
 };
 player.root.add(player.body);
+player.root.position.set(player.x, 0, player.z);
 scene.add(player.root);
 
 function hitEnemy(enemy, direction) {
@@ -611,8 +612,8 @@ function startGame() {
   wave = 0;
   pendingWave = 0;
   player.hp = player.maxHp;
-  player.x = 0;
-  player.z = 0;
+  player.x = CITY_SPAWN.x;
+  player.z = CITY_SPAWN.z;
   player.dx = 0;
   player.dz = -1;
   player.heading = Math.PI;
@@ -627,11 +628,11 @@ function startGame() {
   player.fireTimer = 0;
   player.tapTimer = 0;
   player.root.rotation.y = player.heading;
-  player.root.position.set(0, 0, 0);
+  player.root.position.set(player.x, 0, player.z);
   player.model.material.opacity = 1;
   player.model.material.transparent = false;
-  camera.position.set(0, CAMERA_HEIGHT, CAMERA_DISTANCE);
-  camera.lookAt(0, CAMERA_LOOK_HEIGHT, 0);
+  camera.position.set(CITY_SPAWN.x, CAMERA_HEIGHT, CITY_SPAWN.z + CAMERA_DISTANCE);
+  camera.lookAt(CITY_SPAWN.x, CAMERA_LOOK_HEIGHT, CITY_SPAWN.z);
   animateHero(player.rig, 0, 0);
   scoreLabel.textContent = '0000';
   updateHealth();
