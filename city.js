@@ -75,7 +75,11 @@ export function createCity(scene) {
     const g = c.getContext('2d');
     g.fillStyle = color; g.fillRect(0, 0, 512, 96);
     g.strokeStyle = '#dcd2ac'; g.lineWidth = 4; g.strokeRect(7, 7, 498, 82);
-    g.fillStyle = '#fff0c2'; g.font = 'bold 43px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, 256, 50);
+    g.fillStyle = '#fff0c2'; g.font = 'bold 43px sans-serif';
+    const textWidth = g.measureText(text).width;
+    const maxTextWidth = c.width - 48;
+    if (textWidth > maxTextWidth) g.font = `bold ${Math.floor(43 * maxTextWidth / textWidth)}px sans-serif`;
+    g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, 256, 50);
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, width * 96 / 512), new THREE.MeshStandardMaterial({ map: t, roughness: 0.8 }));
     mesh.position.set(x - (activeBuilding?.x ?? 0), y, z - (activeBuilding?.z ?? 0));
