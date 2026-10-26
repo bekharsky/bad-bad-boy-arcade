@@ -28,6 +28,7 @@ export function createMouseAim({ canvas, reticle, getInitialPosition, onUnlock, 
     }
     reticle.hidden = !locked;
     if (locked && !wasLocked) {
+      canvas.focus({ preventScroll: true });
       const start = getInitialPosition();
       setPosition(start.x, start.y);
     }

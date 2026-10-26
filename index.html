@@ -11,9 +11,9 @@
         "imports": {
           "three": "./vendor/three-0.180.0/build/three.module.min.js",
           "three/addons/": "./vendor/three-0.180.0/examples/jsm/",
-          "game": "./game.js?v=20261026-mouse1",
+          "game": "./game.js?v=20261026-focus1",
           "./movement.js": "./movement.js?v=20261026-mouse1",
-          "./mouse-aim.js": "./mouse-aim.js?v=20261026-mouse1",
+          "./mouse-aim.js": "./mouse-aim.js?v=20261026-focus1",
           "./aim-assist.js": "./aim-assist.js?v=20261026-assist1",
           "./touch-controls.js": "./touch-controls.js?v=20261026-precision1",
           "./hero.js": "./hero.js?v=20261025-medkits1",
@@ -29,7 +29,7 @@
   </head>
   <body>
     <main class="game-shell">
-      <canvas id="game" aria-label="Bad Bad Boy arcade game"></canvas>
+      <canvas id="game" tabindex="0" aria-label="Bad Bad Boy arcade game"></canvas>
       <div id="mouse-reticle" class="mouse-reticle" aria-hidden="true" hidden></div>
       <div id="hero-hud" class="hero-hud" hidden><div id="hero-power" class="hero-power" hidden></div><div class="hero-hp" role="meter" aria-label="Health" aria-valuemin="0" aria-valuemax="5" aria-valuenow="5"><span id="hero-hp-fill"></span></div></div>
 
@@ -48,15 +48,15 @@
           <fieldset class="control-setting">
             <legend>MOVEMENT</legend>
             <div class="control-options">
-              <label class="control-option"><input type="radio" name="start-movement" value="direct" data-control-mode checked /><span class="control-choice"><strong>Direct</strong><span>Screen directions.<br />↑ up · ↓ down<br />← left · → right</span></span></label>
-              <label class="control-option"><input type="radio" name="start-movement" value="tank" data-control-mode /><span class="control-choice"><strong>Tank</strong><span>Character directions.<br />↑ forward · ↓ back<br />← → turn</span></span></label>
+              <label class="control-option"><input type="radio" name="start-movement" value="direct" data-control-mode /><span class="control-choice"><strong>Direct</strong><span>Screen directions.<br />↑ up · ↓ down<br />← left · → right</span></span></label>
+              <label class="control-option"><input type="radio" name="start-movement" value="tank" data-control-mode checked /><span class="control-choice"><strong>Tank</strong><span>Character directions.<br />↑ forward · ↓ back<br />← → turn</span></span></label>
             </div>
           </fieldset>
           <label class="assist-setting"><input type="checkbox" data-aim-assist checked /><span class="assist-switch" aria-hidden="true"></span><span class="assist-copy"><strong>Aim assist</strong><span>Tracks enemies ahead while firing · Direct only</span></span></label>
           <label class="assist-setting" hidden><input type="checkbox" data-mouse-aim checked /><span class="assist-switch" aria-hidden="true"></span><span class="assist-copy"><strong>Mouse aim</strong><span>Move with arrows · Aim with mouse · Esc releases · Direct only</span></span></label>
-          <div class="keys"><kbd>ARROWS / WASD</kbd><span id="movement-description">move in screen directions</span><kbd>SHIFT</kbd><span>fine aim</span><kbd>CLICK / SPACE</kbd><span>spray</span></div>
-          <p class="keyboard-aim-hint" data-keyboard-aim-hint>Hold Shift + ← / → to turn quickly and smoothly.</p>
-          <p class="touch-instructions">Drag on the left in the direction you want to move on screen. The character turns to face that direction. Tap SPRAY near, hold far.</p>
+          <div class="keys"><kbd>ARROWS / WASD</kbd><span id="movement-description">forward/back · turn the character</span><kbd>SHIFT</kbd><span>fine aim</span><kbd>CLICK / SPACE</kbd><span>spray</span></div>
+          <p class="keyboard-aim-hint" data-keyboard-aim-hint>Hold Shift for slower movement and quick, smooth turning, even while firing.</p>
+          <p class="touch-instructions">Drag up to walk where the character is facing; down to walk backward. Drag left/right to turn the character. Tap SPRAY near, hold far.</p>
           <div id="load-status" class="load-status" role="status">Loading models…</div>
           <button id="start" class="primary-button" type="button" disabled>LOADING…</button>
           <button id="retry-load" class="primary-button" type="button" hidden>RETRY LOADING</button>
@@ -82,13 +82,13 @@
         <fieldset class="control-setting">
           <legend>MOVEMENT</legend>
           <div class="control-options">
-            <label class="control-option"><input type="radio" name="game-movement" value="direct" data-control-mode checked /><span class="control-choice"><strong>Direct</strong><span>Screen directions.<br />↑ up · ↓ down<br />← left · → right</span></span></label>
-            <label class="control-option"><input type="radio" name="game-movement" value="tank" data-control-mode /><span class="control-choice"><strong>Tank</strong><span>Character directions.<br />↑ forward · ↓ back<br />← → turn</span></span></label>
+            <label class="control-option"><input type="radio" name="game-movement" value="direct" data-control-mode /><span class="control-choice"><strong>Direct</strong><span>Screen directions.<br />↑ up · ↓ down<br />← left · → right</span></span></label>
+            <label class="control-option"><input type="radio" name="game-movement" value="tank" data-control-mode checked /><span class="control-choice"><strong>Tank</strong><span>Character directions.<br />↑ forward · ↓ back<br />← → turn</span></span></label>
           </div>
         </fieldset>
         <label class="assist-setting"><input type="checkbox" data-aim-assist checked /><span class="assist-switch" aria-hidden="true"></span><span class="assist-copy"><strong>Aim assist</strong><span>Tracks enemies ahead while firing · Direct only</span></span></label>
         <label class="assist-setting" hidden><input type="checkbox" data-mouse-aim checked /><span class="assist-switch" aria-hidden="true"></span><span class="assist-copy"><strong>Mouse aim</strong><span>Move with arrows · Aim with mouse · Esc releases · Direct only</span></span></label>
-        <p class="keyboard-aim-hint" data-keyboard-aim-hint>Hold Shift + ← / → to turn quickly and smoothly.</p>
+        <p class="keyboard-aim-hint" data-keyboard-aim-hint>Hold Shift for slower movement and quick, smooth turning, even while firing.</p>
         <form method="dialog"><button class="primary-button" type="submit">RESUME GAME</button></form>
         <small>Esc to pause or resume</small>
       </dialog>
