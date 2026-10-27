@@ -18,6 +18,50 @@ const { harborMap } = await import('../maps/harbor.js');
 const { maps, mapOrder } = await import('../maps/index.js');
 const { createCampaign } = await import('../waves.js');
 const { createMapManager } = await import('../world/map-manager.js');
+const { createGameCamera } = await import('../world/game-camera.js');
+
+function heroProjection(camera, spawn) {
+  camera.updateMatrixWorld(true);
+  const foot = new THREE.Vector3(spawn.x, 0, spawn.z).project(camera);
+  const head = new THREE.Vector3(spawn.x, 3.45, spawn.z).project(camera);
+  return { height: head.y - foot.y, footY: foot.y, fov: camera.fov };
+}
+
+test('switching between actual districts preserves hero size, screen position and lens on desktop and touch', () => {
+  for (const [width, height, touch] of [[1280, 720, false], [577, 774, true], [844, 390, true]]) {
+    const scene = new THREE.Scene(), world = createMapManager(scene, maps, .736), rig = createGameCamera();
+    rig.resize(width, height, touch);
+    let previous;
+    for (const id of ['harbor', 'senate-square', 'harbor']) {
+      world.activate(id);
+      rig.frame(world.spawn.x, world.spawn.z, 0, true);
+      const next = heroProjection(rig.camera, world.spawn);
+      if (previous) {
+        assert.ok(Math.abs(previous.height - next.height) < 1e-10, 'A map transition must not zoom the hero');
+        assert.ok(Math.abs(previous.footY - next.footY) < 1e-10, 'A map transition must not tilt the view');
+        assert.equal(previous.fov, next.fov, 'The lens belongs to the viewport, not the map');
+      }
+      previous = next;
+    }
+    world.dispose();
+  }
+});
+
+test('the common scale falls between the previous close harbor and distant square views', () => {
+  const spawn = { x: 0, z: 0 };
+  for (const [width, height, touch] of [[1280, 720, false], [577, 774, true]]) {
+    const oldSize = (y, distance, lookHeight, ahead, fov) => {
+      const camera = new THREE.PerspectiveCamera(fov, width / height, .1, 150);
+      camera.position.set(0, y, distance); camera.lookAt(0, lookHeight, -ahead);
+      return heroProjection(camera, spawn).height;
+    };
+    const close = oldSize(10, 12, 1.38, 0, touch ? 56 : 47);
+    const distant = oldSize(14, 18, 3.2, 11, 58);
+    const rig = createGameCamera(); rig.resize(width, height, touch); rig.frame(0, 0, 0, true);
+    const size = heroProjection(rig.camera, spawn).height;
+    assert.ok(size > distant && size < close, 'Use an intermediate view in both districts');
+  }
+});
 
 test('the second district enters the campaign on wave six and a direct link can start there', () => {
   const campaign = createCampaign(maps.map(map => map.id));
@@ -89,7 +133,7 @@ test('the square tram clears actors, blocks liquid while passing and resets its 
   map.dispose();
 });
 
-test('the cathedral fits the district camera and real map switches dispose their own geometry', () => {
+test('the cathedral fits the shared camera and real map switches dispose their own geometry', () => {
   const scene = new THREE.Scene();
   const world = createMapManager(scene, maps, .736);
   world.activate('senate-square');
@@ -100,10 +144,10 @@ test('the cathedral fits the district camera and real map switches dispose their
   const church = root.getObjectByName('Helsinki Cathedral');
   const box = new THREE.Box3().setFromObject(church);
   assert.ok(box.max.y > 17, 'The cathedral rises above the town');
-  const view = world.camera;
-  const camera = new THREE.PerspectiveCamera(view.fov, 577 / 774, .1, 150);
-  camera.position.set(world.spawn.x, view.height, world.spawn.z + view.distance);
-  camera.lookAt(world.spawn.x, view.lookHeight, world.spawn.z - view.lookAhead);
+  const rig = createGameCamera();
+  rig.resize(577, 774, true);
+  rig.frame(world.spawn.x, world.spawn.z, 0, true);
+  const { camera } = rig;
   camera.updateMatrixWorld(true);
   const top = new THREE.Vector3(0, box.max.y, -35).project(camera);
   assert.ok(top.y < .95 && top.y > -.9, 'The main dome stays in frame on a portrait screen');
@@ -114,7 +158,6 @@ test('the cathedral fits the district camera and real map switches dispose their
   assert.equal(disposed, 1);
   assert.equal(root.parent, null);
   assert.equal(scene.children.length, 1);
-  assert.equal(world.camera, undefined, 'Harbor restores its original camera framing');
   assert.equal(world.canStandAt(world.spawn.x, world.spawn.z, .736), true);
   world.dispose();
 });

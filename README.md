@@ -41,7 +41,7 @@ The control arrangement follows the [on-screen stick and button pattern](https:/
 Health is shown only above the hero, with a red bar at low health. The header shows wave and score.
 
 The character's axes are aligned, and his legs use a skeleton with hip, knee, and ankle joints.
-The character reaches the third-floor windows of the map's buildings. His height is three storeys at 1.15 game units each (3.45 total), using the same storey spacing as the facades. The emitter, collision radius, and liquid thickness match this size. The camera frames his full height, and the running animation follows the distance travelled with a stride proportional to his height. Touch devices and narrow windows use a 56-degree camera field of view instead of 47 degrees, showing more surrounding space without changing the hero model or collision radius.
+The character reaches the third-floor windows of the map's buildings. His height is three storeys at 1.15 game units each (3.45 total), using the same storey spacing as the facades. The emitter, collision radius, and liquid thickness match this size. The camera frames his full height, and the running animation follows the distance travelled with a stride proportional to his height. Every district uses the same camera scale: 12 metres high and 15 metres behind the hero, with a fixed view angle and 56-degree field of view (58 degrees on touch devices and narrow windows). This sits between the earlier close harbor view and wider Senate Square view. Map transitions change position without changing the lens, hero size or viewing angle.
 
 ## Loading
 
@@ -59,9 +59,9 @@ On devices with a coarse primary pointer, the stream keeps its glossy coating an
 
 ## City and enemies
 
-The campaign moves from West Harbor to **Senate Square** after five cleared waves, then cycles between the two districts in five-wave blocks. Health and score continue across the move; enemies, scenery, pickups, and camera framing reset for the new district. For a direct local start on the new map, open [Senate Square](http://localhost:8000/?map=senate-square). An unknown `map` parameter uses the normal harbor start.
+The campaign moves from West Harbor to **Senate Square** after five cleared waves, then cycles between the two districts in five-wave blocks. Health and score continue across the move; enemies, scenery and pickups reset for the new district while camera scale stays the same. For a direct local start on the new map, open [Senate Square](http://localhost:8000/?map=senate-square). An unknown `map` parameter uses the normal harbor start.
 
-Senate Square has a broad granite combat area, Helsinki Cathedral with five copper-green domes and a six-column portico, a flight of eighteen steps, the Alexander II monument, the University and Government Palace facades, and the southern Torikorttelit merchant blocks. Eight striped market stalls form two rows with open fighting lanes. A green-and-yellow tram runs along Aleksanterinkatu at the southern edge. The district camera looks farther across the square so the cathedral remains visible. The raised stair and church terrace are scenery with solid boundaries; combat stays on the level square and its surrounding alleys. Four medkits and all four Battery cans sit behind the perimeter buildings, with one emergency medkit on the square.
+Senate Square has a broad granite combat area, Helsinki Cathedral with five copper-green domes and a six-column portico, a flight of eighteen steps, the Alexander II monument, the University and Government Palace facades, and the southern Torikorttelit merchant blocks. Eight striped market stalls form two rows with open fighting lanes. A green-and-yellow tram runs along Aleksanterinkatu at the southern edge. The shared camera looks ahead across the square so the cathedral remains visible. The raised stair and church terrace are scenery with solid boundaries; combat stays on the level square and its surrounding alleys. Four medkits and all four Battery cans sit behind the perimeter buildings, with one emergency medkit on the square.
 
 The layout takes its landmarks from the [City of Helsinki's Senate Square history](https://historia.hel.fi/en/alueet/southern/the-senate-square) and [MyHelsinki's square guide](https://www.myhelsinki.fi/places/senate-square/). Distances, market placement and the tram service are adapted for the game.
 
@@ -106,6 +106,7 @@ Four Battery energy drinks are hidden behind the outer houses instead of droppin
 - `world/map-manager.js`: active map replacement and the stable spatial query API used by gameplay.
 - `world/navigation.js`: collision, movement, line of sight, and shared enemy routing.
 - `world/building-visibility.js`: camera occlusion and building fading.
+- `world/game-camera.js`: shared camera scale, viewport lens and follow behavior for every district.
 - `world/dispose.js`: disposal of map-owned GPU resources.
 - `waves.js`: campaign planning, difficulty, clear delay, and wave/reinforcement scheduling.
 - `batteries.js`: reusable Battery pickup rendering and collection.

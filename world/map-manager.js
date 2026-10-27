@@ -8,7 +8,6 @@ export function createMapManager(scene, definitions, playerRadius = .4) {
     get id() { return active?.id; },
     get name() { return active?.name; },
     get spawn() { return active.spawn; },
-    get camera() { return active?.camera; },
     pickupCapacity(kind) {
       return Math.max(0, ...definitions.map(definition => definition.pickups?.[kind]?.length ?? 0));
     },

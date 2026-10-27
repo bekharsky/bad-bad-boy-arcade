@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createHero, animateHero, HERO_BASE_HEIGHT } from './hero.js';
 import { maps, mapOrder } from './maps/index.js';
 import { createMapManager } from './world/map-manager.js';
+import { createGameCamera } from './world/game-camera.js';
 import { createCampaign, createWaveDirector } from './waves.js';
 import { createBatteries } from './batteries.js';
 import { loadEnemyModels, createEnemy, animateEnemy, disposeEnemy } from './enemies.js';
@@ -20,9 +21,6 @@ const MODEL_URL = './assets/bad-bad-boy.glb?v=20261025-opt1';
 // World metres; the hero keeps the same physical size across every map.
 const HERO_HEIGHT = 3.45;
 const HERO_SCALE = HERO_HEIGHT / HERO_BASE_HEIGHT;
-const CAMERA_HEIGHT = 10;
-const CAMERA_DISTANCE = 12;
-const CAMERA_LOOK_HEIGHT = HERO_HEIGHT * 0.4;
 const keys = new Set();
 let controlMode = 'tank';
 let usingTouchControls = window.matchMedia('(pointer: coarse)').matches;
@@ -101,8 +99,9 @@ const campaign = createCampaign(mapOrder(new URLSearchParams(window.location.sea
 const world = createMapManager(scene, maps, .32 * HERO_SCALE);
 world.activate(campaign.plan(1).mapId);
 
-const camera = new THREE.PerspectiveCamera(47, 1, 0.1, 150);
-frameCamera(world.spawn.x, world.spawn.z, 0, true);
+const cameraRig = createGameCamera();
+const { camera } = cameraRig;
+cameraRig.frame(world.spawn.x, world.spawn.z, 0, true);
 
 scene.add(new THREE.HemisphereLight(0xd8e9ff, 0x757264, 2.3));
 const keyLight = new THREE.DirectionalLight(0xffdfad, 2.6);
@@ -527,7 +526,7 @@ function update(dt) {
     assistMarker.scale.setScalar(assistedTarget.size + .18);
   }
   // Pan with a fixed viewing angle so movement does not swing the aiming view.
-  frameCamera(player.x, player.z, dt);
+  cameraRig.frame(player.x, player.z, dt);
 }
 
 function updateHealth() {
@@ -602,7 +601,7 @@ function placePlayerAtSpawn() {
   player.root.position.set(player.x, 0, player.z);
   player.body.position.set(0, 0, 0);
   player.body.rotation.set(0, 0, 0);
-  frameCamera(player.x, player.z, 0, true);
+  cameraRig.frame(player.x, player.z, 0, true);
   animateHero(player.rig, 0, 0);
 }
 
@@ -661,29 +660,11 @@ function endGame() {
   keys.clear();
 }
 
-function cameraFov() {
-  return world.camera?.fov ?? (window.matchMedia('(pointer: coarse)').matches || canvas.clientWidth <= 680 ? 56 : 47);
-}
-
-function frameCamera(x, z, dt, instant = false) {
-  const view = world.camera ?? {};
-  const distance = view.distance ?? CAMERA_DISTANCE;
-  const target = new THREE.Vector3(x, view.height ?? CAMERA_HEIGHT, z + distance);
-  if (instant) {
-    camera.position.copy(target);
-    camera.fov = cameraFov();
-    camera.updateProjectionMatrix();
-  } else camera.position.lerp(target, 1 - Math.exp(-2.5 * dt));
-  camera.lookAt(camera.position.x, view.lookHeight ?? CAMERA_LOOK_HEIGHT, camera.position.z - distance - (view.lookAhead ?? 0));
-}
-
 function resize() {
   const width = canvas.clientWidth;
   const height = canvas.clientHeight;
   renderer.setSize(width, height, false);
-  camera.aspect = width / height;
-  camera.fov = cameraFov();
-  camera.updateProjectionMatrix();
+  cameraRig.resize(width, height, window.matchMedia('(pointer: coarse)').matches);
 }
 
 function animate(now) {

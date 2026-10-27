@@ -13,7 +13,6 @@ export const senateSquareMap = {
   name: 'Senate Square',
   spawn: { x: -5.5, z: 6.8, heading: Math.PI },
   bounds: { minX: -34, maxX: 34, minZ: -19.5, maxZ: 34 },
-  camera: { height: 14, distance: 18, lookAhead: 11, lookHeight: 3.2, fov: 58 },
   pickups: {
     medkit: [{ x: -8, z: -3 }, hidden(-32.3, -7), hidden(32.3, -8), hidden(-17, 31), hidden(7, 31)],
     battery: [hidden(-32.3, 5), hidden(32.3, 5), hidden(-6, 31), hidden(20, 31)],
