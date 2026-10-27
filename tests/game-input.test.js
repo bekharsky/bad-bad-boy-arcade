@@ -23,7 +23,7 @@ function setup({ capture = false } = {}) {
   const movementHandle = { getBoundingClientRect: () => ({ left: 24, right: 112, top: 680, bottom: 768 }) };
   let interactive = true, firing = false, bursts = 0, errors = 0;
   const mouseAim = createMouseAim({
-    canvas, reticle: { style: {}, hidden: true },
+    canvas,
     getInitialPosition: () => ({ x: 300, y: 400 }),
     onUnlock() {}, onError() { errors++; }
   });

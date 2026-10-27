@@ -63,7 +63,6 @@ let lastMouseUnlock = -Infinity;
 let mouseCaptureFailed = false;
 const mouseAim = createMouseAim({
   canvas,
-  reticle: document.querySelector('#mouse-reticle'),
   getInitialPosition: aimCursorPosition,
   onUnlock() {
     lastMouseUnlock = performance.now();
