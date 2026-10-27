@@ -91,26 +91,9 @@ export function createCity(scene) {
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, 256, 50);
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, width * 96 / 512), new THREE.MeshStandardMaterial({ map: t, roughness: 0.8 }));
-    mesh.position.set(x - (activeBuilding?.x ?? 0), y, z - (activeBuilding?.z ?? 0));
-    (activeBuilding?.group ?? scene).add(mesh);
-    if (activeBuilding) { activeBuilding.materials.push(mesh.material); activeBuilding.meshes.push(mesh); }
+    mesh.position.set(x, y, z);
+    scene.add(mesh);
     return mesh;
-  }
-  // Rooftop sign for the corner shop: red panel, tilted so it does not copy a real logo.
-  function roofLogo(x, z, d, h, width = 3.6) {
-    const c = document.createElement('canvas'); c.width = 1024; c.height = 256;
-    const g = c.getContext('2d');
-    g.fillStyle = '#e4002b'; g.fillRect(0, 0, 1024, 256);
-    g.fillStyle = '#ffffff'; g.textBaseline = 'middle';
-    g.font = 'bold 230px sans-serif'; g.textAlign = 'center'; g.fillText('V', 150, 136);
-    g.font = 'bold 100px sans-serif'; g.textAlign = 'left'; g.fillText('verkkopaukka', 290, 136);
-    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, width * 256 / 1024), new THREE.MeshStandardMaterial({ map: t, roughness: 0.6 }));
-    // Local to the building group: stands on the roof, set back from the front edge, facing the square.
-    mesh.position.set(0, h + 0.35 + width / 4 / 2, d / 2 - 0.35);
-    mesh.rotation.z = 0.12;
-    activeBuilding.group.add(mesh);
-    activeBuilding.materials.push(mesh.material); activeBuilding.meshes.push(mesh);
   }
   const colors = ['#cd9a7f', '#d5c590', '#8fa9a4', '#ceb7a4', '#b38b84', '#a6b2be'];
   let buildingIndex = 0;
@@ -156,7 +139,6 @@ export function createCity(scene) {
         part('box', '#405458', x + offset, .97, front + .27, 1.36, 1.85, .05);
       }
       part('box', '#6e7370', x, h + .42, z, w + .1, .2, d + .1);
-      sign('SATAMAMAKASIINI', x, h - .62, front + .16, w * .67, '#683e32');
     } else if (kind === 'terminal') {
       for (const side of [-1, 1]) {
         part('box', '#345967', x, h * .5, z + side * (d / 2 + .04), w - .45, h * .66, .1);
@@ -170,7 +152,6 @@ export function createCity(scene) {
       part('box', '#d7d2b7', x, .06, front + .85, w + .8, .12, 2.1);
       for (const offset of [-w * .4, w * .4]) part('box', '#c3c7b6', x + offset, 1.15, front + 1.55, .12, 2.3, .12);
       obstacle(x, front + .7, w + .5, 2.3, 2.5);
-      sign('LÄNSISATAMA / T1', x, 2.65, front + 1.01, w * .7, '#244d5c');
     } else if (kind === 'shop') {
       // A larger silver department store, with a red tower and glass frontage.
       for (let y = 1.4; y < h; y += 1.3) {
@@ -185,10 +166,6 @@ export function createCity(scene) {
       }
       part('box', '#bb2635', x - w * .38, h * .54, front + .16, .65, h * .94, .3);
       part('box', '#405058', x, h + .4, z, w * .7, .45, d * .7);
-      roofLogo(x, z, d, h, 5.4);
-      sign('VERKKOPAUKKA', x, 2.1, front + .13, w * .86, '#bd2838');
-      const squareFacingSign = sign('V  verkkopaukka', x + w / 2 + .12, h - .9, z, d * .88, '#bd2838');
-      squareFacingSign.rotation.y = Math.PI / 2;
     } else {
       part('box', '#6e7370', x + w * .23, h + .6, z + d * .2, .45, .8, .5);
       const floors = Math.floor(h / 1.18), columns = Math.floor(w / 1.2);
@@ -207,7 +184,6 @@ export function createCity(scene) {
       if (options.cafe) {
         part('box', '#385f5a', x, 1.8, front + .45, w * .85, .18, 1.1);
         part('box', '#395b60', x, .9, front + .1, w * .72, 1.45, .12);
-        sign(options.cafe, x, 2.16, front + .12, w * .78);
       }
     }
     buildings.push(activeBuilding);

@@ -123,7 +123,7 @@ export function createHarbor(scene) {
     cranes.box('#355c65', x - .15, 5.85, -26.06, .8, .4, .04);
   }
   scene.add(cranes.finish());
-  createCathedral(scene);
+  createClarionHotel(scene);
   const water = new THREE.Mesh(new THREE.PlaneGeometry(140, 58), new THREE.MeshStandardMaterial({ color: '#376b7c', metalness: .35, roughness: .3 }));
   water.name = 'Baltic harbor water';
   water.rotation.x = -Math.PI / 2;
@@ -191,45 +191,63 @@ export function createHarbor(scene) {
   };
 }
 
-// A deliberately miniature Helsinki Cathedral anchors the inland end of the
-// harbour. It is scenery beyond the boundary, rather than literal geography.
-function createCathedral(scene) {
-  const church = model('Helsinki Cathedral');
-  const { box, geometry } = church;
-  const white = '#eee8d5', green = '#668a77', stone = '#b6b4a8';
-  for (let step = 0; step < 4; step++) box(stone, 0, .12 + step * .18, 0, 13 - step * .8, .2, 10 - step * .75);
-  box(white, 0, 2.9, 0, 8.8, 4.7, 5.8);
-  box(white, 0, 3.3, 0, 5.7, 5.5, 8.2);
-  box('#d3d6c8', 0, 5.5, 0, 9.2, .25, 6.2);
-  box('#c7d0c3', 0, 6, 0, 6.2, .2, 8.5);
-  // Portico, columns and the triangular classical pediment.
-  for (let x = -3; x <= 3; x += 1.2) {
-    geometry(white, new THREE.CylinderGeometry(.22, .25, 3.6, 12).translate(x, 2.75, 4.3));
-    box(white, x, .94, 4.3, .6, .2, .6);
-    box(white, x, 4.57, 4.3, .6, .2, .6);
+// Miniature of the two aluminium-and-glass towers, linked lobby and rooftop pool.
+// Architectural reference: https://dtsa.fi/project/clarion-hotel
+function createClarionHotel(scene) {
+  const hotel = model('Clarion Hotel Helsinki');
+  const { box, geometry } = hotel;
+  const silver = '#cbd2cf', dark = '#8a9d9e', glass = '#426775';
+  box('#a3aaa5', 0, .12, 0, 12.6, .24, 7);
+  box('#687e83', 0, .9, 0, 11.7, 1.5, 5.8);
+  box(silver, 0, 1.65, 0, 12, .18, 6.1);
+  // Glazed shared lobby, with slender mullions along the waterfront.
+  for (let x = -5.4; x <= 5.4; x += .6) {
+    box('#aebfbb', x, .95, 2.94, .055, 1.25, .08);
   }
-  box(white, 0, 4.85, 4.3, 7.4, .35, 1.2);
-  const triangle = new THREE.Shape();
-  triangle.moveTo(-3.8, 5); triangle.lineTo(3.8, 5); triangle.lineTo(0, 6.5); triangle.closePath();
-  geometry(white, new THREE.ExtrudeGeometry(triangle, { depth: .35, bevelEnabled: false }).translate(0, 0, 4.65));
-  box('#3d605d', 0, 1.95, 4.12, 1.15, 2.6, .06);
-  for (const x of [-3, -1.5, 1.5, 3]) box('#58756f', x, 3, 2.94, .55, 1.2, .04);
-  geometry(white, new THREE.CylinderGeometry(1.45, 1.6, 2.1, 16).translate(0, 6.9, 0));
-  for (let n = 0; n < 12; n++) {
-    const angle = n * Math.PI / 6;
-    geometry('#47635f', new THREE.CylinderGeometry(.12, .12, .8, 8).translate(Math.sin(angle) * 1.48, 7, Math.cos(angle) * 1.48));
+  box('#dce1d9', 0, 1.35, 3.25, 2.4, .16, 1.2);
+  box('#284a56', 0, .8, 3, 1.2, 1.2, .05);
+
+  function tower(x, z, height, angle, floors) {
+    const w = 4.1, d = 4.8, base = 1.75;
+    function panel(color, px, py, pz, pw, ph, pd) {
+      geometry(color, new THREE.BoxGeometry(pw, ph, pd).translate(px, py, pz).rotateY(angle).translate(x, 0, z));
+    }
+    panel(silver, 0, (base + height) / 2, 0, w, height - base, d);
+    const storey = (height - base - .9) / floors;
+    // Alternate tall windows and recessed metal panels on all four facades.
+    for (let row = 0; row < floors; row++) {
+      const y = base + .3 + (row + .5) * storey;
+      for (const side of [-1, 1]) {
+        for (let col = 0; col < 5; col++) {
+          const px = (col - 2) * .76;
+          panel((row + col) % 4 === 0 ? dark : glass, px, y, side * (d / 2 + .035), .46, storey * .79, .045);
+          panel('#e0e3da', px + .27, y, side * (d / 2 + .065), .055, storey * .94, .06);
+        }
+        for (let col = 0; col < 6; col++) {
+          panel((row + col) % 5 === 0 ? dark : glass, side * (w / 2 + .035), y, (col - 2.5) * .74, .045, storey * .79, .43);
+        }
+      }
+    }
+    // Dark panoramic top floor and a crisp silver roof cap.
+    panel(glass, 0, height - .4, 0, w + .08, .64, d + .08);
+    for (const side of [-1, 1]) {
+      for (let col = -2; col <= 2; col++) panel(silver, col * .78, height - .4, side * (d / 2 + .07), .055, .66, .06);
+    }
+    panel('#e4e5db', 0, height + .02, 0, w + .24, .18, d + .24);
+    return panel;
   }
-  const dome = new THREE.LatheGeometry([[0, 0], [1.55, .05], [1.58, .5], [1.3, 1.35], [.7, 2.1], [.18, 2.5], [.12, 2.7]].map(([x, y]) => new THREE.Vector2(x, y)), 24);
-  geometry(green, dome.translate(0, 7.95, 0));
-  box('#d3b467', 0, 11.05, 0, .09, .8, .09);
-  box('#d3b467', 0, 11.14, 0, .48, .09, .09);
-  for (const x of [-3.6, 3.6]) for (const z of [-2.3, 2.3]) {
-    geometry(white, new THREE.CylinderGeometry(.55, .65, 1.1, 12).translate(x, 5.95, z));
-    geometry(green, new THREE.SphereGeometry(.7, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2).translate(x, 6.5, z));
-    box('#d3b467', x, 7.3, z, .06, .5, .06);
-    box('#d3b467', x, 7.35, z, .28, .06, .06);
-  }
-  const cathedral = church.finish();
-  cathedral.position.set(-36, 0, -18);
-  scene.add(cathedral);
+  const tall = tower(-2.8, -.4, 12, 0, 14);
+  tower(2.8, .55, 10.55, .2, 12);
+  // Glass connection between the separated towers.
+  box('#4b707c', 0, 4.9, .2, 1.8, 1.1, 1.5);
+  for (const y of [4.32, 5.48]) box(silver, 0, y, .2, 1.9, .12, 1.65);
+  for (const x of [-.6, 0, .6]) box(silver, x, 4.9, 1, .055, 1.1, .06);
+  // Cantilevered rooftop pool with a blue glazed end above the harbour.
+  tall('#dbe1d9', 0, 12.2, 1.35, 2.9, .26, 3.4);
+  tall('#358c9d', 0, 12.36, 1.35, 2.5, .08, 3.05);
+  tall('#78b7be', 0, 12.48, 3.08, 2.7, .55, .07);
+  for (const x of [-1.42, 1.42]) tall('#aec8c9', x, 12.48, 1.35, .06, .55, 3.45);
+  const root = hotel.finish();
+  root.position.set(-36, 0, -18);
+  scene.add(root);
 }

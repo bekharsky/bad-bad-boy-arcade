@@ -116,6 +116,22 @@ test('the boulevard stays asphalt on both sides of the tracks past the plaza', (
   for (const name of ['West brick warehouse', 'East brick warehouse', 'West harbor terminal']) {
     assert.ok(scene.getObjectByName(name).position.z < -12, 'The port is on the water side of the boulevard');
   }
-  const cathedral = scene.getObjectByName('Helsinki Cathedral');
-  assert.ok(new THREE.Box3().setFromObject(cathedral).max.x < -27.8, 'The landmark stays outside playable streets');
+  const hotel = scene.getObjectByName('Clarion Hotel Helsinki');
+  assert.ok(hotel, 'Clarion Hotel replaces the cathedral');
+  assert.equal(scene.getObjectByName('Helsinki Cathedral'), undefined);
+  const bounds = new THREE.Box3().setFromObject(hotel);
+  assert.ok(bounds.max.x < -27.8, 'The landmark stays outside playable streets');
+  assert.ok(bounds.max.y > 12, 'The towers and rooftop pool rise above the neighbourhood');
+});
+
+test('building facades and roofs have no sign textures', () => {
+  const { scene } = setup();
+  const names = ['Residential building', 'Verkkopaukka', 'West brick warehouse', 'East brick warehouse', 'West harbor terminal', 'Clarion Hotel Helsinki'];
+  const buildings = scene.children.filter(node => names.includes(node.name));
+  assert.ok(buildings.length >= 10);
+  for (const building of buildings) building.traverse(node => {
+    if (!node.isMesh) return;
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    assert.ok(materials.every(material => !material.map), `${building.name} has no sign texture`);
+  });
 });
