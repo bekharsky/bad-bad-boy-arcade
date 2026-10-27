@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
-const ANCHORS = [[3.2, -3.8], [-13, -1.6], [13, -1.6], [-1.6, -15], [1.6, 15]];
+const KIT_COUNT = 5;
 
 export function createMedkits(scene, city) {
   function boxes(parts) {
@@ -17,7 +17,7 @@ export function createMedkits(scene, city) {
       [0, .36, 0, .35, .07, .12]
     ]),
     new THREE.MeshStandardMaterial({ color: '#f4f3e9', roughness: .55 }),
-    ANCHORS.length
+    KIT_COUNT
   );
   const crosses = new THREE.InstancedMesh(
     boxes([
@@ -26,12 +26,12 @@ export function createMedkits(scene, city) {
       [0, .237, 0, .12, .018, .28], [0, .237, 0, .34, .018, .10]
     ]),
     new THREE.MeshStandardMaterial({ color: '#2eaa78', emissive: '#187448', emissiveIntensity: .4, roughness: .6 }),
-    ANCHORS.length
+    KIT_COUNT
   );
   const halos = new THREE.InstancedMesh(
     new THREE.RingGeometry(.47, .56, 32),
     new THREE.MeshBasicMaterial({ color: '#75e3a8', transparent: true, opacity: .5, depthWrite: false, side: THREE.DoubleSide }),
-    ANCHORS.length
+    KIT_COUNT
   );
   const meshes = [cases, crosses, halos];
   for (const mesh of meshes) {
@@ -67,16 +67,10 @@ export function createMedkits(scene, city) {
   function reset(player) {
     kits.length = 0;
     time = 0;
-    for (const [anchorX, anchorZ] of ANCHORS) {
-      let x = anchorX, z = anchorZ;
-      for (let attempt = 0; attempt < 12; attempt++) {
-        const candidateX = anchorX + (Math.random() - .5);
-        const candidateZ = anchorZ + (Math.random() - .5);
-        if (city.canStandAt(candidateX, candidateZ, player.radius + .12)) {
-          x = candidateX; z = candidateZ; break;
-        }
-      }
-      if (city.canStandAt(x, z, player.radius + .12)) kits.push({ x, z, active: true, phase: Math.random() * Math.PI * 2 });
+    for (let i = 0; i < KIT_COUNT; i++) {
+      // One emergency kit on the square; the other four reward exploration.
+      const point = i === 0 ? { x: 3.5, z: 9.5 } : city.pickupPoint(i - 1, player.radius + .12);
+      if (point && city.canStandAt(point.x, point.z, player.radius + .12)) kits.push({ ...point, active: true, phase: Math.random() * Math.PI * 2 });
     }
     render();
   }

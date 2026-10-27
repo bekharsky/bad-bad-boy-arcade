@@ -6,7 +6,6 @@ function setup() {
   globalThis.document = new EventTarget();
   globalThis.window = new EventTarget();
   const doc = document;
-  const reticle = { hidden: true, style: {} };
   let requests = 0, unlocks = 0, errors = 0;
   const canvas = {
     clientWidth: 800, clientHeight: 600,
@@ -19,7 +18,7 @@ function setup() {
   }
   doc.exitPointerLock = () => lock(null);
   const mouse = createMouseAim({
-    canvas, reticle, getInitialPosition: () => ({ x: 400, y: 200 }),
+    canvas, getInitialPosition: () => ({ x: 400, y: 200 }),
     onUnlock: () => unlocks++, onError: () => errors++
   });
   const move = (x, y) => {
@@ -27,11 +26,11 @@ function setup() {
     Object.assign(event, { movementX: x, movementY: y });
     doc.dispatchEvent(event);
   };
-  return { mouse, canvas, reticle, lock, move, requests: () => requests, unlocks: () => unlocks, errors: () => errors };
+  return { mouse, canvas, lock, move, requests: () => requests, unlocks: () => unlocks, errors: () => errors };
 }
 
 test('mouse capture needs enabling, deduplicates requests and starts along the current aim', () => {
-  const { mouse, reticle, lock, requests } = setup();
+  const { mouse, lock, requests } = setup();
   mouse.request();
   assert.equal(requests(), 0);
   mouse.setEnabled(true);
@@ -39,7 +38,6 @@ test('mouse capture needs enabling, deduplicates requests and starts along the c
   assert.equal(requests(), 1);
   lock();
   assert.equal(mouse.locked, true);
-  assert.equal(reticle.hidden, false);
   assert.deepEqual(mouse.position, { x: 400, y: 200 });
 });
 
@@ -66,7 +64,7 @@ test('capture alone never steers; keyboard steering cancels the helper until fre
   assert.equal(mouse.aiming, false);
 });
 
-test('locked mouse deltas move the crosshair in both axes and keep it inside the game', () => {
+test('locked mouse deltas move the aim point in both axes and keep it inside the game', () => {
   const { mouse, lock, move } = setup();
   mouse.setEnabled(true); lock();
   move(.5, -.75);
@@ -77,11 +75,10 @@ test('locked mouse deltas move the crosshair in both axes and keep it inside the
   assert.deepEqual(mouse.position, { x: 787, y: 13 });
 });
 
-test('native unlock hides the crosshair and notifies the game to pause exactly once', () => {
-  const { mouse, reticle, lock, move, unlocks } = setup();
+test('native unlock notifies the game to pause exactly once', () => {
+  const { mouse, lock, move, unlocks } = setup();
   mouse.setEnabled(true); lock(); lock(null); lock(null);
   assert.equal(mouse.locked, false);
-  assert.equal(reticle.hidden, true);
   assert.equal(unlocks(), 1);
   const before = { ...mouse.position };
   move(20, 20);
@@ -89,22 +86,20 @@ test('native unlock hides the crosshair and notifies the game to pause exactly o
 });
 
 test('pausing or disabling releases capture without triggering another pause', () => {
-  const { mouse, lock, reticle, unlocks } = setup();
+  const { mouse, lock, unlocks } = setup();
   mouse.setEnabled(true); lock();
   mouse.setEnabled(false);
   assert.equal(document.pointerLockElement, null);
   assert.equal(mouse.locked, false);
-  assert.equal(reticle.hidden, true);
   assert.equal(unlocks(), 0);
 });
 
 test('a late capture after pausing is immediately released', () => {
-  const { mouse, lock, reticle, unlocks } = setup();
+  const { mouse, lock, unlocks } = setup();
   mouse.setEnabled(true); mouse.request();
   mouse.setEnabled(false); lock();
   assert.equal(document.pointerLockElement, null);
   assert.equal(mouse.locked, false);
-  assert.equal(reticle.hidden, true);
   assert.equal(unlocks(), 0);
 });
 
@@ -122,11 +117,10 @@ test('capture denial is handled once and can be retried without breaking keyboar
 });
 
 test('unsupported capture and lock owned by another element do not activate mouse aim', () => {
-  const { mouse, canvas, lock, reticle } = setup();
+  const { mouse, canvas, lock } = setup();
   delete canvas.requestPointerLock;
   mouse.setEnabled(true); mouse.request(); lock({});
   assert.equal(mouse.locked, false);
-  assert.equal(reticle.hidden, true);
 });
 
 test('resizing reclamps the cursor without changing its direction or clearing capture', () => {

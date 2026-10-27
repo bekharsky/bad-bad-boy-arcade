@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createHero, animateHero, HERO_BASE_HEIGHT } from './hero.js';
-import { createCity, CITY_STOREY_HEIGHT } from './city.js';
+import { createCity, CITY_STOREY_HEIGHT, CITY_SPAWN } from './city.js';
 import { loadEnemyModels, createEnemy, animateEnemy, disposeEnemy } from './enemies.js';
 import { createLiquidStream } from './liquid.js';
 import { createBiteEffects } from './bites.js';
@@ -10,6 +10,8 @@ import { createTouchControls } from './touch-controls.js';
 import { movePlayer } from './movement.js';
 import { createAimAssist } from './aim-assist.js';
 import { createMouseAim } from './mouse-aim.js';
+import { createEnemyPressure } from './enemy-pressure.js';
+import { bindGameInput } from './game-input.js';
 
 const MODEL_URL = './assets/bad-bad-boy.glb?v=20261025-opt1';
 // Match the map's third-floor windows rather than the sculpture's real size.
@@ -22,11 +24,13 @@ const keys = new Set();
 let controlMode = 'tank';
 let aimAssistEnabled = true;
 let mouseAimEnabled = true;
+let soundEnabled = false;
 try {
   const savedMode = localStorage.getItem('golden-blast-controls');
   if (savedMode === 'direct' || savedMode === 'tank') controlMode = savedMode;
   aimAssistEnabled = localStorage.getItem('golden-blast-aim-assist') !== 'false';
   mouseAimEnabled = localStorage.getItem('golden-blast-mouse-aim') !== 'false';
+  soundEnabled = localStorage.getItem('golden-blast-sound') === 'true';
 } catch { /* Settings still work when browser storage is unavailable. */ }
 
 const canvas = document.querySelector('#game');
@@ -41,27 +45,29 @@ const heroHpFill = document.querySelector('#hero-hp-fill');
 const heroHeadPosition = new THREE.Vector3();
 const scoreLabel = document.querySelector('#score');
 const waveLabel = document.querySelector('#wave');
-const finalScore = document.querySelector('#final-score');
 const toast = document.querySelector('#toast');
 const sprayRange = document.querySelector('#spray-range');
 const pressureFill = document.querySelector('#pressure-fill');
 const controlsDialog = document.querySelector('#controls-dialog');
-const controlsButton = document.querySelector('#open-controls');
+const settingsButton = document.querySelector('#open-settings');
+const settingsDone = document.querySelector('#settings-done');
+const soundSetting = document.querySelector('#sound-setting');
+const rangeHud = document.querySelector('.range-hud');
 const mouseSupported = typeof canvas.requestPointerLock === 'function' && window.matchMedia('(any-pointer: fine)').matches;
 const aimRay = new THREE.Raycaster();
 const aimScreen = new THREE.Vector2();
 const aimPoint = new THREE.Vector3();
 const aimGround = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 let lastMouseUnlock = -Infinity;
+let mouseCaptureFailed = false;
 const mouseAim = createMouseAim({
   canvas,
-  reticle: document.querySelector('#mouse-reticle'),
   getInitialPosition: aimCursorPosition,
   onUnlock() {
     lastMouseUnlock = performance.now();
-    if (playing) pauseGame();
+    if (playing) openSettings();
   },
-  onError() { showToast('Mouse capture unavailable. Use arrows or Shift to aim.'); }
+  onError() { mouseCaptureFailed = true; }
 });
 const touchControls = createTouchControls({
   zone: document.querySelector('#joystick-zone'),
@@ -81,23 +87,23 @@ renderer.toneMappingExposure = 1.12;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#7c929f');
-scene.fog = new THREE.Fog('#7c929f', 25, 65);
+scene.fog = new THREE.Fog('#7c929f', 40, 100);
 
-const camera = new THREE.PerspectiveCamera(47, 1, 0.1, 100);
-camera.position.set(0, CAMERA_HEIGHT, CAMERA_DISTANCE);
-camera.lookAt(0, CAMERA_LOOK_HEIGHT, 0);
+const camera = new THREE.PerspectiveCamera(47, 1, 0.1, 150);
+camera.position.set(CITY_SPAWN.x, CAMERA_HEIGHT, CITY_SPAWN.z + CAMERA_DISTANCE);
+camera.lookAt(CITY_SPAWN.x, CAMERA_LOOK_HEIGHT, CITY_SPAWN.z);
 
 scene.add(new THREE.HemisphereLight(0xd8e9ff, 0x757264, 2.3));
 const keyLight = new THREE.DirectionalLight(0xffdfad, 2.6);
 keyLight.position.set(-12, 25, 10);
 keyLight.castShadow = true;
 keyLight.shadow.mapSize.set(2048, 2048);
-keyLight.shadow.camera.left = -28;
-keyLight.shadow.camera.right = 28;
-keyLight.shadow.camera.top = 28;
-keyLight.shadow.camera.bottom = -28;
+keyLight.shadow.camera.left = -38;
+keyLight.shadow.camera.right = 38;
+keyLight.shadow.camera.top = 38;
+keyLight.shadow.camera.bottom = -38;
 keyLight.shadow.normalBias = 0.035;
-keyLight.shadow.camera.far = 70;
+keyLight.shadow.camera.far = 100;
 scene.add(keyLight);
 const city = createCity(scene);
 
@@ -106,8 +112,8 @@ const player = {
   body: new THREE.Group(),
   model: null,
   rig: null,
-  x: 0,
-  z: 0,
+  x: CITY_SPAWN.x,
+  z: CITY_SPAWN.z,
   dx: 0,
   dz: 1,
   heading: 0,
@@ -128,21 +134,23 @@ const player = {
   runBlend: 0
 };
 player.root.add(player.body);
+player.root.position.set(player.x, 0, player.z);
 scene.add(player.root);
 
-function hitEnemy(enemy, direction) {
-  enemy.hp -= 2;
+function hitEnemy(enemy, direction, impact) {
+  enemy.hp -= impact.damage;
   enemy.hit = 0.18;
-  city.move(enemy, direction.x * 0.38, direction.z * 0.38, enemy.size);
+  city.move(enemy, direction.x * impact.knockback, direction.z * impact.knockback, enemy.size);
   enemy.root.position.set(enemy.x, 0, enemy.z);
   if (enemy.hp <= 0) removeEnemy(enemy, true);
 }
-const streamOptions = { scale: HERO_HEIGHT / 2.25, refraction: !window.matchMedia('(pointer: coarse)').matches };
+const streamOptions = { scale: HERO_HEIGHT / 2.25, refraction: !window.matchMedia('(pointer: coarse)').matches, getHitTime: () => gameTime };
 const stream = createLiquidStream(scene, city, hitEnemy, streamOptions);
 // Battery power adds two side streams that fan out from the centre stream.
 const sideStreams = [createLiquidStream(scene, city, hitEnemy, streamOptions), createLiquidStream(scene, city, hitEnemy, streamOptions)];
 
 const enemies = [];
+const enemyPressure = createEnemyPressure();
 const aimAssist = createAimAssist((origin, enemy) => city.lineClear(origin.x, origin.z, enemy.x, enemy.z, .12));
 const assistMarker = new THREE.Mesh(
   new THREE.RingGeometry(.88, 1, 32),
@@ -154,8 +162,7 @@ scene.add(assistMarker);
 const effects = [];
 const biteEffects = createBiteEffects(scene);
 const medkits = createMedkits(scene, city);
-// Slugs sometimes drop a Battery. Walking over it turns the stream neon and splits it into three.
-const BATTERY_DROP_CHANCE = 0.3;
+// Battery cans are hidden in back courtyards. Exploration powers up the spray.
 const POWER_TIME = 8;
 const SPREAD_ANGLE = 0.22;
 const STREAM_COLOR = '#ffd34c';
@@ -191,7 +198,6 @@ let gameTime = 0;
 let score = 0;
 let wave = 1;
 let pendingWave = 0;
-let soundEnabled = false;
 let audioContext = null;
 let frameTime = 0;
 
@@ -254,7 +260,8 @@ async function loadModels() {
     player.body.add(player.model);
     status.classList.add('hidden');
     startButton.disabled = false;
-    startButton.textContent = 'START GAME';
+    startButton.textContent = 'PLAY';
+    if (!controlsDialog.open && [document.body, canvas].includes(document.activeElement)) startButton.focus({ preventScroll: true });
     window.dispatchEvent(new Event('game:ready'));
   } catch (error) {
     console.error('Could not load game models:', error);
@@ -273,10 +280,11 @@ function makeEnemy(x, z, level, kind) {
 }
 
 function spawnWave(level) {
+  enemyPressure.reset();
   wave = level;
   waveLabel.textContent = String(wave).padStart(2, '0');
   city.routeTo(player.x, player.z);
-  const count = Math.min(3 + level * 2, 18);
+  const count = Math.min(5 + (level - 1) * 3, 30);
   for (let i = 0; i < count; i++) {
     const point = city.spawnPoint(player, i, count);
     makeEnemy(point.x, point.z, level, i % 3 === 0 ? 'slug' : 'snail');
@@ -290,7 +298,7 @@ function removeEnemy(enemy, pop = false) {
   disposeEnemy(enemy);
   if (pop) {
     score += 150;
-    if (enemy.kind === 'slug' && Math.random() < BATTERY_DROP_CHANCE) dropBattery(enemy.x, enemy.z);
+    enemyPressure.onKill();
     scoreLabel.textContent = String(score).padStart(4, '0');
     burst(enemy.x, enemy.hitHeight, enemy.z, 0xffd34e, 10);
     blip(440 + Math.random() * 280, 0.045);
@@ -391,7 +399,7 @@ function syncMouseAim() {
 
 function requestMouseAim() {
   syncMouseAim();
-  mouseAim.request();
+  if (!mouseCaptureFailed) mouseAim.request();
 }
 
 function resolveAssistedHeading(heading, dt) {
@@ -410,6 +418,7 @@ function update(dt) {
   // Finish the final bite's splash even after the round ends.
   biteEffects.update(dt);
   if (!playing) return;
+  if (city.update(dt, [player, ...enemies])) showToast('TRAM 9 · JÄTKÄSAARI');
 
   const firing = keys.has('Space') || keys.has('Fire') || touchControls.input.firing || player.tapTimer > 0;
   const moving = updateMovement(dt, firing);
@@ -433,7 +442,8 @@ function update(dt) {
   player.powerTimer = Math.max(0, player.powerTimer - dt);
   updateSpread(dt, firing);
   pressureFill.style.transform = `scaleX(${spray.charge})`;
-  sprayRange.textContent = spray.blocked ? 'BLOCKED' : `${spray.range.toFixed(1)} m`;
+  sprayRange.textContent = spray.blocked ? '×' : `${spray.range.toFixed(1)} m`;
+  rangeHud.setAttribute('aria-label', spray.blocked ? 'Spray blocked' : `Spray range ${spray.range.toFixed(1)} metres`);
   player.fireTimer -= dt;
   if (firing && player.fireTimer <= 0) {
     blip(180 + Math.random() * 35, 0.035);
@@ -509,7 +519,17 @@ function update(dt) {
       pendingWave = 0;
       spawnWave(wave + 1);
     }
-  } else pendingWave = 0;
+  } else {
+    pendingWave = 0;
+    if (playing) {
+      const count = enemyPressure.update(dt, enemies.length);
+      for (let i = 0; i < count; i++) {
+        const point = city.spawnPoint(player, i, count);
+        makeEnemy(point.x, point.z, wave, i % 3 === 0 ? 'slug' : 'snail');
+      }
+      if (count) showToast(`REINFORCEMENTS +${count} · KEEP FIGHTING!`);
+    }
+  }
 
   const assistedTarget = aimAssist.target;
   assistMarker.visible = !!assistedTarget?.alive;
@@ -546,7 +566,7 @@ function updateHeroHp() {
   heroHud.style.transform = `translate(${x - 32}px, ${y}px)`;
 }
 
-function dropBattery(x, z) {
+function placeBattery(x, z) {
   const mesh = new THREE.Mesh(batteryGeometry, batteryMaterials);
   mesh.position.set(x, 0.3, z);
   scene.add(mesh);
@@ -558,6 +578,7 @@ function updateBatteries(dt) {
     const battery = batteries[i];
     battery.mesh.rotation.y += dt * 2;
     if (Math.hypot(player.x - battery.x, player.z - battery.z) > player.radius + 0.4) continue;
+    if (!city.lineClear(player.x, player.z, battery.x, battery.z, .12)) continue;
     scene.remove(battery.mesh);
     batteries.splice(i, 1);
     player.powerTimer += POWER_TIME;
@@ -592,13 +613,14 @@ function collectMedkit(amount) {
 
 function startGame() {
   if (!player.model) return;
+  mouseCaptureFailed = false;
   clearArena();
   score = 0;
   wave = 0;
   pendingWave = 0;
   player.hp = player.maxHp;
-  player.x = 0;
-  player.z = 0;
+  player.x = CITY_SPAWN.x;
+  player.z = CITY_SPAWN.z;
   player.dx = 0;
   player.dz = -1;
   player.heading = Math.PI;
@@ -613,18 +635,23 @@ function startGame() {
   player.fireTimer = 0;
   player.tapTimer = 0;
   player.root.rotation.y = player.heading;
-  player.root.position.set(0, 0, 0);
+  player.root.position.set(player.x, 0, player.z);
   player.model.material.opacity = 1;
   player.model.material.transparent = false;
-  camera.position.set(0, CAMERA_HEIGHT, CAMERA_DISTANCE);
-  camera.lookAt(0, CAMERA_LOOK_HEIGHT, 0);
+  camera.position.set(CITY_SPAWN.x, CAMERA_HEIGHT, CITY_SPAWN.z + CAMERA_DISTANCE);
+  camera.lookAt(CITY_SPAWN.x, CAMERA_LOOK_HEIGHT, CITY_SPAWN.z);
   animateHero(player.rig, 0, 0);
   scoreLabel.textContent = '0000';
   updateHealth();
+  city.reset();
   medkits.reset(player);
+  for (let i = 4; i < 8; i++) {
+    const point = city.pickupPoint(i, player.radius + .12);
+    if (point) placeBattery(point.x, point.z);
+  }
   spawnWave(1);
   playing = true;
-  controlsButton.hidden = false;
+  rangeHud.hidden = false;
   touchControls.setEnabled(true);
   startScreen.classList.add('hidden');
   endScreen.classList.add('hidden');
@@ -657,13 +684,12 @@ function endGame() {
   playing = false;
   syncMouseAim();
   resetAimAssist();
-  controlsButton.hidden = true;
+  rangeHud.hidden = true;
   touchControls.setEnabled(false);
   stream.clear();
   player.tapTimer = 0;
   player.moveSpeed = 0;
   player.turnSpeed = 0;
-  finalScore.textContent = String(score).padStart(4, '0');
   endScreen.classList.remove('hidden');
   blip(80, 0.25);
   keys.clear();
@@ -718,23 +744,12 @@ function syncControlMode() {
     checkbox.disabled = false;
   }
   syncMouseAim();
-  document.querySelector('#movement-description').textContent = direct ? 'move in screen directions' : 'forward/back · turn the character';
-  const movementHint = direct ? 'ARROWS / WASD move & face screen directions' : '↑ ↓ / W S forward/back · ← → / A D turn';
-  document.querySelector('.controls-hint').textContent = `${movementHint} · SHIFT fine aim${mouseSupported && mouseAimEnabled ? ' · MOUSE aim helper' : ''} · CLICK / SPACE spray · ESC pause`;
-  for (const hint of document.querySelectorAll('[data-keyboard-aim-hint]')) {
-    hint.textContent = direct
-      ? 'Arrows / WASD move and face screen directions. Shift + ← / → turns precisely.'
-      : '↑ / ↓ forward/back · ← / → turn · Shift for finer turns.';
-    if (mouseSupported && mouseAimEnabled) hint.textContent += ' Move the mouse to help aim. Keyboard turns take priority. Esc releases the mouse and pauses.';
-  }
-  document.querySelector('.touch-instructions').textContent = direct
-    ? 'Drag on the left in the direction you want to move on screen. The character turns to face that direction. Tap SPRAY near, hold far.'
-    : 'Drag up to walk where the character is facing; down to walk backward. Drag left/right to turn the character. Tap SPRAY near, hold far.';
 }
 
 for (const checkbox of document.querySelectorAll('[data-mouse-aim]')) {
   checkbox.addEventListener('change', () => {
     mouseAimEnabled = checkbox.checked;
+    mouseCaptureFailed = false;
     try { localStorage.setItem('golden-blast-mouse-aim', String(mouseAimEnabled)); } catch { /* Storage is optional. */ }
     resetInput();
     syncControlMode();
@@ -759,23 +774,26 @@ for (const radio of document.querySelectorAll('[data-control-mode]')) {
     syncControlMode();
   });
 }
-function pauseGame() {
+function openSettings() {
   resetInput();
+  settingsDone.textContent = playing ? 'RESUME' : 'DONE';
   if (!controlsDialog.open) controlsDialog.showModal();
   syncMouseAim();
 }
-controlsButton.addEventListener('click', pauseGame);
+settingsButton.addEventListener('click', openSettings);
 controlsDialog.addEventListener('close', () => {
   resetInput();
-  if (playing) canvas.focus({ preventScroll: true });
+  (playing ? canvas : settingsButton).focus({ preventScroll: true });
   syncMouseAim();
 });
 controlsDialog.querySelector('form').addEventListener('submit', event => {
   event.preventDefault();
   controlsDialog.close();
   resetInput();
-  canvas.focus({ preventScroll: true });
-  requestMouseAim();
+  if (playing) {
+    canvas.focus({ preventScroll: true });
+    requestMouseAim();
+  }
 });
 
 window.addEventListener('keydown', (event) => {
@@ -784,37 +802,39 @@ window.addEventListener('keydown', (event) => {
     if (performance.now() - lastMouseUnlock < 200) return;
     if (!event.repeat) {
       if (controlsDialog.open) controlsDialog.close();
-      else pauseGame();
+      else openSettings();
     }
     return;
   }
   if (controlsDialog.open) return;
   if (!mouseAim.locked && event.target instanceof Element && event.target.closest('select, input')) return;
-  if (!playing && event.target instanceof Element && event.target.closest('button')) return;
+  if (!playing && event.target instanceof Element && event.target.closest('button, a')) return;
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code)) event.preventDefault();
   keys.add(event.code);
   if (event.code === 'Space' && !event.repeat && playing) beginSpray();
   if (event.code === 'Enter' && !playing && !startScreen.classList.contains('hidden') && player.model) { startGame(); requestMouseAim(); }
 });
 window.addEventListener('keyup', (event) => keys.delete(event.code));
-window.addEventListener('blur', () => { resetInput(); if (mouseAim.locked && playing) pauseGame(); });
+window.addEventListener('blur', () => { resetInput(); if (mouseAim.locked && playing) openSettings(); });
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) { resetInput(); if (mouseAim.locked && playing) pauseGame(); }
+  if (document.hidden) { resetInput(); if (mouseAim.locked && playing) openSettings(); }
 });
 window.addEventListener('resize', resize);
-canvas.addEventListener('pointerdown', (event) => {
-  if (event.pointerType === 'mouse' && event.button === 0 && playing && !controlsDialog.open) {
-    if (mouseSupported && mouseAimEnabled && !mouseAim.locked) requestMouseAim();
-    else { keys.add('Fire'); beginSpray(); }
-  }
+bindGameInput({
+  canvas,
+  movementZone: document.querySelector('#joystick-zone'),
+  movementHandle: document.querySelector('.joystick-hint'),
+  canInteract: () => playing && !controlsDialog.open,
+  setFiring: firing => firing ? keys.add('Fire') : keys.delete('Fire'),
+  beginSpray,
+  requestMouseAim,
 });
-window.addEventListener('pointerup', event => { if (event.pointerType === 'mouse') keys.delete('Fire'); });
 startButton.addEventListener('click', () => { startGame(); requestMouseAim(); });
 restartButton.addEventListener('click', () => { startGame(); requestMouseAim(); });
-document.querySelector('#sound').addEventListener('click', (event) => {
-  soundEnabled = !soundEnabled;
-  event.currentTarget.textContent = soundEnabled ? '♫' : '♪';
-  event.currentTarget.classList.toggle('sound-on', soundEnabled);
+soundSetting.checked = soundEnabled;
+soundSetting.addEventListener('change', () => {
+  soundEnabled = soundSetting.checked;
+  try { localStorage.setItem('golden-blast-sound', String(soundEnabled)); } catch { /* Storage is optional. */ }
   if (soundEnabled) blip(520, 0.05);
 });
 

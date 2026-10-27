@@ -1,5 +1,5 @@
-// Pointer lock drives a visible cursor without letting it leave the game.
-export function createMouseAim({ canvas, reticle, getInitialPosition, onUnlock, onError }) {
+// Pointer lock tracks an aim point; the game renders its marker on the ground.
+export function createMouseAim({ canvas, getInitialPosition, onUnlock, onError }) {
   const position = { x: 0, y: 0 };
   let enabled = false;
   let locked = false;
@@ -9,15 +9,16 @@ export function createMouseAim({ canvas, reticle, getInitialPosition, onUnlock, 
   function setPosition(x, y) {
     position.x = Math.max(12, Math.min(canvas.clientWidth - 12, x));
     position.y = Math.max(12, Math.min(canvas.clientHeight - 12, y));
-    reticle.style.left = `${position.x}px`;
-    reticle.style.top = `${position.y}px`;
   }
 
   function fail() {
     if (!pending) return;
     pending = false;
     aiming = false;
-    if (enabled) onError();
+    if (enabled) {
+      canvas.focus({ preventScroll: true });
+      onError();
+    }
   }
 
   document.addEventListener('pointerlockchange', () => {
@@ -29,7 +30,6 @@ export function createMouseAim({ canvas, reticle, getInitialPosition, onUnlock, 
       locked = false;
       document.exitPointerLock();
     }
-    reticle.hidden = !locked;
     if (locked && !wasLocked) {
       canvas.focus({ preventScroll: true });
       const start = getInitialPosition();
@@ -57,7 +57,6 @@ export function createMouseAim({ canvas, reticle, getInitialPosition, onUnlock, 
       if (!enabled) {
         aiming = false;
         pending = false;
-        reticle.hidden = true;
         if (document.pointerLockElement === canvas) document.exitPointerLock();
       }
     },

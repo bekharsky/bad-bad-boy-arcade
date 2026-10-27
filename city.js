@@ -1,8 +1,11 @@
 import * as THREE from 'three';
+import { createTram, createHarbor } from './city-scenery.js';
 
 export const CITY_STOREY_HEIGHT = 1.15;
+export const CITY_SPAWN = Object.freeze({ x: -5, z: 7 });
+const BOULEVARD_Z = -5;
 
-// A small, walkable Nordic neighbourhood. Dimensions are in game metres.
+// A walkable Nordic harbour neighbourhood. Dimensions are in game metres.
 export function createCity(scene) {
   const colliders = [];
   const batches = new Map();
@@ -13,6 +16,9 @@ export function createCity(scene) {
     cylinder: new THREE.CylinderGeometry(0.5, 0.5, 1, 10),
     sphere: new THREE.IcosahedronGeometry(0.5, 1),
   };
+  for (const geometry of Object.values(geometries)) {
+    if (!geometry.index) geometry.setIndex(Array.from({ length: geometry.attributes.position.count }, (_, i) => i));
+  }
   const dummy = new THREE.Object3D();
   let seed = 37;
   const random = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
@@ -47,28 +53,31 @@ export function createCity(scene) {
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
   texture.repeat.set(12, 12);
   texture.anisotropy = 4;
-  surface(64, 64, 0, 0, '#b5b2a6', -0.045, texture);
-  surface(6.5, 60, 0, 0, '#414b53', -0.025);
-  surface(60, 6.5, 0, 0, '#414b53', -0.024);
+  surface(92, 70, -4, 6, '#b5b2a6', -0.045, texture);
+  // The boulevard, rails and shoreline all run east–west. The square sits
+  // beside the street, so asphalt never disappears underneath plaza paving.
+  surface(76, 9.4, 0, BOULEVARD_Z, '#414b53', -.018);
+  const trackTexture = texture.clone();
+  trackTexture.repeat.set(16, .65);
+  surface(76, 2.25, 0, BOULEVARD_Z, '#a39e88', -.006, trackTexture);
+  surface(76, 3.6, 0, -11.6, '#b6b6a8', -.022);
+  surface(76, 5.4, 0, -25.5, '#c3c3b3', -.02);
   const plazaTexture = texture.clone();
-  plazaTexture.repeat.set(3.6, 3);
-  surface(14, 12, 0, 0, '#d0c4af', 0.002, plazaTexture);
-  // Pale granite border around the central square, with openings onto streets.
-  for (const s of [-1, 1]) {
-    for (const offset of [-5.2, 5.2]) {
-      part('box', '#c4c7c1', offset, 0.035, s * 6.12, 3.5, 0.07, 0.22);
-      part('box', '#c4c7c1', s * 7.12, 0.035, offset * 0.85, 0.22, 0.07, 2.8);
-    }
-    // Zebra crossings and the tram rails leading into the square.
-    for (let n = -2; n <= 2; n++) {
-      part('box', '#e6dfc8', n * 1.05, -0.014, s * 8, 0.58, 0.012, 1.6);
-      part('box', '#e6dfc8', s * 9, -0.014, n * 1.05, 1.6, 0.012, 0.58);
-    }
-    for (let n = 11; n <= 27; n += 3.5) {
-      part('box', '#d4c9a3', 0, -0.014, s * n, 0.1, 0.012, 1.6);
-      part('box', '#d4c9a3', s * n, -0.014, 0, 1.6, 0.012, 0.1);
-    }
-    for (const x of [-1.2, 1.2]) part('box', '#8b9c9e', x, -0.012, s * 17.5, 0.055, 0.014, 16);
+  plazaTexture.repeat.set(5.5, 3.75);
+  surface(22, 15, 0, 8.5, '#d0c4af', .002, plazaTexture);
+  for (const x of [-11.12, 11.12]) {
+    for (const z of [4, 13]) part('box', '#c4c7c1', x, .035, z, .22, .07, 5.8);
+  }
+  for (const x of [-7.2, 7.2]) part('box', '#c4c7c1', x, .035, 16.1, 7, .07, .22);
+  // Crossings connect the shop square, port alleys and waterfront promenade.
+  for (const x of [-10, 10]) for (let n = -4; n <= 4; n++) {
+    part('box', '#e6dfc8', x, .008, BOULEVARD_Z + n, 1.9, .012, .52);
+  }
+  for (const z of [BOULEVARD_Z - .65, BOULEVARD_Z + .65]) part('box', '#869998', 0, .025, z, 76, .025, .065);
+  for (const z of [BOULEVARD_Z - 4.5, BOULEVARD_Z + 4.5]) part('box', '#d7d3bd', 0, .006, z, 76, .012, .1);
+  for (let x = -34; x <= 34; x += 3.5) for (const side of [-1, 1]) {
+    if (Math.abs(Math.abs(x) - 10) < 2.4) continue;
+    part('box', '#e2ddc7', x, .009, BOULEVARD_Z + side * 1.65, 1.6, .012, .07);
   }
   function sign(text, x, y, z, width, color = '#254e50') {
     const c = document.createElement('canvas'); c.width = 512; c.height = 96;
@@ -82,77 +91,117 @@ export function createCity(scene) {
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, 256, 50);
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, width * 96 / 512), new THREE.MeshStandardMaterial({ map: t, roughness: 0.8 }));
-    mesh.position.set(x - (activeBuilding?.x ?? 0), y, z - (activeBuilding?.z ?? 0));
-    (activeBuilding?.group ?? scene).add(mesh);
-    if (activeBuilding) { activeBuilding.materials.push(mesh.material); activeBuilding.meshes.push(mesh); }
+    mesh.position.set(x, y, z);
+    scene.add(mesh);
     return mesh;
-  }
-  // Rooftop sign for the corner shop: red panel, tilted so it does not copy a real logo.
-  function roofLogo(x, z, d, h) {
-    const c = document.createElement('canvas'); c.width = 1024; c.height = 256;
-    const g = c.getContext('2d');
-    g.fillStyle = '#e4002b'; g.fillRect(0, 0, 1024, 256);
-    g.fillStyle = '#ffffff'; g.textBaseline = 'middle';
-    g.font = 'bold 230px sans-serif'; g.textAlign = 'center'; g.fillText('V', 150, 136);
-    g.font = 'bold 100px sans-serif'; g.textAlign = 'left'; g.fillText('verkkopaukka', 290, 136);
-    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
-    const width = 3.6;
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, width * 256 / 1024), new THREE.MeshStandardMaterial({ map: t, roughness: 0.6 }));
-    // Local to the building group: stands on the roof, set back from the front edge, facing the square.
-    mesh.position.set(0, h + 0.35 + width / 4 / 2, d / 2 - 0.35);
-    mesh.rotation.z = 0.12;
-    activeBuilding.group.add(mesh);
-    activeBuilding.materials.push(mesh.material); activeBuilding.meshes.push(mesh);
   }
   const colors = ['#cd9a7f', '#d5c590', '#8fa9a4', '#ceb7a4', '#b38b84', '#a6b2be'];
   let buildingIndex = 0;
-  function building(x, z, w, d, h, logo = false) {
+  function building(x, z, w, d, h, options = {}) {
     const group = new THREE.Group();
+    group.name = options.name ?? 'Residential building';
     group.position.set(x, 0, z);
+    group.rotation.y = options.turn ?? 0;
     activeBuilding = {
       group, x, z, batches: new Map(), materials: [], meshes: [], opacity: 1, hiddenUntil: 0,
       bounds: new THREE.Box3(),
     };
-    const color = colors[buildingIndex++ % colors.length];
-    obstacle(x, z, w + 0.12, d + 0.12, h + 1);
+    const kind = options.kind ?? 'residential';
+    const color = options.color ?? colors[buildingIndex % colors.length];
+    buildingIndex++;
+    const turned = Math.abs(Math.sin(group.rotation.y)) > .5;
+    obstacle(x, z, (turned ? d : w) + .12, (turned ? w : d) + .12, h + 1);
     part('box', color, x, h / 2, z, w, h, d);
-    part('box', '#87877e', x, 0.16, z, w + 0.08, 0.32, d + 0.08);
-    part('box', '#e0d6c0', x, h - 0.14, z, w + 0.23, 0.22, d + 0.23);
-    part('box', '#48565d', x, h + 0.17, z, w + 0.1, 0.35, d + 0.1);
-    part('box', '#6e7370', x + w * 0.23, h + 0.6, z + d * 0.2, 0.45, 0.8, 0.5);
-    const floors = Math.floor(h / 1.18);
-    const columns = Math.floor(w / 1.2);
-    for (const side of [-1, 1]) {
-      for (let row = 0; row < floors; row++) for (let col = 0; col < columns; col++) {
-        const wx = x + (col - (columns - 1) / 2) * 1.15;
-        const wy = 0.85 + row * CITY_STOREY_HEIGHT;
-        part('box', '#e2d7bd', wx, wy, z + side * (d / 2 + 0.025), 0.67, 0.85, 0.07);
-        part('box', random() > 0.42 ? '#edce87' : '#536f79', wx, wy, z + side * (d / 2 + 0.07), 0.49, 0.66, 0.05, 0, true);
-        part('box', '#c8bfa8', wx, wy, z + side * (d / 2 + 0.11), 0.04, 0.67, 0.035);
-      }
-      for (let row = 0; row < floors; row++) for (let col = 0; col < Math.floor(d / 1.3); col++) {
-        part('box', '#dfcda3', x + side * (w / 2 + 0.03), 0.85 + row * CITY_STOREY_HEIGHT, z + (col - (Math.floor(d / 1.3) - 1) / 2) * 1.2, 0.07, 0.78, 0.55);
-      }
-    }
+    part('box', '#87877e', x, .16, z, w + .08, .32, d + .08);
+    part('box', '#e0d6c0', x, h - .14, z, w + .23, .22, d + .23);
+    part('box', '#48565d', x, h + .17, z, w + .1, .35, d + .1);
     const front = z + d / 2;
-    part('box', '#31434a', x, 0.6, front + 0.1, 0.8, 1.2, 0.15);
-    if (buildingIndex % 3 === 0) {
-      part('box', '#385f5a', x, 1.3, front + 0.45, w * 0.75, 0.18, 0.9);
-      sign(['CAFE', 'KIOSK', 'BAKERY'][Math.floor(buildingIndex / 3) % 3], x, 1.65, front + 0.12, w * 0.7);
+    if (kind === 'warehouse') {
+      // Brick courses, pilasters, arched windows and large loading doors.
+      for (const side of [-1, 1]) {
+        for (let row = .55; row < h - .35; row += .48) {
+          part('box', '#a16e59', x, row, z + side * (d / 2 + .014), w, .018, .024);
+          for (let col = -w / 2 + .6; col < w / 2; col += 1.2) {
+            part('box', '#a16e59', x + col + (Math.round(row / .48) % 2) * .35, row + .23, z + side * (d / 2 + .015), .018, .44, .026);
+          }
+        }
+        for (let col = -w / 2 + 1; col <= w / 2 - .8; col += 1.8) {
+          part('box', '#b68161', x + col, h / 2, z + side * (d / 2 + .08), .18, h, .18);
+          for (const y of [1.1, 2.9]) {
+            part('box', '#dfc89e', x + col + .7, y, z + side * (d / 2 + .05), .7, .95, .08);
+            part('box', '#36515a', x + col + .7, y + .02, z + side * (d / 2 + .1), .51, .72, .05);
+            part('sphere', '#36515a', x + col + .7, y + .36, z + side * (d / 2 + .1), .51, .36, .06);
+          }
+        }
+      }
+      for (const offset of [-w * .27, w * .27]) {
+        part('box', '#d0ba91', x + offset, 1, front + .17, 1.65, 2.05, .17);
+        part('box', '#405458', x + offset, .97, front + .27, 1.36, 1.85, .05);
+      }
+      part('box', '#6e7370', x, h + .42, z, w + .1, .2, d + .1);
+    } else if (kind === 'terminal') {
+      for (const side of [-1, 1]) {
+        part('box', '#345967', x, h * .5, z + side * (d / 2 + .04), w - .45, h * .66, .1);
+        for (let col = -w / 2 + .65; col < w / 2; col += 1.15) {
+          part('box', '#c5cfcb', x + col, h * .5, z + side * (d / 2 + .11), .075, h * .68, .08);
+        }
+        part('box', '#526d71', x, h * .48, z + side * (d / 2 + .12), w, .13, .12);
+      }
+      part('box', '#d2d8cc', x, h + .25, z, w + 1.2, .22, d + 1.3);
+      part('box', '#394c50', x, 2.3, front + .9, w + .4, .22, 2.3);
+      part('box', '#d7d2b7', x, .06, front + .85, w + .8, .12, 2.1);
+      for (const offset of [-w * .4, w * .4]) part('box', '#c3c7b6', x + offset, 1.15, front + 1.55, .12, 2.3, .12);
+      obstacle(x, front + .7, w + .5, 2.3, 2.5);
+    } else if (kind === 'shop') {
+      // A larger silver department store, with a red tower and glass frontage.
+      for (let y = 1.4; y < h; y += 1.3) {
+        for (const side of [-1, 1]) {
+          part('box', '#405c66', x, y, z + side * (d / 2 + .025), w - .35, .25, .07);
+          part('box', '#d8dacf', x + side * (w / 2 + .04), y, z, .08, .12, d);
+        }
+      }
+      for (const side of [-1, 1]) {
+        part('box', '#638c92', x + side * (w / 2 + .05), 1, z, .1, 1.65, d - .5);
+        part('box', '#638c92', x, 1, z + side * (d / 2 + .05), w - .5, 1.65, .1);
+      }
+      part('box', '#bb2635', x - w * .38, h * .54, front + .16, .65, h * .94, .3);
+      part('box', '#405058', x, h + .4, z, w * .7, .45, d * .7);
+    } else {
+      part('box', '#6e7370', x + w * .23, h + .6, z + d * .2, .45, .8, .5);
+      const floors = Math.floor(h / 1.18), columns = Math.floor(w / 1.2);
+      for (const side of [-1, 1]) {
+        for (let row = 0; row < floors; row++) for (let col = 0; col < columns; col++) {
+          const wx = x + (col - (columns - 1) / 2) * 1.15, wy = .85 + row * CITY_STOREY_HEIGHT;
+          part('box', '#e2d7bd', wx, wy, z + side * (d / 2 + .025), .67, .85, .07);
+          part('box', random() > .42 ? '#edce87' : '#536f79', wx, wy, z + side * (d / 2 + .07), .49, .66, .05, 0, true);
+          part('box', '#c8bfa8', wx, wy, z + side * (d / 2 + .11), .04, .67, .035);
+        }
+        for (let row = 0; row < floors; row++) for (let col = 0; col < Math.floor(d / 1.3); col++) {
+          part('box', '#dfcda3', x + side * (w / 2 + .03), .85 + row * CITY_STOREY_HEIGHT, z + (col - (Math.floor(d / 1.3) - 1) / 2) * 1.2, .07, .78, .55);
+        }
+      }
+      part('box', '#31434a', x, .6, front + .1, .8, 1.2, .15);
+      if (options.cafe) {
+        part('box', '#385f5a', x, 1.8, front + .45, w * .85, .18, 1.1);
+        part('box', '#395b60', x, .9, front + .1, w * .72, 1.45, .12);
+      }
     }
-    if (logo) roofLogo(x, z, d, h);
     buildings.push(activeBuilding);
     scene.add(group);
     activeBuilding = null;
   }
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-    building(sx * 10.2, sz * 10, 4.5, 4.7, 3.5 + random() * 1.7, sx > 0 && sz < 0);
-    building(sx * 16, sz * 9.7, 4.7, 4.4, 3.2 + random() * 2.5);
-    building(sx * 10, sz * 16.3, 4.8, 4.5, 4 + random() * 2);
-    building(sx * 16, sz * 16.3, 4.4, 4.7, 3.5 + random() * 2.5);
-    building(sx * 25, sz * 10, 5.5, 5, 5 + random() * 3);
-    building(sx * 10, sz * 25, 5, 5, 6 + random() * 3);
-  }
+  // The industrial waterfront is opposite the colourful homes and cafés.
+  building(-19, -18.5, 10, 7, 4.5, { kind: 'warehouse', color: '#985442', name: 'West brick warehouse' });
+  building(-3.5, -19.2, 12, 6.5, 4.8, { kind: 'warehouse', color: '#a15e49', name: 'East brick warehouse' });
+  building(17.5, -18, 12, 8.5, 4.1, { kind: 'terminal', color: '#77888a', name: 'West harbor terminal' });
+  building(-14, 7.5, 7.2, 8, 6.8, { kind: 'shop', color: '#c3c8c4', name: 'Verkkopaukka' });
+  building(17, 5.8, 7, 7, 5.8, { cafe: 'KAHVILA SATAMA', turn: -Math.PI / 2, color: '#d2b791' });
+  building(-22.5, 17, 5, 6, 5.4, { cafe: 'LEIPOMO', color: '#a9bbb2' });
+  building(17.8, 17.5, 6, 5.5, 6.2, { cafe: 'CAFE HELMI', color: '#bd8c77' });
+  building(4.5, 22, 7.5, 5.2, 5.6, { cafe: 'KIOSKI', turn: Math.PI, color: '#a6b2be' });
+  building(-7.5, 22, 6, 5, 5.8, { color: '#d5c590' });
+  for (const x of [-22, -8, 8, 23]) building(x, 34, 6.5, 6, 6 + random() * 2);
+  building(35, 8, 7, 8, 7.4, { color: '#b2aaa1' });
   function lamp(x, z) {
     part('cylinder', '#33454b', x, 1.25, z, 0.09, 2.5, 0.09);
     part('cylinder', '#33454b', x, 0.1, z, 0.3, 0.2, 0.3);
@@ -169,31 +218,58 @@ export function createCity(scene) {
     part('sphere', '#7d985f', x - 0.3, 2.65, z, 1.25, 1.2, 1.25);
     obstacle(x, z, 1.3, 1.3, 3.25);
   }
-  for (const s of [-1, 1]) {
-    for (const x of [-5.7, 5.7]) lamp(x, s * 4.9);
-    planter(s * 5.4, -2.7); planter(s * 5.4, 3);
-    for (const z of [-14, 14]) { lamp(s * 4.2, z); planter(s * 6, z); }
-    // Benches flank the square; the centre stays open for running and turning.
-    part('box', '#a57c4d', s * 4.9, 0.44, 0, 0.55, 0.12, 1.6);
-    part('box', '#a57c4d', s * 5.17, 0.74, 0, 0.08, 0.65, 1.6);
-    for (const z of [-0.6, 0.6]) part('box', '#3b4849', s * 4.9, 0.2, z, 0.45, 0.4, 0.09);
-    obstacle(s * 4.95, 0, 0.7, 1.7, 1.1);
-    // Parked cars along the east–west street.
-    for (const x of [12, 17]) {
-      const px = s * x, pz = 4.1;
-      part('box', s > 0 ? '#cc8058' : '#6593a0', px, 0.46, pz, 1.8, 0.52, 0.85);
-      part('box', '#384e59', px - 0.08, 0.86, pz, 0.95, 0.42, 0.7);
-      for (const wheel of [-0.6, 0.6]) for (const side of [-1, 1]) part('sphere', '#30393e', px + wheel, 0.23, pz + side * 0.43, 0.4, 0.4, 0.18);
-      obstacle(px, pz, 1.9, 1, 1.1);
-    }
+  for (const x of [-24, -8, 8, 25]) {
+    lamp(x, 1.1);
+    lamp(x, -24.7);
   }
-  const squareSign = sign('BAD BAD BOY  /  HELSINKI', 0, 0.011, -5.1, 3.5, '#4b6267');
+  for (const [x, z] of [[-9, 13.7], [9.2, 13.7], [9.2, 3.3], [-10, -25.6], [7, -25.6]]) planter(x, z);
+  // Café terraces face the open square, leaving broad paths around the tables.
+  for (const [x, z] of [[12.2, 4.5], [12.2, 8], [16, 21.7]]) {
+    part('cylinder', '#c8b592', x, .75, z, .95, .12, .95);
+    part('cylinder', '#3b4849', x, .38, z, .09, .7, .09);
+    for (const side of [-1, 1]) {
+      part('box', '#a57c4d', x, .43, z + side * .8, .5, .12, .5);
+      part('box', '#40514d', x, .2, z + side * .8, .08, .4, .45);
+    }
+    obstacle(x, z, 1.1, 2.2, 1);
+  }
+  for (const x of [-7, 6]) {
+    part('box', '#a57c4d', x, .44, 16.9, 1.9, .12, .55);
+    part('box', '#a57c4d', x, .74, 17.17, 1.9, .65, .08);
+    obstacle(x, 16.95, 2, .7, 1.1);
+  }
+  for (const [x, z, color] of [[-25, -11.5, '#6593a0'], [25, -11.5, '#cc8058'], [-23, 5, '#9e5045']]) {
+    part('box', color, x, .46, z, 1.8, .52, .85);
+    part('box', '#384e59', x - .08, .86, z, .95, .42, .7);
+    for (const wheel of [-.6, .6]) for (const side of [-1, 1]) part('sphere', '#30393e', x + wheel, .23, z + side * .43, .4, .4, .18);
+    obstacle(x, z, 1.9, 1, 1.1);
+  }
+  // Overhead contact wire and cross spans make the tracks part of the street.
+  part('box', '#455854', 0, 4.08, BOULEVARD_Z, 76, .025, .025);
+  for (const x of [-26, -13, 0, 13, 26]) {
+    for (const z of [-10.6, .9]) {
+      part('cylinder', '#52625e', x, 2.2, z, .1, 4.4, .1);
+      obstacle(x, z, .2, .2, 4.4);
+    }
+    part('box', '#52625e', x, 4.25, -4.85, .025, .025, 11.5);
+  }
+  const squareSign = sign('BAD BAD BOY / HELSINKI', 0, .025, 14.5, 5.5, '#4b6267');
   squareSign.rotation.x = -Math.PI / 2;
   // Physical bollards and painted edges communicate the playable boundary.
-  for (let n = -20; n <= 20; n += 2) for (const s of [-1, 1]) {
-    part('cylinder', '#697c7d', n, 0.28, s * 22.2, 0.13, 0.56, 0.13);
-    part('cylinder', '#697c7d', s * 22.2, 0.28, n, 0.13, 0.56, 0.13);
+  for (let n = -26; n <= 26; n += 2) for (const s of [-1, 1]) {
+    part('cylinder', '#697c7d', n, 0.28, s * 28.2, 0.13, 0.56, 0.13);
+    part('cylinder', '#697c7d', s * 28.2, 0.28, n, 0.13, 0.56, 0.13);
   }
+  // Granite seawall and mooring posts mark the northern edge of the city.
+  part('box', '#697e80', 0, -.1, -28.75, 76, .55, .5);
+  for (let x = -26; x <= 26; x += 4) {
+    part('cylinder', '#334b52', x, .15, -28.45, .24, .3, .24);
+    part('box', '#334b52', x, .31, -28.45, .4, .08, .15);
+  }
+  const tram = createTram(scene, { z: BOULEVARD_Z });
+  const harbor = createHarbor(scene);
+  for (const x of [-26, 9, 26]) obstacle(x, -26.6, 1.7, .85, 5.4);
+
   for (const batch of batches.values()) {
     const material = new THREE.MeshStandardMaterial({ color: batch.color, roughness: 0.85, emissive: batch.glow ? batch.color : '#000000', emissiveIntensity: batch.glow ? 0.22 : 0 });
     const mesh = new THREE.InstancedMesh(geometries[batch.shape], material, batch.transforms.length);
@@ -285,9 +361,10 @@ export function createCity(scene) {
     }
   }
 
-  const limit = 21.8;
+  const limit = 27.8;
+  const overlaps = (c, x, z, r, y = null) => x + r > c.minX && x - r < c.maxX && z + r > c.minZ && z - r < c.maxZ && (y === null || (y + r > 0 && y - r < c.height));
   function blocked(x, z, r = 0.4, y = null) {
-    return Math.abs(x) + r > limit || Math.abs(z) + r > limit || colliders.some(c => x + r > c.minX && x - r < c.maxX && z + r > c.minZ && z - r < c.maxZ && (y === null || (y + r > 0 && y - r < c.height)));
+    return Math.abs(x) + r > limit || Math.abs(z) + r > limit || colliders.some(c => overlaps(c, x, z, r, y)) || (tram.root.visible && overlaps(tram.collider, x, z, r, y));
   }
   function move(entity, dx, dz, r) {
     const x = THREE.MathUtils.clamp(entity.x + dx, -limit + r, limit - r);
@@ -309,15 +386,18 @@ export function createCity(scene) {
     return true;
   }
   // A shared flood field routes all enemies around buildings and street furniture.
-  const width = 44, cells = width * width;
+  const halfWidth = Math.ceil(limit), width = halfWidth * 2, cells = width * width;
   const distances = new Int16Array(cells);
   const open = new Uint8Array(cells);
   const queue = new Int16Array(cells);
-  const cell = (x, z) => Math.max(0, Math.min(43, Math.floor(z + 22))) * width + Math.max(0, Math.min(43, Math.floor(x + 22)));
-  const coords = i => ({ x: i % width - 21.5, z: Math.floor(i / width) - 21.5 });
-  const neighbours = i => [i % width > 0 ? i - 1 : -1, i % width < 43 ? i + 1 : -1, i >= width ? i - width : -1, i < cells - width ? i + width : -1].filter(n => n >= 0);
-  for (let i = 0; i < cells; i++) { const p = coords(i); open[i] = Number(!blocked(p.x, p.z, 0.56)); }
+  const cell = (x, z) => Math.max(0, Math.min(width - 1, Math.floor(z + halfWidth))) * width + Math.max(0, Math.min(width - 1, Math.floor(x + halfWidth)));
+  const coords = i => ({ x: i % width - halfWidth + .5, z: Math.floor(i / width) - halfWidth + .5 });
+  const neighbours = i => [i % width > 0 ? i - 1 : -1, i % width < width - 1 ? i + 1 : -1, i >= width ? i - width : -1, i < cells - width ? i + width : -1].filter(n => n >= 0);
   let lastCell = -1;
+  function refreshNavigation() {
+    for (let i = 0; i < cells; i++) { const p = coords(i); open[i] = Number(!blocked(p.x, p.z, 0.56)); }
+    lastCell = -1;
+  }
   function routeTo(x, z) {
     let target = cell(x, z);
     if (!open[target]) {
@@ -352,5 +432,52 @@ export function createCity(scene) {
     for (let i = 0; i < cells; i++) if (distances[i] >= 5 && distances[i] <= 12) return coords(i);
     return { x: 0, z: 4 };
   }
-  return { move, routeTo, chase, spawnPoint, lineClear, lineClear3D, updateVisibility, canStandAt: (x, z, radius) => !blocked(x, z, radius) };
+  // Back courtyards are beyond the houses when viewed from the square. Keep
+  // them explicit so a random retry can never put a reward back on the plaza.
+  const courtyards = [[-20, 7.5], [-7.5, 26], [-19, -24.2], [17.5, -24.5], [-3.5, -24.4], [23, 5.8], [-26, 17], [23, 20]];
+  function pickupPoint(index, radius) {
+    const [x, z] = courtyards[index % courtyards.length];
+    for (let attempt = 0; attempt < 12; attempt++) {
+      const px = x + (Math.random() - .5) * .65, pz = z + (Math.random() - .5) * .65;
+      if (!blocked(px, pz, radius) && distances[cell(px, pz)] >= 0) return { x: px, z: pz };
+    }
+    return !blocked(x, z, radius) && distances[cell(x, z)] >= 0 ? { x, z } : null;
+  }
+
+  let sceneryTime = 0, tramCell = null;
+  function reset() {
+    tram.reset();
+    sceneryTime = 0;
+    tramCell = null;
+    refreshNavigation();
+    routeTo(CITY_SPAWN.x, CITY_SPAWN.z);
+  }
+  function update(dt, entities) {
+    sceneryTime += dt;
+    harbor.update(sceneryTime);
+    const departed = tram.update(dt);
+    if (tram.root.visible) {
+      for (const entity of entities) {
+        if (entity.alive === false) continue;
+        const radius = entity.radius ?? entity.size;
+        if (!overlaps(tram.collider, entity.x, entity.z, radius)) continue;
+        // A passing tram nudges actors safely onto the clear sides of the
+        // boulevard; it cannot trap or carry them into a building or the sea.
+        const side = entity.z >= BOULEVARD_Z ? 1 : -1;
+        for (const sign of [side, -side]) {
+          const z = sign > 0 ? tram.collider.maxZ + radius + .08 : tram.collider.minZ - radius - .08;
+          if (!blocked(entity.x, z, radius)) {
+            entity.z = z;
+            entity.root.position.set(entity.x, 0, entity.z);
+            break;
+          }
+        }
+      }
+    }
+    const occupiedCell = tram.root.visible ? Math.floor(tram.root.position.x) : null;
+    if (occupiedCell !== tramCell) { tramCell = occupiedCell; refreshNavigation(); }
+    return departed;
+  }
+  reset();
+  return { move, routeTo, chase, spawnPoint, pickupPoint, lineClear, lineClear3D, updateVisibility, update, reset, canStandAt: (x, z, radius) => !blocked(x, z, radius) };
 }

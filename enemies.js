@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
 
+export const ENEMY_HEALTH = Object.freeze({ snail: 4, slug: 2 });
+
 const templates = new Map();
 
 export async function loadEnemyModels() {
@@ -51,7 +53,7 @@ export function createEnemy(kind, level) {
   return {
     root, body, model, kind, mixer, actions, state: 'walk', materials: [...materials.values()],
     size: radius, hitHeight: size.y * scale * 0.52, baseScale: scale,
-    hp: 4 + Math.floor((level - 1) / 3),
+    hp: ENEMY_HEALTH[kind] + Math.floor((level - 1) / 5),
     speed: 0.5 + Math.random() * 0.15 + Math.min(level, 12) * 0.035,
     hit: 0, attack: Math.random() * 0.5, alive: true, wobble: Math.random() * Math.PI * 2,
   };
