@@ -213,8 +213,30 @@ function buildSenateSquare(root) {
     street.box('#47616b', x, 2.1, 18.5, .8, .65, .12);
     street.box('#e6dfbb', x, 2.1, 18.57, .36, .32, .025);
   }
-  // Subtle bollards mark the playable alleys; no invisible harbour water boundary.
-  for (let x = -32; x <= 32; x += 2) street.geometry('#747e77', new THREE.CylinderGeometry(.08, .12, .55, 8).translate(x, .275, 34.4));
+  // Match the harbor's visible perimeter on every exposed edge. Solid buildings
+  // and the church terrace already mark their sections of the boundary.
+  const boundary = createSceneryModel('Senate Square boundary');
+  const { minX, maxX, minZ, maxZ } = senateSquareMap.bounds;
+  const width = maxX - minX, depth = maxZ - minZ;
+  for (const x of [minX, maxX]) boundary.box('#c2c7b8', x, .025, (minZ + maxZ) / 2, .22, .05, depth);
+  for (const z of [minZ, maxZ]) boundary.box('#c2c7b8', (minX + maxX) / 2, .025, z, width, .05, .22);
+  function bollard(x, z) {
+    if (colliders.some(collider => overlaps(collider, x, z, .18))) return;
+    boundary.geometry('#697c7d', new THREE.CylinderGeometry(.085, .11, .62, 10).translate(x, .31, z));
+    boundary.geometry('#d5d7bf', new THREE.CylinderGeometry(.09, .09, .065, 10).translate(x, .48, z));
+    boundary.geometry('#697c7d', new THREE.SphereGeometry(.085, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2).translate(x, .62, z));
+  }
+  for (let x = minX; x <= maxX; x += 2) {
+    bollard(x, minZ - .3);
+    bollard(x, maxZ + .3);
+  }
+  for (let z = minZ; z <= maxZ; z += 2) {
+    // The tram enters through the street portals; no posts stand on its tracks.
+    if (Math.abs(z - TRAM_Z) < 3.3) continue;
+    bollard(minX - .3, z);
+    bollard(maxX + .3, z);
+  }
+  root.add(boundary.finish({ vertexColors: true }));
   root.add(street.finish());
 
   const tram = createTram(root, { z: TRAM_Z, display: '7  SENAATINTORI', extent: 44, initialWait: 6 });
