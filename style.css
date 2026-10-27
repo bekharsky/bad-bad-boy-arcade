@@ -52,8 +52,9 @@ button { font: inherit; }
 .hero-hp span { display: block; width: 100%; height: 100%; background: linear-gradient(90deg, #ff8b54, #ffd34e); transition: width .2s, background .2s; }
 
 .hud { position: absolute; z-index: 2; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: clamp(12px, 2.4vw, 32px); padding: 20px clamp(16px, 4vw, 54px); pointer-events: none; background: linear-gradient(180deg, rgba(10, 11, 17, .68), transparent); }
-.brand { margin-right: auto; color: var(--ink); font: 800 clamp(17px, 2vw, 24px)/1 "Barlow Condensed", sans-serif; letter-spacing: .13em; white-space: nowrap; }
+.brand { display: flex; align-items: center; margin-right: auto; color: var(--ink); font: 800 clamp(17px, 2vw, 24px)/1 "Barlow Condensed", sans-serif; letter-spacing: .13em; white-space: nowrap; }
 .brand-mark { color: var(--gold); margin-right: 8px; }
+.brand-city::before { content: "· "; }
 .stat { display: grid; gap: 3px; text-align: center; min-width: 50px; }
 .stat-label { color: #aaa7b3; font: 700 10px/1 "Barlow Condensed", sans-serif; letter-spacing: .16em; }
 .stat strong { color: var(--ink); font: 800 21px/1 "Barlow Condensed", sans-serif; }
@@ -70,9 +71,9 @@ button { font: inherit; }
 .overlay { position: absolute; z-index: 4; inset: 0; display: grid; place-items: safe center; padding: 24px; overflow-y: auto; background: linear-gradient(90deg, #11131bcc, #11131b44 75%); transition: opacity .25s; }
 .overlay.hidden { display: none; }
 .card { width: min(430px, 100%); margin-right: auto; margin-left: clamp(0px, 8vw, 120px); padding: clamp(24px, 4vw, 42px); border: 1px solid #ffffff20; border-radius: 20px; background: linear-gradient(145deg, rgba(32,31,45,.94), rgba(18,19,29,.94)); box-shadow: 0 24px 90px #0008; backdrop-filter: blur(14px); }
-.eyebrow { color: var(--gold); font: 700 11px/1 "Barlow Condensed", sans-serif; letter-spacing: .2em; }
 h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 900 clamp(52px, 8vw, 78px)/.82 "Barlow Condensed", Impact, sans-serif; letter-spacing: -.025em; }
-h1 span { color: var(--gold); }
+.title-line { display: block; }
+.title-accent { color: var(--gold); }
 .card p { max-width: 310px; margin: 22px 0; color: #c5c2ce; font-size: 14px; line-height: 1.6; }
 .primary-button { width: 100%; padding: 14px 18px; border: 0; border-radius: 9px; color: #242018; background: linear-gradient(110deg, #ffe37a, #ffbf37); box-shadow: 0 7px 25px #f0ac2f30; font: 800 14px/1 "Barlow Condensed", sans-serif; letter-spacing: .15em; cursor: pointer; transition: transform .15s, filter .15s; }
 .primary-button:hover:not(:disabled) { transform: translateY(-2px); filter: brightness(1.06); }
@@ -81,7 +82,6 @@ h1 span { color: var(--gold); }
 .credits-link { display: block; width: fit-content; margin: 18px auto 0; color: #b9b6c1; font-size: 10px; text-decoration: none; }
 .credits-link:hover { color: var(--gold); text-decoration: underline; }
 .control-setting { min-width: 0; margin: 0 0 20px; padding: 0; border: 0; }
-.control-setting legend { margin-bottom: 10px; padding: 0; color: var(--gold); font-size: 10px; font-weight: 800; letter-spacing: .12em; }
 .control-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .control-option { position: relative; cursor: pointer; }
 .control-option input { position: absolute; z-index: 1; top: 15px; right: 12px; width: 16px; height: 16px; margin: 0; appearance: none; -webkit-appearance: none; border: 1px solid #ffffff55; border-radius: 50%; cursor: pointer; }
@@ -112,10 +112,7 @@ h1 span { color: var(--gold); }
 .controls-card .assist-setting { min-height: 44px; margin-bottom: 10px; padding: 10px 12px; }
 .controls-card::backdrop { background: #11131bd9; }
 .end-card { margin-right: 0; margin-left: 0; text-align: center; }
-.end-card h2 { font-size: 58px; }
-.end-card p { margin: 8px auto 22px; }
-.final-score { margin: 0 0 22px; color: #aaa7b3; font-size: 10px; font-weight: 800; letter-spacing: .2em; }
-.final-score strong { margin-left: 8px; color: var(--gold); font: 800 27px/1 "Barlow Condensed", sans-serif; letter-spacing: 0; }
+.end-card h2 { margin: 0 0 28px; font-size: 58px; }
 .toast { position: absolute; z-index: 3; top: 82px; left: 50%; transform: translate(-50%, -10px); padding: 9px 15px; border: 1px solid #ffffff20; border-radius: 999px; color: var(--gold); background: #181925df; font: 700 12px/1 "Barlow Condensed", sans-serif; letter-spacing: .12em; opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; }
 .toast.visible { transform: translate(-50%, 0); opacity: 1; }
 .mobile-controls { display: none; }
@@ -124,11 +121,13 @@ h1 span { color: var(--gold); }
 .pressure-track { height: 5px; margin-top: 8px; overflow: hidden; border-radius: 4px; background: #ffffff20; }
 .pressure-track span { display: block; height: 100%; transform: scaleX(0); transform-origin: left; background: linear-gradient(90deg, #fff0a1, #ffbd31); }
 #start-screen .card { position: relative; width: min(360px, 100%); margin: 0; padding: 32px; }
-#start-screen h1 { margin: 24px 0 32px; font-size: 76px; line-height: .86; }
+#start-screen h1 { margin: 24px 0 32px; font-size: clamp(48px, 13vw, 72px); line-height: .9; }
 
 @media (max-width: 680px) {
   .hud { gap: 8px; padding: max(14px, env(safe-area-inset-top)) 14px 14px; }
-  .brand { font-size: clamp(13px, 3.8vw, 17px); letter-spacing: .04em; }
+  .brand { font-size: clamp(17px, 4vw, 21px); line-height: 1.05; letter-spacing: .04em; }
+  .brand-city { display: block; }
+  .brand-city::before { content: none; }
   .stat { min-width: 35px; }
   .stat strong { font-size: 18px; }
   .card { margin: 0; padding: 27px; }
@@ -158,8 +157,6 @@ h1 span { color: var(--gold); }
   #start-screen { padding: 12px; }
   #start-screen .card { width: min(440px, 100%); padding: 20px; }
   #start-screen h1 { margin: 28px 0 24px; font-size: 48px; line-height: .9; }
-  #start-screen h1 br { display: none; }
-  #start-screen h1 span::before { content: ' '; white-space: pre; }
   .controls-card { padding: 18px; }
   .controls-card h2 { margin: 8px 0 12px; font-size: 36px; }
   .controls-card .control-setting { margin-bottom: 12px; }

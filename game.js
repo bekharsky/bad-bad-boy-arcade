@@ -45,7 +45,6 @@ const heroHpFill = document.querySelector('#hero-hp-fill');
 const heroHeadPosition = new THREE.Vector3();
 const scoreLabel = document.querySelector('#score');
 const waveLabel = document.querySelector('#wave');
-const finalScore = document.querySelector('#final-score');
 const toast = document.querySelector('#toast');
 const sprayRange = document.querySelector('#spray-range');
 const pressureFill = document.querySelector('#pressure-fill');
@@ -691,7 +690,6 @@ function endGame() {
   player.tapTimer = 0;
   player.moveSpeed = 0;
   player.turnSpeed = 0;
-  finalScore.textContent = String(score).padStart(4, '0');
   endScreen.classList.remove('hidden');
   blip(80, 0.25);
   keys.clear();
@@ -778,7 +776,6 @@ for (const radio of document.querySelectorAll('[data-control-mode]')) {
 }
 function openSettings() {
   resetInput();
-  document.querySelector('#settings-paused').hidden = !playing;
   settingsDone.textContent = playing ? 'RESUME' : 'DONE';
   if (!controlsDialog.open) controlsDialog.showModal();
   syncMouseAim();
