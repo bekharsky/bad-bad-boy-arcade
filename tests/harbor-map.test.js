@@ -16,19 +16,23 @@ globalThis.document = {
   }
 };
 const THREE = await import('three');
-const { createCity, CITY_SPAWN } = await import('../city.js');
+const { harborMap } = await import('../maps/harbor.js');
+const CITY_SPAWN = harborMap.spawn;
 const { createMedkits } = await import('../medkits.js');
 const setup = () => {
   const scene = new THREE.Scene();
-  return { scene, city: createCity(scene) };
+  const city = harborMap.create();
+  scene.add(city.root);
+  return { scene, city };
 };
 
 test('expanded city keeps its bounds and all eight hidden courtyards walkable and reachable', () => {
   const { city } = setup();
   assert.equal(city.canStandAt(26, 0, .6), true);
   assert.equal(city.canStandAt(0, -28, .6), false);
-  for (let i = 0; i < 8; i++) {
-    const point = city.pickupPoint(i, .86);
+  const points = [...city.pickupPoints('medkit', .86).slice(1), ...city.pickupPoints('battery', .86)];
+  assert.equal(points.length, 8);
+  for (const [i, point] of points.entries()) {
     assert.ok(point, `Courtyard ${i} has space for a pickup and the player`);
     assert.equal(city.canStandAt(point.x, point.z, .86), true);
     assert.equal(city.lineClear(CITY_SPAWN.x, CITY_SPAWN.z, point.x, point.z, .1), false, 'A house hides the reward from the square');
@@ -127,11 +131,29 @@ test('the boulevard stays asphalt on both sides of the tracks past the plaza', (
 test('building facades and roofs have no sign textures', () => {
   const { scene } = setup();
   const names = ['Residential building', 'Verkkopaukka', 'West brick warehouse', 'East brick warehouse', 'West harbor terminal', 'Clarion Hotel Helsinki'];
-  const buildings = scene.children.filter(node => names.includes(node.name));
+  const buildings = [];
+  scene.traverse(node => { if (names.includes(node.name)) buildings.push(node); });
   assert.ok(buildings.length >= 10);
   for (const building of buildings) building.traverse(node => {
     if (!node.isMesh) return;
     const materials = Array.isArray(node.material) ? node.material : [node.material];
     assert.ok(materials.every(material => !material.map), `${building.name} has no sign texture`);
   });
+});
+
+test('reset restores faded buildings and their shadows for the next run', () => {
+  const { city, scene } = setup();
+  const camera = new THREE.PerspectiveCamera();
+  camera.position.set(-14, 3, 15);
+  const hero = new THREE.Group();
+  hero.position.set(-14, 0, 0);
+  city.updateVisibility(camera, hero, 3.45, 1);
+  const meshes = scene.getObjectByName('Verkkopaukka').children;
+  assert.ok(meshes.some(mesh => mesh.material.opacity < .2));
+  city.reset();
+  for (const mesh of meshes) {
+    assert.equal(mesh.material.opacity, 1);
+    assert.equal(mesh.material.transparent, false);
+    assert.equal(mesh.castShadow, true);
+  }
 });

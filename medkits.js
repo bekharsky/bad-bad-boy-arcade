@@ -1,9 +1,8 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
-const KIT_COUNT = 5;
-
-export function createMedkits(scene, city) {
+export function createMedkits(scene, world) {
+  const capacity = world.pickupCapacity('medkit');
   function boxes(parts) {
     const pieces = parts.map(([x, y, z, w, h, d]) => new THREE.BoxGeometry(w, h, d).translate(x, y, z));
     const geometry = mergeGeometries(pieces);
@@ -17,7 +16,7 @@ export function createMedkits(scene, city) {
       [0, .36, 0, .35, .07, .12]
     ]),
     new THREE.MeshStandardMaterial({ color: '#f4f3e9', roughness: .55 }),
-    KIT_COUNT
+    capacity
   );
   const crosses = new THREE.InstancedMesh(
     boxes([
@@ -26,12 +25,12 @@ export function createMedkits(scene, city) {
       [0, .237, 0, .12, .018, .28], [0, .237, 0, .34, .018, .10]
     ]),
     new THREE.MeshStandardMaterial({ color: '#2eaa78', emissive: '#187448', emissiveIntensity: .4, roughness: .6 }),
-    KIT_COUNT
+    capacity
   );
   const halos = new THREE.InstancedMesh(
     new THREE.RingGeometry(.47, .56, 32),
     new THREE.MeshBasicMaterial({ color: '#75e3a8', transparent: true, opacity: .5, depthWrite: false, side: THREE.DoubleSide }),
-    KIT_COUNT
+    capacity
   );
   const meshes = [cases, crosses, halos];
   for (const mesh of meshes) {
@@ -67,10 +66,8 @@ export function createMedkits(scene, city) {
   function reset(player) {
     kits.length = 0;
     time = 0;
-    for (let i = 0; i < KIT_COUNT; i++) {
-      // One emergency kit on the square; the other four reward exploration.
-      const point = i === 0 ? { x: 3.5, z: 9.5 } : city.pickupPoint(i - 1, player.radius + .12);
-      if (point && city.canStandAt(point.x, point.z, player.radius + .12)) kits.push({ ...point, active: true, phase: Math.random() * Math.PI * 2 });
+    for (const point of world.pickupPoints('medkit', player.radius + .12)) {
+      kits.push({ ...point, active: true, phase: Math.random() * Math.PI * 2 });
     }
     render();
   }
@@ -80,7 +77,7 @@ export function createMedkits(scene, city) {
     for (const kit of kits) {
       if (!kit.active || player.hp >= player.maxHp) continue;
       if (Math.hypot(player.x - kit.x, player.z - kit.z) > player.radius + .45) continue;
-      if (!city.lineClear(player.x, player.z, kit.x, kit.z, .12)) continue;
+      if (!world.lineClear(player.x, player.z, kit.x, kit.z, .12)) continue;
       kit.active = false;
       onPickup(Math.min(2, player.maxHp - player.hp));
     }

@@ -1,12 +1,27 @@
 import * as THREE from 'three';
-import { createTram, createHarbor } from './city-scenery.js';
+import { createTram, createHarbor } from './harbor-scenery.js';
+import { createMap } from '../world/map.js';
+import { overlaps } from '../world/navigation.js';
 
-export const CITY_STOREY_HEIGHT = 1.15;
-export const CITY_SPAWN = Object.freeze({ x: -5, z: 7 });
+const STOREY_HEIGHT = 1.15;
 const BOULEVARD_Z = -5;
+const courtyards = [[-20, 7.5], [-7.5, 26], [-19, -24.2], [17.5, -24.5], [-3.5, -24.4], [23, 5.8], [-26, 17], [23, 20]];
+const hiddenPoint = ([x, z]) => ({ x, z, jitter: .65 });
 
-// A walkable Nordic harbour neighbourhood. Dimensions are in game metres.
-export function createCity(scene) {
+export const harborMap = {
+  id: 'harbor',
+  name: 'West Harbor',
+  spawn: { x: -5, z: 7, heading: Math.PI },
+  bounds: { minX: -27.8, maxX: 27.8, minZ: -27.8, maxZ: 27.8 },
+  pickups: {
+    medkit: [{ x: 3.5, z: 9.5 }, ...courtyards.slice(0, 4).map(hiddenPoint)],
+    battery: courtyards.slice(4).map(hiddenPoint),
+  },
+  create() { return createMap(harborMap, buildHarbor); },
+};
+
+// Only harbor scenery and behavior live here; navigation and lifecycle are shared.
+function buildHarbor(scene) {
   const colliders = [];
   const batches = new Map();
   const buildings = [];
@@ -171,13 +186,13 @@ export function createCity(scene) {
       const floors = Math.floor(h / 1.18), columns = Math.floor(w / 1.2);
       for (const side of [-1, 1]) {
         for (let row = 0; row < floors; row++) for (let col = 0; col < columns; col++) {
-          const wx = x + (col - (columns - 1) / 2) * 1.15, wy = .85 + row * CITY_STOREY_HEIGHT;
+          const wx = x + (col - (columns - 1) / 2) * 1.15, wy = .85 + row * STOREY_HEIGHT;
           part('box', '#e2d7bd', wx, wy, z + side * (d / 2 + .025), .67, .85, .07);
           part('box', random() > .42 ? '#edce87' : '#536f79', wx, wy, z + side * (d / 2 + .07), .49, .66, .05, 0, true);
           part('box', '#c8bfa8', wx, wy, z + side * (d / 2 + .11), .04, .67, .035);
         }
         for (let row = 0; row < floors; row++) for (let col = 0; col < Math.floor(d / 1.3); col++) {
-          part('box', '#dfcda3', x + side * (w / 2 + .03), .85 + row * CITY_STOREY_HEIGHT, z + (col - (Math.floor(d / 1.3) - 1) / 2) * 1.2, .07, .78, .55);
+          part('box', '#dfcda3', x + side * (w / 2 + .03), .85 + row * STOREY_HEIGHT, z + (col - (Math.floor(d / 1.3) - 1) / 2) * 1.2, .07, .78, .55);
         }
       }
       part('box', '#31434a', x, .6, front + .1, .8, 1.2, .15);
@@ -323,161 +338,40 @@ export function createCity(scene) {
     house.bounds.setFromObject(house.group).expandByScalar(0.06);
   }
 
-  const sightRay = new THREE.Ray();
-  const intersection = new THREE.Vector3();
-  const cameraRight = new THREE.Vector3();
-  const heroPosition = new THREE.Vector3();
-  const sightTargets = Array.from({ length: 5 }, () => new THREE.Vector3());
-  let visibilityTime = 0;
-  function updateVisibility(camera, hero, height, dt) {
-    visibilityTime += dt;
-    camera.updateMatrixWorld();
-    hero.getWorldPosition(heroPosition);
-    cameraRight.setFromMatrixColumn(camera.matrixWorld, 0);
-    const samples = [[0, 0.12], [0, 0.5], [0, 0.9], [-0.19, 0.6], [0.19, 0.6]];
-    samples.forEach(([side, y], i) => {
-      sightTargets[i].copy(heroPosition).addScaledVector(cameraRight, side * height);
-      sightTargets[i].y += y * height;
-    });
-    for (const house of buildings) {
-      const occluded = sightTargets.some(target => {
-        sightRay.origin.copy(camera.position);
-        sightRay.direction.copy(target).sub(camera.position).normalize();
-        return sightRay.intersectBox(house.bounds, intersection) !== null && intersection.distanceToSquared(camera.position) < target.distanceToSquared(camera.position) - 0.01;
-      });
-      if (occluded) house.hiddenUntil = visibilityTime + 0.15;
-      const target = occluded || visibilityTime < house.hiddenUntil ? 0.12 : 1;
-      let opacity = THREE.MathUtils.damp(house.opacity, target, 14, dt);
-      if (Math.abs(opacity - target) < 0.003) opacity = target;
-      if (Math.abs(opacity - house.opacity) < 0.00001) continue;
-      house.opacity = opacity;
-      for (const material of house.materials) {
-        const transparent = opacity < 1;
-        if (material.transparent !== transparent) { material.transparent = transparent; material.needsUpdate = true; }
-        material.opacity = opacity;
-        material.depthWrite = !transparent;
-      }
-      for (const mesh of house.meshes) mesh.castShadow = opacity > 0.98;
-    }
-  }
-
-  const limit = 27.8;
-  const overlaps = (c, x, z, r, y = null) => x + r > c.minX && x - r < c.maxX && z + r > c.minZ && z - r < c.maxZ && (y === null || (y + r > 0 && y - r < c.height));
-  function blocked(x, z, r = 0.4, y = null) {
-    return Math.abs(x) + r > limit || Math.abs(z) + r > limit || colliders.some(c => overlaps(c, x, z, r, y)) || (tram.root.visible && overlaps(tram.collider, x, z, r, y));
-  }
-  function move(entity, dx, dz, r) {
-    const x = THREE.MathUtils.clamp(entity.x + dx, -limit + r, limit - r);
-    if (!blocked(x, entity.z, r)) entity.x = x;
-    const z = THREE.MathUtils.clamp(entity.z + dz, -limit + r, limit - r);
-    if (!blocked(entity.x, z, r)) entity.z = z;
-  }
-  function lineClear(x, z, tx, tz, r = 0.5) {
-    const steps = Math.ceil(Math.hypot(tx - x, tz - z) / 0.25);
-    for (let i = 1; i <= steps; i++) if (blocked(x + (tx - x) * i / steps, z + (tz - z) * i / steps, r)) return false;
-    return true;
-  }
-  function lineClear3D(from, to, radius = 0) {
-    const steps = Math.max(1, Math.ceil(from.distanceTo(to) / 0.1));
-    for (let i = 0; i <= steps; i++) {
-      const t = i / steps;
-      if (blocked(from.x + (to.x - from.x) * t, from.z + (to.z - from.z) * t, radius, from.y + (to.y - from.y) * t)) return false;
-    }
-    return true;
-  }
-  // A shared flood field routes all enemies around buildings and street furniture.
-  const halfWidth = Math.ceil(limit), width = halfWidth * 2, cells = width * width;
-  const distances = new Int16Array(cells);
-  const open = new Uint8Array(cells);
-  const queue = new Int16Array(cells);
-  const cell = (x, z) => Math.max(0, Math.min(width - 1, Math.floor(z + halfWidth))) * width + Math.max(0, Math.min(width - 1, Math.floor(x + halfWidth)));
-  const coords = i => ({ x: i % width - halfWidth + .5, z: Math.floor(i / width) - halfWidth + .5 });
-  const neighbours = i => [i % width > 0 ? i - 1 : -1, i % width < width - 1 ? i + 1 : -1, i >= width ? i - width : -1, i < cells - width ? i + width : -1].filter(n => n >= 0);
-  let lastCell = -1;
-  function refreshNavigation() {
-    for (let i = 0; i < cells; i++) { const p = coords(i); open[i] = Number(!blocked(p.x, p.z, 0.56)); }
-    lastCell = -1;
-  }
-  function routeTo(x, z) {
-    let target = cell(x, z);
-    if (!open[target]) {
-      let best = Infinity;
-      for (let i = 0; i < cells; i++) if (open[i]) { const p = coords(i), d = (p.x - x) ** 2 + (p.z - z) ** 2; if (d < best) { best = d; target = i; } }
-    }
-    if (target === lastCell) return;
-    lastCell = target; distances.fill(-1);
-    let head = 0, tail = 1; queue[0] = target; distances[target] = 0;
-    while (head < tail) { const i = queue[head++]; for (const n of neighbours(i)) if (open[n] && distances[n] < 0) { distances[n] = distances[i] + 1; queue[tail++] = n; } }
-  }
-  function chase(x, z, tx, tz) {
-    if (lineClear(x, z, tx, tz, 0.54)) return { x: tx - x, z: tz - z };
-    const here = cell(x, z);
-    let next = -1, best = Infinity;
-    for (const i of [here, ...neighbours(here)]) if (open[i] && distances[i] >= 0) {
-      const p = coords(i);
-      const value = distances[i] + Math.hypot(p.x - x, p.z - z) * 0.2;
-      if (value < best && lineClear(x, z, p.x, p.z, 0.5)) { best = value; next = i; }
-    }
-    const p = next < 0 ? { x, z } : coords(next);
-    return { x: p.x - x, z: p.z - z };
-  }
-  function spawnPoint(player, index, count) {
-    for (let tries = 0; tries < 100; tries++) {
-      const angle = index / count * Math.PI * 2 + tries * 0.41;
-      const distance = 7 + Math.random() * 4;
-      const x = player.x + Math.cos(angle) * distance, z = player.z + Math.sin(angle) * distance;
-      if (!blocked(x, z, 0.75) && distances[cell(x, z)] >= 0) return { x, z };
-    }
-    // The navigation field always contains a reachable cell near the player.
-    for (let i = 0; i < cells; i++) if (distances[i] >= 5 && distances[i] <= 12) return coords(i);
-    return { x: 0, z: 4 };
-  }
-  // Back courtyards are beyond the houses when viewed from the square. Keep
-  // them explicit so a random retry can never put a reward back on the plaza.
-  const courtyards = [[-20, 7.5], [-7.5, 26], [-19, -24.2], [17.5, -24.5], [-3.5, -24.4], [23, 5.8], [-26, 17], [23, 20]];
-  function pickupPoint(index, radius) {
-    const [x, z] = courtyards[index % courtyards.length];
-    for (let attempt = 0; attempt < 12; attempt++) {
-      const px = x + (Math.random() - .5) * .65, pz = z + (Math.random() - .5) * .65;
-      if (!blocked(px, pz, radius) && distances[cell(px, pz)] >= 0) return { x: px, z: pz };
-    }
-    return !blocked(x, z, radius) && distances[cell(x, z)] >= 0 ? { x, z } : null;
-  }
-
   let sceneryTime = 0, tramCell = null;
-  function reset() {
-    tram.reset();
-    sceneryTime = 0;
-    tramCell = null;
-    refreshNavigation();
-    routeTo(CITY_SPAWN.x, CITY_SPAWN.z);
-  }
-  function update(dt, entities) {
-    sceneryTime += dt;
-    harbor.update(sceneryTime);
-    const departed = tram.update(dt);
-    if (tram.root.visible) {
-      for (const entity of entities) {
-        if (entity.alive === false) continue;
-        const radius = entity.radius ?? entity.size;
-        if (!overlaps(tram.collider, entity.x, entity.z, radius)) continue;
-        // A passing tram nudges actors safely onto the clear sides of the
-        // boulevard; it cannot trap or carry them into a building or the sea.
-        const side = entity.z >= BOULEVARD_Z ? 1 : -1;
-        for (const sign of [side, -side]) {
-          const z = sign > 0 ? tram.collider.maxZ + radius + .08 : tram.collider.minZ - radius - .08;
-          if (!blocked(entity.x, z, radius)) {
-            entity.z = z;
-            entity.root.position.set(entity.x, 0, entity.z);
-            break;
+  return {
+    colliders,
+    buildings,
+    dynamicColliders: () => tram.root.visible ? [tram.collider] : [],
+    reset() {
+      tram.reset();
+      sceneryTime = 0;
+      tramCell = null;
+    },
+    update(dt, entities, navigation) {
+      sceneryTime += dt;
+      harbor.update(sceneryTime);
+      const departed = tram.update(dt);
+      if (tram.root.visible) {
+        for (const entity of entities) {
+          if (entity.alive === false) continue;
+          const radius = entity.radius ?? entity.size;
+          if (!overlaps(tram.collider, entity.x, entity.z, radius)) continue;
+          // Push onto a clear side of the boulevard without crossing a building.
+          const side = entity.z >= BOULEVARD_Z ? 1 : -1;
+          for (const direction of [side, -side]) {
+            const z = direction > 0 ? tram.collider.maxZ + radius + .08 : tram.collider.minZ - radius - .08;
+            if (navigation.canStandAt(entity.x, z, radius)) {
+              entity.z = z;
+              entity.root.position.set(entity.x, 0, entity.z);
+              break;
+            }
           }
         }
       }
-    }
-    const occupiedCell = tram.root.visible ? Math.floor(tram.root.position.x) : null;
-    if (occupiedCell !== tramCell) { tramCell = occupiedCell; refreshNavigation(); }
-    return departed;
-  }
-  reset();
-  return { move, routeTo, chase, spawnPoint, pickupPoint, lineClear, lineClear3D, updateVisibility, update, reset, canStandAt: (x, z, radius) => !blocked(x, z, radius) };
+      const occupiedCell = tram.root.visible ? Math.floor(tram.root.position.x) : null;
+      if (occupiedCell !== tramCell) { tramCell = occupiedCell; navigation.refresh(); }
+      return departed ? 'TRAM 9 · JÄTKÄSAARI' : null;
+    },
+  };
 }
