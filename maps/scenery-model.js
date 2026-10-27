@@ -15,10 +15,23 @@ export function createSceneryModel(name) {
   function box(color, x, y, z, w, h, d, rotation = 0) {
     geometry(color, new THREE.BoxGeometry(w, h, d).rotateZ(rotation).translate(x, y, z));
   }
-  function finish() {
-    for (const [color, pieces] of batches) {
+  function finish({ vertexColors = false } = {}) {
+    if (!batches.size) return group;
+    const mergedPieces = [];
+    if (vertexColors) for (const [color, pieces] of batches) {
+      const shade = new THREE.Color(color);
+      for (const piece of pieces) {
+        const colors = new Float32Array(piece.attributes.position.count * 3);
+        for (let i = 0; i < colors.length; i += 3) shade.toArray(colors, i);
+        piece.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        mergedPieces.push(piece);
+      }
+    }
+    const groups = vertexColors ? [[null, mergedPieces]] : batches;
+    for (const [color, pieces] of groups) {
       const merged = mergeGeometries(pieces);
-      const mesh = new THREE.Mesh(merged, new THREE.MeshStandardMaterial({ color, roughness: .65 }));
+      const material = new THREE.MeshStandardMaterial(vertexColors ? { vertexColors: true, roughness: .65 } : { color, roughness: .65 });
+      const mesh = new THREE.Mesh(merged, material);
       mesh.castShadow = mesh.receiveShadow = true;
       group.add(mesh);
       for (const piece of pieces) piece.dispose();
