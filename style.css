@@ -122,6 +122,13 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 900 clamp(52px, 8vw, 78px
 .pressure-track span { display: block; height: 100%; transform: scaleX(0); transform-origin: left; background: linear-gradient(90deg, #fff0a1, #ffbd31); }
 #start-screen .card { position: relative; width: min(360px, 100%); margin: 0; padding: 32px; }
 #start-screen h1 { margin: 24px 0 32px; font-size: clamp(48px, 13vw, 72px); line-height: .9; }
+.start-controls { display: grid; grid-template-columns: 1.3fr 1fr; gap: 12px; margin-top: 22px; }
+.start-control { display: grid; justify-items: center; gap: 9px; }
+.start-control-keys { display: flex; align-items: center; justify-content: center; gap: 5px; }
+.start-controls kbd { display: inline-flex; align-items: center; justify-content: center; min-height: 28px; padding: 0 6px; border: 1px solid #ffffff26; border-bottom-width: 3px; border-radius: 5px; color: #e3e0e9; background: linear-gradient(#ffffff0b, #ffffff04); font: 600 11px/1 Inter, sans-serif; white-space: nowrap; }
+.start-controls .start-space-key { min-width: 76px; letter-spacing: .06em; }
+.start-control-or { color: #74717f; font-size: 10px; }
+.start-control-label { color: #aaa6b5; font: 700 10px/1 "Barlow Condensed", sans-serif; letter-spacing: .18em; }
 
 @media (max-width: 680px) {
   .hud { gap: 8px; padding: max(14px, env(safe-area-inset-top)) 14px 14px; }
