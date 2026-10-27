@@ -206,12 +206,27 @@ test('tank controls turn in place and back up without changing the facing direct
   assert.ok(reverse.player.moveSpeed < 0);
 });
 
-test('tank joystick can steer and move at the same time', () => {
+test('the virtual joystick stays directional when the keyboard mode is Tank', () => {
   const { player, step } = setup({ mode: 'tank', touch: { x: .5, z: -.5 } });
   step(30);
-  assert.ok(player.heading < 0);
+  assert.ok(Math.abs(player.heading - Math.PI * .75) < 1e-10);
   assert.ok(player.moveSpeed > 0);
-  assert.ok(Math.hypot(player.x, player.z) > 0);
+  assert.ok(player.x > 0 && player.z < 0);
+});
+
+test('joystick reversal changes travel immediately and completes facing quickly while firing', () => {
+  for (const mode of ['direct', 'tank']) for (const fps of [30, 60, 120]) {
+    const { player, input, step } = setup({ mode, touch: { x: 0, z: -1 }, firing: true });
+    input.dt = 1 / fps;
+    step(fps);
+    const before = player.z;
+    input.touch = { x: 0, z: 1 };
+    step();
+    assert.ok(player.z > before, 'Movement reverses on the first frame');
+    step(Math.ceil(fps * .18));
+    assert.ok(Math.abs(player.heading) < 1e-10, 'Turning is not slowed by the fire button');
+    assert.equal(player.dz, 1);
+  }
 });
 
 test('Direct keyboard movement and facing stay identical to controls without a mouse', () => {

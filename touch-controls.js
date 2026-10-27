@@ -1,7 +1,7 @@
 // Each control owns its pointer so moving and spraying work with two thumbs.
-export function createTouchControls({ zone, stick, thumb, fireButton, onFireStart }) {
+export function createTouchControls({ zone, stick, thumb, home, fireButton, onFireStart, onInput = () => {} }) {
   const radius = 44;
-  const deadzone = 0.12;
+  const deadzone = 0.1;
   const input = { x: 0, z: 0, firing: false };
   let enabled = false;
   let movePointer = null, firePointer = null;
@@ -36,18 +36,14 @@ export function createTouchControls({ zone, stick, thumb, fireButton, onFireStar
     let dx = event.clientX - originX, dy = event.clientY - originY;
     const distance = Math.hypot(dx, dy);
     if (distance > radius) {
-      // Slide the base after the thumb reaches its limit. Reversing direction
-      // then responds immediately, even after a long drag across the screen.
-      originX += dx * (1 - radius / distance);
-      originY += dy * (1 - radius / distance);
+      // Keep a stable centre for the whole gesture, like a physical stick.
+      // The thumb is clamped; long drags cannot move the neutral point.
       dx *= radius / distance;
       dy *= radius / distance;
     }
     const length = Math.min(distance, radius);
     const deflection = Math.max(0, (length / radius - deadzone) / (1 - deadzone));
-    // Give the centre more room for fine positioning, with full speed still
-    // available at the edge. Direction stays continuous at every angle.
-    const strength = deflection * (0.35 + 0.65 * deflection);
+    const strength = deflection;
     input.x = length ? dx / length * strength : 0;
     input.z = length ? dy / length * strength : 0;
     const bounds = zone.getBoundingClientRect();
@@ -62,9 +58,15 @@ export function createTouchControls({ zone, stick, thumb, fireButton, onFireStar
     movePointer = event.pointerId;
     originX = event.clientX;
     originY = event.clientY;
+    const bounds = home?.getBoundingClientRect();
+    if (bounds && Math.hypot(event.clientX - (bounds.left + bounds.width / 2), event.clientY - (bounds.top + bounds.height / 2)) <= bounds.width / 2) {
+      originX = bounds.left + bounds.width / 2;
+      originY = bounds.top + bounds.height / 2;
+    }
     zone.setPointerCapture(movePointer);
     stick.hidden = false;
     zone.classList.add('engaged');
+    onInput();
     move(event);
   });
   zone.addEventListener('pointermove', move);
@@ -84,6 +86,7 @@ export function createTouchControls({ zone, stick, thumb, fireButton, onFireStar
     fireButton.setPointerCapture(firePointer);
     input.firing = true;
     fireButton.classList.add('pressed');
+    onInput();
     onFireStart();
   });
   for (const element of [zone, fireButton]) {

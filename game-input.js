@@ -21,7 +21,7 @@ export function bindGameInput({ canvas, movementZone, movementHandle, canInterac
     const onHandle = handle && event.clientX >= handle.left && event.clientX <= handle.right && event.clientY >= handle.top && event.clientY <= handle.bottom;
     if (onHandle) return;
     // The transparent touch zone covers most of the left-hand playfield.
-    // Keep mouse clicks there as shots; mouse dragging from MOVE still steers.
+    // Keep mouse clicks there as shots; mouse dragging from the visible joystick still steers.
     event.stopPropagation();
     spray(event);
   }, true);
