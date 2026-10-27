@@ -57,10 +57,6 @@ button { font: inherit; }
 .stat { display: grid; gap: 3px; text-align: center; min-width: 50px; }
 .stat-label { color: #aaa7b3; font: 700 10px/1 "Barlow Condensed", sans-serif; letter-spacing: .16em; }
 .stat strong { color: var(--ink); font: 800 21px/1 "Barlow Condensed", sans-serif; }
-.mouse-reticle { position: absolute; z-index: 3; width: 20px; height: 20px; transform: translate(-50%, -50%); border: 2px solid #fff0b0; border-radius: 50%; box-shadow: 0 0 0 1px #20252c, 0 2px 6px #0008; pointer-events: none; }
-.mouse-reticle::before, .mouse-reticle::after { content: ''; position: absolute; background: #fff0b0; box-shadow: 0 0 0 1px #20252c; }
-.mouse-reticle::before { width: 2px; height: 26px; left: 7px; top: -5px; }
-.mouse-reticle::after { width: 26px; height: 2px; top: 7px; left: -5px; }
 
 /* One primary action; preferences stay behind a secondary, labelled gear. */
 .settings-button { position: absolute; top: 16px; right: 16px; display: grid; place-items: center; width: 44px; height: 44px; padding: 10px; border: 1px solid #ffffff25; border-radius: 50%; color: #b9b6c1; background: #ffffff06; cursor: pointer; }
