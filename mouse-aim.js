@@ -17,7 +17,10 @@ export function createMouseAim({ canvas, reticle, getInitialPosition, onUnlock, 
     if (!pending) return;
     pending = false;
     aiming = false;
-    if (enabled) onError();
+    if (enabled) {
+      canvas.focus({ preventScroll: true });
+      onError();
+    }
   }
 
   document.addEventListener('pointerlockchange', () => {

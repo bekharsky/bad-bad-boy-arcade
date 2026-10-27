@@ -11,6 +11,7 @@ import { movePlayer } from './movement.js';
 import { createAimAssist } from './aim-assist.js';
 import { createMouseAim } from './mouse-aim.js';
 import { createEnemyPressure } from './enemy-pressure.js';
+import { bindGameInput } from './game-input.js';
 
 const MODEL_URL = './assets/bad-bad-boy.glb?v=20261025-opt1';
 // Match the map's third-floor windows rather than the sculpture's real size.
@@ -59,6 +60,7 @@ const aimScreen = new THREE.Vector2();
 const aimPoint = new THREE.Vector3();
 const aimGround = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 let lastMouseUnlock = -Infinity;
+let mouseCaptureFailed = false;
 const mouseAim = createMouseAim({
   canvas,
   reticle: document.querySelector('#mouse-reticle'),
@@ -67,7 +69,7 @@ const mouseAim = createMouseAim({
     lastMouseUnlock = performance.now();
     if (playing) openSettings();
   },
-  onError() { showToast('Mouse unavailable'); }
+  onError() { mouseCaptureFailed = true; }
 });
 const touchControls = createTouchControls({
   zone: document.querySelector('#joystick-zone'),
@@ -399,7 +401,7 @@ function syncMouseAim() {
 
 function requestMouseAim() {
   syncMouseAim();
-  mouseAim.request();
+  if (!mouseCaptureFailed) mouseAim.request();
 }
 
 function resolveAssistedHeading(heading, dt) {
@@ -613,6 +615,7 @@ function collectMedkit(amount) {
 
 function startGame() {
   if (!player.model) return;
+  mouseCaptureFailed = false;
   clearArena();
   score = 0;
   wave = 0;
@@ -749,6 +752,7 @@ function syncControlMode() {
 for (const checkbox of document.querySelectorAll('[data-mouse-aim]')) {
   checkbox.addEventListener('change', () => {
     mouseAimEnabled = checkbox.checked;
+    mouseCaptureFailed = false;
     try { localStorage.setItem('golden-blast-mouse-aim', String(mouseAimEnabled)); } catch { /* Storage is optional. */ }
     resetInput();
     syncControlMode();
@@ -820,13 +824,15 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) { resetInput(); if (mouseAim.locked && playing) openSettings(); }
 });
 window.addEventListener('resize', resize);
-canvas.addEventListener('pointerdown', (event) => {
-  if (event.pointerType === 'mouse' && event.button === 0 && playing && !controlsDialog.open) {
-    if (mouseSupported && mouseAimEnabled && !mouseAim.locked) requestMouseAim();
-    else { keys.add('Fire'); beginSpray(); }
-  }
+bindGameInput({
+  canvas,
+  movementZone: document.querySelector('#joystick-zone'),
+  movementHandle: document.querySelector('.joystick-hint'),
+  canInteract: () => playing && !controlsDialog.open,
+  setFiring: firing => firing ? keys.add('Fire') : keys.delete('Fire'),
+  beginSpray,
+  requestMouseAim,
 });
-window.addEventListener('pointerup', event => { if (event.pointerType === 'mouse') keys.delete('Fire'); });
 startButton.addEventListener('click', () => { startGame(); requestMouseAim(); });
 restartButton.addEventListener('click', () => { startGame(); requestMouseAim(); });
 soundSetting.checked = soundEnabled;
