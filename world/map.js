@@ -7,6 +7,7 @@ import { disposeObject } from './dispose.js';
  * A map owns its scenery subtree, collision data, spawn, and pickup anchors.
  * The builder supplies static colliders and optional buildings, dynamicColliders,
  * reset(), and update(dt, actors, navigation), which may return an announcement.
+ * The definition may supply camera framing for a district's scale and skyline.
  * Coordinates use world metres; the map root stays at the origin.
  */
 export function createMap(definition, build) {
@@ -22,6 +23,7 @@ export function createMap(definition, build) {
       id: definition.id,
       name: definition.name,
       spawn: definition.spawn,
+      camera: definition.camera,
       root,
       pickupCapacity(kind) { return definition.pickups?.[kind]?.length ?? 0; },
       pickupPoints(kind, radius) {

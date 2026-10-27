@@ -59,6 +59,12 @@ On devices with a coarse primary pointer, the stream keeps its glossy coating an
 
 ## City and enemies
 
+The campaign moves from West Harbor to **Senate Square** after five cleared waves, then cycles between the two districts in five-wave blocks. Health and score continue across the move; enemies, scenery, pickups, and camera framing reset for the new district. For a direct local start on the new map, open [Senate Square](http://localhost:8000/?map=senate-square). An unknown `map` parameter uses the normal harbor start.
+
+Senate Square has a broad granite combat area, Helsinki Cathedral with five copper-green domes and a six-column portico, a flight of eighteen steps, the Alexander II monument, the University and Government Palace facades, and the southern Torikorttelit merchant blocks. Eight striped market stalls form two rows with open fighting lanes. A green-and-yellow tram runs along Aleksanterinkatu at the southern edge. The district camera looks farther across the square so the cathedral remains visible. The raised stair and church terrace are scenery with solid boundaries; combat stays on the level square and its surrounding alleys. Four medkits and all four Battery cans sit behind the perimeter buildings, with one emergency medkit on the square.
+
+The layout takes its landmarks from the [City of Helsinki's Senate Square history](https://historia.hel.fi/en/alueet/southern/the-senate-square) and [MyHelsinki's square guide](https://www.myhelsinki.fi/places/senate-square/). Distances, market placement and the tram service are adapted for the game.
+
 The harbour neighbourhood has a 22 × 15 metre cobbled square and a playable area spanning 55.6 metres in each direction. The hero starts beside the silver Verkkopaukka department store with its glass frontage. A continuous road and tram corridor runs parallel to the shoreline along the edge of the square, with crossings connecting the neighbourhood to the waterfront. Red-brick warehouses, a glass ferry terminal, dock cranes, and a broad quay occupy the water side; homes, cafés, bakery windows, and outdoor tables line the inland side. A white cruise ferry sits on Baltic water beyond the quay, and a miniature Clarion Hotel Helsinki with twin silver towers, a glass connection, and a rooftop pool marks the western backdrop. Building signs are temporarily omitted. The hotel follows the [architect’s reference](https://dtsa.fi/project/clarion-hotel). This is a playful interpretation of the harbour rather than a scale reconstruction.
 
 A green-and-yellow articulated Helsinki tram follows the boulevard from west to east, then returns in the opposite direction. Rails sit in a cobbled median between the asphalt traffic lanes, beneath contact wires and cross spans. The first service departs after eight seconds; subsequent services wait 22–34 seconds between trips. Its body blocks walking and the liquid stream, gently nudges actors off the tracks, and updates the enemies' navigation grid as it moves. Buildings and street furniture also have collision boundaries. Enemies navigate around obstacles using a shared navigation grid. The stream cannot pass through obstacles.
@@ -87,9 +93,11 @@ Four Battery energy drinks are hidden behind the outer houses instead of droppin
 - `aim-assist.js`: Direct-mode target selection, stable locks, bounded aim correction, and batched obstruction checks.
 - `mouse-aim.js`: pointer lock, aim coordinates, capture lifecycle, and safe keyboard fallback.
 - `game-input.js`: pointer-lock-independent mouse spraying and gameplay focus restoration.
-- `maps/index.js`: registry and campaign order of completed maps.
+- `maps/index.js`: registry, campaign order and direct district starts.
 - `maps/harbor.js`: West Harbor layout, bounds, spawn, pickup anchors, and tram behavior.
-- `maps/harbor-scenery.js`: Helsinki tram, cruise ferry, water, dock cranes, and Clarion Hotel.
+- `maps/harbor-scenery.js`: cruise ferry, water, dock cranes, and Clarion Hotel.
+- `maps/senate-square.js` and `maps/senate-landmarks.js`: Senate Square, cathedral, stairs, monument, merchant blocks and market rows.
+- `maps/tram.js` and `maps/scenery-model.js`: shared animated tram and merged scenery geometry.
 - `world/map.js`: map instance creation, reset, pickup placement, and resource ownership.
 - `world/map-manager.js`: active map replacement and the stable spatial query API used by gameplay.
 - `world/navigation.js`: collision, movement, line of sight, and shared enemy routing.

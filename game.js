@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createHero, animateHero, HERO_BASE_HEIGHT } from './hero.js';
-import { maps } from './maps/index.js';
+import { maps, mapOrder } from './maps/index.js';
 import { createMapManager } from './world/map-manager.js';
 import { createCampaign, createWaveDirector } from './waves.js';
 import { createBatteries } from './batteries.js';
@@ -97,13 +97,12 @@ renderer.toneMappingExposure = 1.12;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#7c929f');
 scene.fog = new THREE.Fog('#7c929f', 40, 100);
-const campaign = createCampaign(maps.map(map => map.id));
+const campaign = createCampaign(mapOrder(new URLSearchParams(window.location.search).get('map')).map(map => map.id));
 const world = createMapManager(scene, maps, .32 * HERO_SCALE);
 world.activate(campaign.plan(1).mapId);
 
 const camera = new THREE.PerspectiveCamera(47, 1, 0.1, 150);
-camera.position.set(world.spawn.x, CAMERA_HEIGHT, world.spawn.z + CAMERA_DISTANCE);
-camera.lookAt(world.spawn.x, CAMERA_LOOK_HEIGHT, world.spawn.z);
+frameCamera(world.spawn.x, world.spawn.z, 0, true);
 
 scene.add(new THREE.HemisphereLight(0xd8e9ff, 0x757264, 2.3));
 const keyLight = new THREE.DirectionalLight(0xffdfad, 2.6);
@@ -527,9 +526,8 @@ function update(dt) {
     assistMarker.position.set(assistedTarget.x, .025, assistedTarget.z);
     assistMarker.scale.setScalar(assistedTarget.size + .18);
   }
-  camera.position.lerp(new THREE.Vector3(player.x, CAMERA_HEIGHT, player.z + CAMERA_DISTANCE), 1 - Math.exp(-2.5 * dt));
   // Pan with a fixed viewing angle so movement does not swing the aiming view.
-  camera.lookAt(camera.position.x, CAMERA_LOOK_HEIGHT, camera.position.z - CAMERA_DISTANCE);
+  frameCamera(player.x, player.z, dt);
 }
 
 function updateHealth() {
@@ -604,8 +602,7 @@ function placePlayerAtSpawn() {
   player.root.position.set(player.x, 0, player.z);
   player.body.position.set(0, 0, 0);
   player.body.rotation.set(0, 0, 0);
-  camera.position.set(player.x, CAMERA_HEIGHT, player.z + CAMERA_DISTANCE);
-  camera.lookAt(player.x, CAMERA_LOOK_HEIGHT, player.z);
+  frameCamera(player.x, player.z, 0, true);
   animateHero(player.rig, 0, 0);
 }
 
@@ -664,12 +661,28 @@ function endGame() {
   keys.clear();
 }
 
+function cameraFov() {
+  return world.camera?.fov ?? (window.matchMedia('(pointer: coarse)').matches || canvas.clientWidth <= 680 ? 56 : 47);
+}
+
+function frameCamera(x, z, dt, instant = false) {
+  const view = world.camera ?? {};
+  const distance = view.distance ?? CAMERA_DISTANCE;
+  const target = new THREE.Vector3(x, view.height ?? CAMERA_HEIGHT, z + distance);
+  if (instant) {
+    camera.position.copy(target);
+    camera.fov = cameraFov();
+    camera.updateProjectionMatrix();
+  } else camera.position.lerp(target, 1 - Math.exp(-2.5 * dt));
+  camera.lookAt(camera.position.x, view.lookHeight ?? CAMERA_LOOK_HEIGHT, camera.position.z - distance - (view.lookAhead ?? 0));
+}
+
 function resize() {
   const width = canvas.clientWidth;
   const height = canvas.clientHeight;
   renderer.setSize(width, height, false);
   camera.aspect = width / height;
-  camera.fov = window.matchMedia('(pointer: coarse)').matches || width <= 680 ? 56 : 47;
+  camera.fov = cameraFov();
   camera.updateProjectionMatrix();
 }
 
