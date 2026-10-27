@@ -284,7 +284,7 @@ function spawnWave(level) {
   wave = level;
   waveLabel.textContent = String(wave).padStart(2, '0');
   city.routeTo(player.x, player.z);
-  const count = Math.min(3 + level * 2, 18);
+  const count = Math.min(5 + (level - 1) * 3, 30);
   for (let i = 0; i < count; i++) {
     const point = city.spawnPoint(player, i, count);
     makeEnemy(point.x, point.z, level, i % 3 === 0 ? 'slug' : 'snail');

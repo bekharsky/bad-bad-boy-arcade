@@ -177,7 +177,7 @@ export function createLiquidStream(scene, city, onHit, { scale = 1, refraction =
     const strength = groundSplash ? .6 : 1;
     onHit(enemy, delta, {
       charge, groundSplash,
-      damage: THREE.MathUtils.lerp(1.5, 3, pressure) * strength,
+      damage: strength,
       knockback: THREE.MathUtils.lerp(.14, .42, pressure) * strength,
     });
   }
