@@ -22,7 +22,7 @@ Retain each enemy model's attribution and licence when distributing the game. Th
 
 Bad Bad Boy is a sculpture by Tommi Toija in Helsinki. The game character was prepared from the user-provided `bc222867938641be8050f747614e5d34.glb`; it is not covered by the snail and slug licences above.
 
-The city environment is generated in `city.js`. Three.js: https://threejs.org/ (MIT).
+The city environment is generated in `maps/harbor.js` and `maps/harbor-scenery.js`. Three.js: https://threejs.org/ (MIT).
 
 ## Included libraries and fonts
 

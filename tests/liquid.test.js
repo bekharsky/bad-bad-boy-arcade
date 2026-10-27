@@ -12,7 +12,8 @@ registerHooks({
 });
 const THREE = await import('three');
 const { createLiquidStream } = await import('../liquid.js');
-const { ENEMY_HEALTH, createEnemy, loadEnemyModels } = await import('../enemies.js');
+const { ENEMY_HEALTH } = await import('../waves.js');
+const { createEnemy, loadEnemyModels } = await import('../enemies.js');
 const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
 
 function setup(refraction = true, options = {}) {
@@ -49,7 +50,7 @@ test('empty liquid stays hidden without scheduling empty buffer uploads', () => 
 
 const target = (x, z, hp = 100) => ({ alive: true, x, z, hp, hitHeight: .3, size: .43 });
 
-test('early-wave slugs take two direct hits and snails four at low and full pressure', () => {
+test('early-wave slugs take one direct hit and snails two at low and full pressure', () => {
   for (const charged of [false, true]) {
     const hitsToKill = kind => {
       const { advance, impacts } = setup();
@@ -63,32 +64,35 @@ test('early-wave slugs take two direct hits and snails four at low and full pres
       assert.ok(impacts.every(hit => !hit.groundSplash), 'Count direct contacts only');
       return impacts.length;
     };
-    assert.equal(hitsToKill('slug'), 2);
-    assert.equal(hitsToKill('snail'), 4);
+    assert.equal(hitsToKill('slug'), 1);
+    assert.equal(hitsToKill('snail'), 2);
   }
 });
 
-test('enemy health increases by one only after each five-wave block', async context => {
+test('enemy health increases by one only after each three-wave block', async context => {
   context.mock.method(GLTFLoader.prototype, 'loadAsync', async () => {
     const scene = new THREE.Group();
     scene.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial()));
     return { scene, animations: [] };
   });
   await loadEnemyModels();
-  for (const [wave, slug, snail] of [[1, 2, 4], [5, 2, 4], [6, 3, 5], [10, 3, 5], [11, 4, 6], [20, 5, 7], [21, 6, 8]]) {
+  for (const [wave, slug, snail] of [[1, 1, 2], [3, 1, 2], [4, 2, 3], [6, 2, 3], [7, 3, 4], [9, 3, 4], [10, 4, 5]]) {
     assert.equal(createEnemy('slug', wave).hp, slug, `Slug health on wave ${wave}`);
     assert.equal(createEnemy('snail', wave).hp, snail, `Snail health on wave ${wave}`);
   }
 });
 
-test('one close tap hurts an enemy but no longer kills it immediately', () => {
-  const { advance, impacts } = setup();
-  const enemy = target(0, .7, ENEMY_HEALTH.slug);
-  advance(5, true, [enemy]);
-  advance(60, false, [enemy]);
-  assert.ok(impacts.length > 0);
-  assert.equal(enemy.hp, 1, 'A short burst needs one more hit to defeat a slug');
-  assert.ok(impacts.every(hit => hit.charge < .1));
+test('one short close tap kills an early slug and leaves a snail needing one more hit', () => {
+  for (const [kind, remaining] of [['slug', 0], ['snail', 1]]) {
+    const { advance, impacts } = setup();
+    const enemy = target(0, .7, ENEMY_HEALTH[kind]);
+    advance(5, true, [enemy]);
+    advance(60, false, [enemy]);
+    assert.equal(impacts.length, 1);
+    assert.equal(enemy.hp, remaining);
+    assert.equal(enemy.alive, kind === 'snail');
+    assert.ok(impacts.every(hit => hit.charge < .1));
+  }
 });
 
 test('charged liquid keeps stronger knockback after release with fixed direct damage', () => {

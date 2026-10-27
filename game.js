@@ -1,7 +1,10 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createHero, animateHero, HERO_BASE_HEIGHT } from './hero.js';
-import { createCity, CITY_STOREY_HEIGHT, CITY_SPAWN } from './city.js';
+import { maps } from './maps/index.js';
+import { createMapManager } from './world/map-manager.js';
+import { createCampaign, createWaveDirector } from './waves.js';
+import { createBatteries } from './batteries.js';
 import { loadEnemyModels, createEnemy, animateEnemy, disposeEnemy } from './enemies.js';
 import { createLiquidStream } from './liquid.js';
 import { createBiteEffects } from './bites.js';
@@ -10,12 +13,11 @@ import { createTouchControls } from './touch-controls.js';
 import { movePlayer } from './movement.js';
 import { createAimAssist } from './aim-assist.js';
 import { createMouseAim } from './mouse-aim.js';
-import { createEnemyPressure } from './enemy-pressure.js';
 import { bindGameInput } from './game-input.js';
 
 const MODEL_URL = './assets/bad-bad-boy.glb?v=20261025-opt1';
-// Match the map's third-floor windows rather than the sculpture's real size.
-const HERO_HEIGHT = CITY_STOREY_HEIGHT * 3;
+// World metres; the hero keeps the same physical size across every map.
+const HERO_HEIGHT = 3.45;
 const HERO_SCALE = HERO_HEIGHT / HERO_BASE_HEIGHT;
 const CAMERA_HEIGHT = 10;
 const CAMERA_DISTANCE = 12;
@@ -88,10 +90,13 @@ renderer.toneMappingExposure = 1.12;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#7c929f');
 scene.fog = new THREE.Fog('#7c929f', 40, 100);
+const campaign = createCampaign(maps.map(map => map.id));
+const world = createMapManager(scene, maps, .32 * HERO_SCALE);
+world.activate(campaign.plan(1).mapId);
 
 const camera = new THREE.PerspectiveCamera(47, 1, 0.1, 150);
-camera.position.set(CITY_SPAWN.x, CAMERA_HEIGHT, CITY_SPAWN.z + CAMERA_DISTANCE);
-camera.lookAt(CITY_SPAWN.x, CAMERA_LOOK_HEIGHT, CITY_SPAWN.z);
+camera.position.set(world.spawn.x, CAMERA_HEIGHT, world.spawn.z + CAMERA_DISTANCE);
+camera.lookAt(world.spawn.x, CAMERA_LOOK_HEIGHT, world.spawn.z);
 
 scene.add(new THREE.HemisphereLight(0xd8e9ff, 0x757264, 2.3));
 const keyLight = new THREE.DirectionalLight(0xffdfad, 2.6);
@@ -105,15 +110,14 @@ keyLight.shadow.camera.bottom = -38;
 keyLight.shadow.normalBias = 0.035;
 keyLight.shadow.camera.far = 100;
 scene.add(keyLight);
-const city = createCity(scene);
 
 const player = {
   root: new THREE.Group(),
   body: new THREE.Group(),
   model: null,
   rig: null,
-  x: CITY_SPAWN.x,
-  z: CITY_SPAWN.z,
+  x: world.spawn.x,
+  z: world.spawn.z,
   dx: 0,
   dz: 1,
   heading: 0,
@@ -140,18 +144,25 @@ scene.add(player.root);
 function hitEnemy(enemy, direction, impact) {
   enemy.hp -= impact.damage;
   enemy.hit = 0.18;
-  city.move(enemy, direction.x * impact.knockback, direction.z * impact.knockback, enemy.size);
+  world.move(enemy, direction.x * impact.knockback, direction.z * impact.knockback, enemy.size);
   enemy.root.position.set(enemy.x, 0, enemy.z);
   if (enemy.hp <= 0) removeEnemy(enemy, true);
 }
 const streamOptions = { scale: HERO_HEIGHT / 2.25, refraction: !window.matchMedia('(pointer: coarse)').matches, getHitTime: () => gameTime };
-const stream = createLiquidStream(scene, city, hitEnemy, streamOptions);
+const stream = createLiquidStream(scene, world, hitEnemy, streamOptions);
 // Battery power adds two side streams that fan out from the centre stream.
-const sideStreams = [createLiquidStream(scene, city, hitEnemy, streamOptions), createLiquidStream(scene, city, hitEnemy, streamOptions)];
+const sideStreams = [createLiquidStream(scene, world, hitEnemy, streamOptions), createLiquidStream(scene, world, hitEnemy, streamOptions)];
 
 const enemies = [];
-const enemyPressure = createEnemyPressure();
-const aimAssist = createAimAssist((origin, enemy) => city.lineClear(origin.x, origin.z, enemy.x, enemy.z, .12));
+const waves = createWaveDirector({
+  campaign,
+  onWave: spawnWave,
+  onReinforcements(count, plan) {
+    spawnEnemies(count, plan.number);
+    showToast(`REINFORCEMENTS +${count} · KEEP FIGHTING!`);
+  },
+});
+const aimAssist = createAimAssist((origin, enemy) => world.lineClear(origin.x, origin.z, enemy.x, enemy.z, .12));
 const assistMarker = new THREE.Mesh(
   new THREE.RingGeometry(.88, 1, 32),
   new THREE.MeshBasicMaterial({ color: '#ffd34e', transparent: true, opacity: .85, depthWrite: false })
@@ -161,43 +172,18 @@ assistMarker.visible = false;
 scene.add(assistMarker);
 const effects = [];
 const biteEffects = createBiteEffects(scene);
-const medkits = createMedkits(scene, city);
+const medkits = createMedkits(scene, world);
+const batteries = createBatteries(scene, world);
 // Battery cans are hidden in back courtyards. Exploration powers up the spray.
 const POWER_TIME = 8;
 const SPREAD_ANGLE = 0.22;
 const STREAM_COLOR = '#ffd34c';
 const POWER_COLOR = '#39ff14';
-const batteries = [];
-// Battery energy drink can: black body, gold label. The side carries the label; the ends are plain black.
-function makeCanLabel() {
-  const canvasLabel = document.createElement('canvas');
-  canvasLabel.width = 256;
-  canvasLabel.height = 128;
-  const ctx = canvasLabel.getContext('2d');
-  ctx.fillStyle = '#111';
-  ctx.fillRect(0, 0, 256, 128);
-  ctx.fillStyle = '#e2b24a';
-  ctx.fillRect(0, 34, 256, 10);
-  ctx.fillRect(0, 84, 256, 10);
-  ctx.font = 'bold 42px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#e2b24a';
-  ctx.fillText('BATTERY', 128, 64);
-  const texture = new THREE.CanvasTexture(canvasLabel);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  return texture;
-}
-const batteryGeometry = new THREE.CylinderGeometry(0.1, 0.1, 0.34, 16);
-const canEnd = new THREE.MeshStandardMaterial({ color: '#111', roughness: 0.35, metalness: 0.4 });
-const batteryMaterials = [new THREE.MeshStandardMaterial({ map: makeCanLabel(), roughness: 0.35, metalness: 0.4 }), canEnd, canEnd];
 const spreadFacing = { dx: 0, dz: 0 };
 let spreadOn = false;
 let playing = false;
 let gameTime = 0;
 let score = 0;
-let wave = 1;
-let pendingWave = 0;
 let audioContext = null;
 let frameTime = 0;
 
@@ -279,17 +265,28 @@ function makeEnemy(x, z, level, kind) {
   enemies.push(enemy);
 }
 
-function spawnWave(level) {
-  enemyPressure.reset();
-  wave = level;
-  waveLabel.textContent = String(wave).padStart(2, '0');
-  city.routeTo(player.x, player.z);
-  const count = Math.min(5 + (level - 1) * 3, 30);
+function spawnEnemies(count, level) {
+  world.routeTo(player.x, player.z);
   for (let i = 0; i < count; i++) {
-    const point = city.spawnPoint(player, i, count);
-    makeEnemy(point.x, point.z, level, i % 3 === 0 ? 'slug' : 'snail');
+    const point = world.spawnPoint(player, i, count);
+    if (point) makeEnemy(point.x, point.z, level, i % 3 === 0 ? 'slug' : 'snail');
   }
-  if (level > 1) showToast(`WAVE ${level}`);
+}
+
+function spawnWave(plan) {
+  const changedMap = world.activate(plan.mapId);
+  if (changedMap || plan.number === 1) {
+    // Preserve score and health between maps; no old attacks or pickups travel
+    // with the player. Reset also rebuilds navigation before placing pickups.
+    clearArena();
+    world.reset();
+    placePlayerAtSpawn();
+    medkits.reset(player);
+    batteries.reset(player);
+  }
+  waveLabel.textContent = String(plan.number).padStart(2, '0');
+  spawnEnemies(plan.enemyCount, plan.number);
+  if (plan.number > 1) showToast(changedMap ? `WAVE ${plan.number} · ${world.name.toUpperCase()}` : `WAVE ${plan.number}`);
 }
 
 function removeEnemy(enemy, pop = false) {
@@ -298,7 +295,7 @@ function removeEnemy(enemy, pop = false) {
   disposeEnemy(enemy);
   if (pop) {
     score += 150;
-    enemyPressure.onKill();
+    waves.onKill();
     scoreLabel.textContent = String(score).padStart(4, '0');
     burst(enemy.x, enemy.hitHeight, enemy.z, 0xffd34e, 10);
     blip(440 + Math.random() * 280, 0.045);
@@ -366,7 +363,7 @@ function updateMovement(dt, firing) {
   if (keyboardSteering() || touchControls.input.x || touchControls.input.z) mouseAim.resetAim();
   const assisted = controlMode === 'direct' && aimAssistEnabled && firing && !mouseAim.aiming && !keys.has('ShiftLeft') && !keys.has('ShiftRight');
   if (!assisted) resetAimAssist();
-  return movePlayer(player, city, {
+  return movePlayer(player, world, {
     keys, touch: touchControls.input, mode: controlMode, dt, firing, height: HERO_HEIGHT,
     resolveAim: assisted ? resolveAssistedHeading : null,
     aimHeading: mouseHeading()
@@ -418,7 +415,8 @@ function update(dt) {
   // Finish the final bite's splash even after the round ends.
   biteEffects.update(dt);
   if (!playing) return;
-  if (city.update(dt, [player, ...enemies])) showToast('TRAM 9 · JÄTKÄSAARI');
+  const announcement = world.update(dt, [player, ...enemies]);
+  if (announcement) showToast(announcement);
 
   const firing = keys.has('Space') || keys.has('Fire') || touchControls.input.firing || player.tapTimer > 0;
   const moving = updateMovement(dt, firing);
@@ -434,7 +432,7 @@ function update(dt) {
   player.body.rotation.x = 0.07 * player.runBlend * THREE.MathUtils.clamp(player.moveSpeed / player.speed, -1, 1);
   animateHero(player.rig, player.runTime, player.runBlend);
   medkits.update(dt, player, collectMedkit);
-  updateBatteries(dt);
+  batteries.update(dt, player, collectBattery);
 
   player.tapTimer = Math.max(0, player.tapTimer - dt);
   // Each parcel starts at the hands, then follows its own ballistic trajectory.
@@ -450,7 +448,7 @@ function update(dt) {
     player.fireTimer = 0.1;
   }
 
-  city.routeTo(player.x, player.z);
+  world.routeTo(player.x, player.z);
   for (const enemy of enemies) {
     if (!enemy.alive) continue;
     enemy.attack -= dt;
@@ -458,10 +456,10 @@ function update(dt) {
     const vx = player.x - enemy.x;
     const vz = player.z - enemy.z;
     const dist = Math.hypot(vx, vz) || 0.001;
-    const attacking = dist <= enemy.size + player.radius + 0.06 && city.lineClear(enemy.x, enemy.z, player.x, player.z, 0.1);
+    const attacking = dist <= enemy.size + player.radius + 0.06 && world.lineClear(enemy.x, enemy.z, player.x, player.z, 0.1);
     enemy.root.rotation.y = Math.atan2(vx, vz);
     if (!attacking) {
-      const direction = city.chase(enemy.x, enemy.z, player.x, player.z);
+      const direction = world.chase(enemy.x, enemy.z, player.x, player.z);
       // Soft separation keeps a pack from collapsing into one blob.
       for (const other of enemies) {
         if (other === enemy || !other.alive) continue;
@@ -475,7 +473,7 @@ function update(dt) {
       }
       const step = Math.hypot(direction.x, direction.z);
       if (step > 0.01) {
-        city.move(enemy, direction.x / step * enemy.speed * dt, direction.z / step * enemy.speed * dt, enemy.size);
+        world.move(enemy, direction.x / step * enemy.speed * dt, direction.z / step * enemy.speed * dt, enemy.size);
         enemy.root.rotation.y = Math.atan2(direction.x, direction.z);
       }
       enemy.root.position.set(enemy.x, 0, enemy.z);
@@ -513,23 +511,7 @@ function update(dt) {
   for (let i = enemies.length - 1; i >= 0; i--) {
     if (!enemies[i].alive) enemies.splice(i, 1);
   }
-  if (enemies.length === 0) {
-    pendingWave += dt;
-    if (pendingWave > 1.4) {
-      pendingWave = 0;
-      spawnWave(wave + 1);
-    }
-  } else {
-    pendingWave = 0;
-    if (playing) {
-      const count = enemyPressure.update(dt, enemies.length);
-      for (let i = 0; i < count; i++) {
-        const point = city.spawnPoint(player, i, count);
-        makeEnemy(point.x, point.z, wave, i % 3 === 0 ? 'slug' : 'snail');
-      }
-      if (count) showToast(`REINFORCEMENTS +${count} · KEEP FIGHTING!`);
-    }
-  }
+  if (playing) waves.update(dt, enemies.length);
 
   const assistedTarget = aimAssist.target;
   assistMarker.visible = !!assistedTarget?.alive;
@@ -566,25 +548,10 @@ function updateHeroHp() {
   heroHud.style.transform = `translate(${x - 32}px, ${y}px)`;
 }
 
-function placeBattery(x, z) {
-  const mesh = new THREE.Mesh(batteryGeometry, batteryMaterials);
-  mesh.position.set(x, 0.3, z);
-  scene.add(mesh);
-  batteries.push({ x, z, mesh });
-}
-
-function updateBatteries(dt) {
-  for (let i = batteries.length - 1; i >= 0; i--) {
-    const battery = batteries[i];
-    battery.mesh.rotation.y += dt * 2;
-    if (Math.hypot(player.x - battery.x, player.z - battery.z) > player.radius + 0.4) continue;
-    if (!city.lineClear(player.x, player.z, battery.x, battery.z, .12)) continue;
-    scene.remove(battery.mesh);
-    batteries.splice(i, 1);
-    player.powerTimer += POWER_TIME;
-    showToast('BATTERY POWER!');
-    blip(880, .15);
-  }
+function collectBattery() {
+  player.powerTimer += POWER_TIME;
+  showToast('BATTERY POWER!');
+  blip(880, .15);
 }
 
 function updateSpread(dt, firing) {
@@ -611,45 +578,40 @@ function collectMedkit(amount) {
   blip(740, .12);
 }
 
-function startGame() {
-  if (!player.model) return;
-  mouseCaptureFailed = false;
-  clearArena();
-  score = 0;
-  wave = 0;
-  pendingWave = 0;
-  player.hp = player.maxHp;
-  player.x = CITY_SPAWN.x;
-  player.z = CITY_SPAWN.z;
-  player.dx = 0;
-  player.dz = -1;
-  player.heading = Math.PI;
+function placePlayerAtSpawn() {
+  player.x = world.spawn.x;
+  player.z = world.spawn.z;
+  player.heading = world.spawn.heading ?? Math.PI;
+  player.dx = Math.sin(player.heading);
+  player.dz = Math.cos(player.heading);
   player.targetHeading = player.heading;
-  player.moveX = 0;
-  player.moveZ = -1;
+  player.moveX = player.dx;
+  player.moveZ = player.dz;
   player.moveSpeed = 0;
   player.turnSpeed = 0;
   player.runTime = 0;
   player.runBlend = 0;
-  player.invulnerable = 0;
   player.fireTimer = 0;
-  player.tapTimer = 0;
   player.root.rotation.y = player.heading;
   player.root.position.set(player.x, 0, player.z);
+  player.body.position.set(0, 0, 0);
+  player.body.rotation.set(0, 0, 0);
+  camera.position.set(player.x, CAMERA_HEIGHT, player.z + CAMERA_DISTANCE);
+  camera.lookAt(player.x, CAMERA_LOOK_HEIGHT, player.z);
+  animateHero(player.rig, 0, 0);
+}
+
+function startGame() {
+  if (!player.model) return;
+  mouseCaptureFailed = false;
+  score = 0;
+  player.hp = player.maxHp;
+  player.invulnerable = 0;
   player.model.material.opacity = 1;
   player.model.material.transparent = false;
-  camera.position.set(CITY_SPAWN.x, CAMERA_HEIGHT, CITY_SPAWN.z + CAMERA_DISTANCE);
-  camera.lookAt(CITY_SPAWN.x, CAMERA_LOOK_HEIGHT, CITY_SPAWN.z);
-  animateHero(player.rig, 0, 0);
   scoreLabel.textContent = '0000';
   updateHealth();
-  city.reset();
-  medkits.reset(player);
-  for (let i = 4; i < 8; i++) {
-    const point = city.pickupPoint(i, player.radius + .12);
-    if (point) placeBattery(point.x, point.z);
-  }
-  spawnWave(1);
+  waves.start();
   playing = true;
   rangeHud.hidden = false;
   touchControls.setEnabled(true);
@@ -661,15 +623,14 @@ function startGame() {
 }
 
 function clearArena() {
-  resetAimAssist();
+  resetInput();
   stream.clear();
   biteEffects.clear();
   medkits.clear();
   player.tapTimer = 0;
   player.powerTimer = 0;
   for (const side of sideStreams) side.clear();
-  for (const battery of batteries) scene.remove(battery.mesh);
-  batteries.length = 0;
+  batteries.clear();
   for (const enemy of enemies) disposeEnemy(enemy);
   for (const effect of effects) {
     scene.remove(effect.object);
@@ -708,7 +669,7 @@ function animate(now) {
   const dt = Math.min(0.05, frameTime ? (now - frameTime) / 1000 : 0);
   frameTime = now;
   update(dt);
-  if (player.model) city.updateVisibility(camera, player.root, HERO_HEIGHT, dt);
+  if (player.model) world.updateVisibility(camera, player.root, HERO_HEIGHT, dt);
   renderer.render(scene, camera);
   updateHeroHp();
 }

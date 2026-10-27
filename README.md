@@ -60,7 +60,7 @@ The harbour neighbourhood has a 22 × 15 metre cobbled square and a playable are
 A green-and-yellow articulated Helsinki tram follows the boulevard from west to east, then returns in the opposite direction. Rails sit in a cobbled median between the asphalt traffic lanes, beneath contact wires and cross spans. The first service departs after eight seconds; subsequent services wait 22–34 seconds between trips. Its body blocks walking and the liquid stream, gently nudges actors off the tracks, and updates the enemies' navigation grid as it moves. Buildings and street furniture also have collision boundaries. Enemies navigate around obstacles using a shared navigation grid. The stream cannot pass through obstacles.
 Buildings smoothly fade to 12% opacity when they overlap the character's feet, body, shoulders, or head along the camera's line of sight. Walls, roofs, and windows fade together and return to full opacity once the view is clear.
 
-Waves contain snails and Spanish slugs. On waves 1–5, slugs take two direct hits to defeat and snails take four, at any pressure. Health increases by one every five waves: three/five hits on waves 6–10, four/six on waves 11–15, and so on. Waves start with five enemies and add three per wave, up to 30, so difficulty grows mainly through larger crowds. Higher pressure increases range and knockback; ground splashes still deal 60% of direct damage. Each enemy is worth 150 points. Both enemy models are free and openly licensed: Snail by Poly by Google (CC BY 3.0) and Slug by Poly by Google (CC BY 3.0). Sources, licences, and modifications are listed in [CREDITS.md](./CREDITS.md) and the in-game Models & credits page.
+Waves contain snails and Spanish slugs. On waves 1–3, slugs take one direct hit to defeat and snails take two, at any pressure. Health increases by one every three waves: two/three hits on waves 4–6, three/four on waves 7–9, and so on. Waves start with eight enemies and add three per wave, up to 30, so difficulty grows mainly through larger crowds. Higher pressure increases range and knockback; ground splashes still deal 60% of direct damage. Each enemy is worth 150 points. Both enemy models are free and openly licensed: Snail by Poly by Google (CC BY 3.0) and Slug by Poly by Google (CC BY 3.0). Sources, licences, and modifications are listed in [CREDITS.md](./CREDITS.md) and the in-game Models & credits page.
 
 Going 18 seconds without a kill brings two reinforcements. Further arrivals come after eight seconds, then six, then every four, with groups gradually growing to six enemies. Any kill resets this pressure and grants another 18 seconds; clearing a wave also resets it. The crowd is capped at 48 living enemies. Pausing freezes the timer.
 
@@ -82,8 +82,16 @@ Four Battery energy drinks are hidden behind the outer houses instead of droppin
 - `aim-assist.js`: Direct-mode target selection, stable locks, bounded aim correction, and batched obstruction checks.
 - `mouse-aim.js`: pointer lock, aim coordinates, capture lifecycle, and safe keyboard fallback.
 - `game-input.js`: pointer-lock-independent mouse spraying and gameplay focus restoration.
-- `city.js`: environment, collisions, and navigation.
-- `city-scenery.js`: animated Helsinki tram, cruise ferry, harbour water, dock cranes, and miniature Clarion Hotel Helsinki.
+- `maps/index.js`: registry and campaign order of completed maps.
+- `maps/harbor.js`: West Harbor layout, bounds, spawn, pickup anchors, and tram behavior.
+- `maps/harbor-scenery.js`: Helsinki tram, cruise ferry, water, dock cranes, and Clarion Hotel.
+- `world/map.js`: map instance creation, reset, pickup placement, and resource ownership.
+- `world/map-manager.js`: active map replacement and the stable spatial query API used by gameplay.
+- `world/navigation.js`: collision, movement, line of sight, and shared enemy routing.
+- `world/building-visibility.js`: camera occlusion and building fading.
+- `world/dispose.js`: disposal of map-owned GPU resources.
+- `waves.js`: campaign planning, difficulty, clear delay, and wave/reinforcement scheduling.
+- `batteries.js`: reusable Battery pickup rendering and collection.
 - `enemy-pressure.js`: kill-sensitive reinforcement timing and crowd limits.
 - `liquid.js`: ballistic liquid simulation, fluid surface, droplets, splashes, and hit detection.
 - `enemies.js`: loading and animating the snail and slug models.
@@ -94,6 +102,30 @@ Four Battery energy drinks are hidden behind the outer houses instead of droppin
 - `assets/enemies/`: original enemy GLBs with materials and animations.
 - `scripts/prepare-model.mjs`: prepare the game GLB from the source model.
 - `scripts/optimize-model.mjs`: simplify geometry with meshoptimizer, reorder the vertex cache, compact vertex streams, use 16-bit indices, and encode the texture with Sharp.
+
+## Maps and wave progression
+
+The game uses plain JavaScript modules and Three.js for rendering. Map content is separate from movement, combat, and campaign rules. Only West Harbor is implemented and registered today; Senate Square and Kamppi can be added without changing combat or copying navigation code.
+
+Each map definition provides a unique `id`, a display `name`, rectangular `bounds`, a `spawn` with an optional heading in radians, and `pickups.medkit` / `pickups.battery` anchors. Coordinates use world metres, with Y up and the map root at the origin. An anchor may specify a `jitter` width; placement checks clearance and reachability. Medkit instance capacity is sized for the largest registered map, rather than a harbor-specific count.
+
+A definition's `create()` calls `createMap(definition, build)`. The builder adds only map-owned scenery to the supplied root and returns collision boxes (`minX`, `maxX`, `minZ`, `maxZ`, `height`). It can also supply `buildings` for camera fading, a `dynamicColliders()` callback, `reset()`, and `update(dt, actors, navigation)`. Moving obstacles call `navigation.refresh()` when their occupied space changes; `update` may return a player-facing announcement. Harbor-specific tram rules stay in the harbor module.
+
+Register completed definitions in `maps/index.js`. `createCampaign` follows that order in blocks of five waves by default, then loops back to the first map while difficulty keeps increasing. `wavesPerMap` can be set when constructing the campaign; map rotation is independent of enemy health progression. With only one registered map, every wave remains in West Harbor.
+
+`createWaveDirector` advances only after a wave stays empty for 1.4 seconds and manages reinforcement pressure. It receives simulation time from the existing game loop, so pausing cannot trigger a delayed wave. Restart begins at wave 1 and clears both the transition delay and reinforcement pressure.
+
+`game.js` coordinates a map transition at a wave boundary: keep score and health, clear active attacks and effects, reset Battery power and inputs, place the player and camera at the new spawn, refill that map's pickups, then spawn the new wave. Pickups stay consumed between waves on the same map. Restart resets the current map or returns to the campaign's first map.
+
+The map manager prepares and validates a new map before replacing the old one. Its query functions always address the active map, so streams, aim assist, movement, and pickups cannot retain stale collision data. Removing a map disposes its owned geometries, materials, textures, and instance buffers exactly once; hero, enemy templates, and reusable pickup assets live outside that root. This follows [Three.js resource disposal guidance](https://threejs.org/manual/pages/how-to-dispose-of-objects.html).
+
+Run the tests with Node 24 or newer:
+
+```bash
+node --test
+```
+
+The suite checks real harbor navigation and tram behavior, map replacement with different bounds, GPU disposal events, pickup relocation, safe spawn fallback, campaign rotation, and restart timing. New map geometry should also be inspected in the browser.
 
 ## Prepare the character model
 
