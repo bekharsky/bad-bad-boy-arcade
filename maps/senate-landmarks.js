@@ -117,7 +117,7 @@ function dome(model, x, base, z, radius, height, drumHeight = .8, main = false) 
   for (let i = 0; i < 12; i++) {
     const a = i * Math.PI / 6, r = radius * .848;
     if (main) {
-      windowFrame(model, x + Math.sin(a) * r, base - drumHeight + .38, z + Math.cos(a) * r, .7, 1.7, a);
+      windowFrame(model, x + Math.sin(a) * r, base - drumHeight + .38, z + Math.cos(a) * r, .7, drumHeight * .52, a);
       const pa = a + Math.PI / 12;
       const face = section(model, x + Math.sin(pa) * radius * .86, z + Math.cos(pa) * radius * .86, pa);
       face.box(TRIM, 0, base - drumHeight / 2, .035, .21, drumHeight - .25, .2);
@@ -216,16 +216,16 @@ export function createCathedral() {
     }
   }
   // The tall, windowed central drum is the main difference from a generic dome.
-  box(WHITE, 0, 10.5, z, 5.6, 1.3, 5.6);
-  dome(church, 0, 14.35, z, 2.67, 2.0, 4.1, true);
-  for (const x of [-8, 8]) for (const dz of [-4.35, 4.35]) {
-    box(WHITE, x, 10.4, z + dz, 2.9, 2.2, 2.9);
-    for (const y of [9.5, 11.25, 11.6]) box(TRIM, x, y, z + dz, 3.15, .16, 3.15);
+  box(WHITE, 0, 10.15, z, 5.6, .6, 5.6);
+  dome(church, 0, 16.25, z, 2.67, 2.3, 6.0, true);
+  for (const x of [-6.15, 6.15]) for (const dz of [-3.2, 3.2]) {
+    box(WHITE, x, 10.4, z + dz, 2.7, 2.2, 2.7);
+    for (const y of [9.5, 11.25, 11.6]) box(TRIM, x, y, z + dz, 2.95, .16, 2.95);
     for (const side of [-1, 1]) {
-      box(TRIM, x + side * 1.27, 10.45, z + dz + 1.48, .19, 1.7, .15);
-      box(TRIM, x + side * 1.27, 10.45, z + dz - 1.48, .19, 1.7, .15);
+      box(TRIM, x + side * 1.17, 10.45, z + dz + 1.38, .19, 1.7, .15);
+      box(TRIM, x + side * 1.17, 10.45, z + dz - 1.38, .19, 1.7, .15);
     }
-    dome(church, x, 12.08, z + dz, 1.43, 1.14, .55);
+    dome(church, x, 12.08, z + dz, 1.33, 1.14, .55);
   }
   // Three sculptures on each of the four pediments, batched into one material.
   for (const side of [-1, 1]) {
