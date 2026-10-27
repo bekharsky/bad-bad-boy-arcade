@@ -12,15 +12,17 @@ function turnPlayer(player, targetSpeed, dt) {
   player.turnSpeed = targetSpeed + (player.turnSpeed - targetSpeed) * decay;
 }
 
-function faceHeading(player, target, dt) {
+function faceHeading(player, target, dt, turnRate = 14) {
   const angle = Math.atan2(Math.sin(target - player.heading), Math.cos(target - player.heading));
-  const turnStep = 14 * dt;
+  const turnStep = turnRate * dt;
   player.heading = Math.abs(angle) <= turnStep ? target : player.heading + Math.sign(angle) * turnStep;
   player.turnSpeed = 0;
 }
 
 export function movePlayer(player, city, { keys, touch, mode, dt, firing, height, resolveAim = null, aimHeading = null }) {
   const touchStrength = Math.hypot(touch.x, touch.z);
+  // A virtual stick is directional even if the keyboard uses Tank controls.
+  if (touchStrength) mode = 'direct';
   const x = touchStrength ? touch.x : Number(keys.has('KeyD') || keys.has('ArrowRight')) - Number(keys.has('KeyA') || keys.has('ArrowLeft'));
   const z = touchStrength ? touch.z : Number(keys.has('KeyS') || keys.has('ArrowDown')) - Number(keys.has('KeyW') || keys.has('ArrowUp'));
   const precise = keys.has('ShiftLeft') || keys.has('ShiftRight');
@@ -57,7 +59,7 @@ export function movePlayer(player, city, { keys, touch, mode, dt, firing, height
     const target = resolveAim?.(requested, dt) ?? requested;
     // Small corrections reach their exact angle in one frame. Larger turns
     // stay smooth and finish in finite time instead of trailing the input.
-    faceHeading(player, target, dt);
+    faceHeading(player, target, dt, touchStrength ? 22 : 14);
   }
 
   player.heading = Math.atan2(Math.sin(player.heading), Math.cos(player.heading));

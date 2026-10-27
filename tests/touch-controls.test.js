@@ -27,15 +27,18 @@ function pointer(element, type, pointerId = 1, clientX = 100, clientY = 200) {
   element.dispatchEvent(event);
 }
 
-function setup() {
+function setup({ withHome = false } = {}) {
   globalThis.window = new EventTarget();
   globalThis.document = new EventTarget();
   const zone = new Element(), stick = new Element(), thumb = new Element(), fireButton = new Element();
+  const home = withHome ? new Element() : undefined;
+  if (home) home.getBoundingClientRect = () => ({ left: 40, top: 220, width: 112, height: 112 });
   zone.parentElement = new Element();
   let bursts = 0;
-  const controls = createTouchControls({ zone, stick, thumb, fireButton, onFireStart: () => bursts++ });
+  let inputs = 0;
+  const controls = createTouchControls({ zone, stick, thumb, home, fireButton, onFireStart: () => bursts++, onInput: () => inputs++ });
   controls.setEnabled(true);
-  return { controls, zone, stick, thumb, fireButton, bursts: () => bursts };
+  return { controls, zone, stick, thumb, fireButton, bursts: () => bursts, inputs: () => inputs };
 }
 
 test('joystick starts under the finger, ignores jitter, and supports analog speed', () => {
@@ -47,11 +50,11 @@ test('joystick starts under the finger, ignores jitter, and supports analog spee
   pointer(zone, 'pointermove', 1, 103, 200);
   assert.equal(controls.input.x, 0);
   pointer(zone, 'pointermove', 1, 122, 200);
-  assert.ok(controls.input.x > 0.2 && controls.input.x < 0.3);
+  assert.ok(controls.input.x > .4 && controls.input.x < .5);
   assert.equal(controls.input.z, 0);
 });
 
-test('joystick response gives more room for fine movement and still reaches full speed', () => {
+test('joystick responds promptly after the deadzone and reaches full speed at the edge', () => {
   const { zone, controls } = setup();
   pointer(zone, 'pointerdown');
   let previous = 0;
@@ -60,19 +63,36 @@ test('joystick response gives more room for fine movement and still reaches full
     assert.ok(controls.input.x > previous);
     previous = controls.input.x;
     assert.equal(controls.input.z, 0);
-    if (distance <= 16) assert.ok(controls.input.x < .15);
+    if (distance <= 10) assert.ok(controls.input.x < .15);
   }
   assert.equal(controls.input.x, 1);
 });
 
-test('long drags slide the base, cap diagonal speed, and allow immediate reversal', () => {
+test('long drags keep the base stable, cap diagonal speed, and reverse across the neutral point', () => {
   const { zone, stick, controls } = setup();
   pointer(zone, 'pointerdown');
   pointer(zone, 'pointermove', 1, 300, 400);
   assert.ok(Math.abs(Math.hypot(controls.input.x, controls.input.z) - 1) < 1e-10);
-  assert.ok(parseFloat(stick.style.left) > 200);
-  pointer(zone, 'pointermove', 1, 220, 320);
+  assert.equal(stick.style.left, '90px');
+  assert.equal(stick.style.top, '80px');
+  pointer(zone, 'pointermove', 1, 80, 180);
   assert.ok(controls.input.x < 0 && controls.input.z < 0);
+});
+
+test('pressing the visible stick uses its centre; touching elsewhere creates a floating origin', () => {
+  const { zone, stick, controls, inputs } = setup({ withHome: true });
+  pointer(zone, 'pointerdown', 1, 120, 276);
+  assert.equal(stick.style.left, '86px');
+  assert.equal(stick.style.top, '156px');
+  assert.ok(controls.input.x > .4, 'An edge press starts moving without another drag');
+  assert.equal(controls.input.z, 0);
+  pointer(zone, 'pointerup', 1);
+  pointer(zone, 'pointerdown', 2, 200, 150);
+  assert.equal(stick.style.left, '190px');
+  assert.equal(stick.style.top, '30px');
+  assert.equal(controls.input.x, 0);
+  assert.equal(controls.input.z, 0);
+  assert.equal(inputs(), 2);
 });
 
 test('movement and spray keep separate pointers, including extra fingers and releases', () => {

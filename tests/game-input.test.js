@@ -67,7 +67,7 @@ test('the invisible touch movement zone does not swallow mouse shots over the wo
   assert.equal(document.activeElement, game.canvas);
 });
 
-test('dragging MOVE with a mouse and touching the playfield still belong to the joystick', () => {
+test('dragging the visible stick with a mouse and touching the playfield still belong to the joystick', () => {
   const game = setup();
   const drag = pointer(window, 'pointerdown', game.movementZone, { clientX: 50, clientY: 720 });
   assert.equal(game.bursts(), 0);

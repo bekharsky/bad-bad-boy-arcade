@@ -14,6 +14,7 @@ import { movePlayer } from './movement.js';
 import { createAimAssist } from './aim-assist.js';
 import { createMouseAim } from './mouse-aim.js';
 import { bindGameInput } from './game-input.js';
+import { preventGameZoom } from './gesture-guard.js';
 
 const MODEL_URL = './assets/bad-bad-boy.glb?v=20261025-opt1';
 // World metres; the hero keeps the same physical size across every map.
@@ -24,6 +25,7 @@ const CAMERA_DISTANCE = 12;
 const CAMERA_LOOK_HEIGHT = HERO_HEIGHT * 0.4;
 const keys = new Set();
 let controlMode = 'tank';
+let usingTouchControls = window.matchMedia('(pointer: coarse)').matches;
 let aimAssistEnabled = true;
 let mouseAimEnabled = true;
 let soundEnabled = false;
@@ -36,6 +38,7 @@ try {
 } catch { /* Settings still work when browser storage is unavailable. */ }
 
 const canvas = document.querySelector('#game');
+preventGameZoom(document);
 const status = document.querySelector('#load-status');
 const startScreen = document.querySelector('#start-screen');
 const endScreen = document.querySelector('#end-screen');
@@ -75,8 +78,12 @@ const touchControls = createTouchControls({
   zone: document.querySelector('#joystick-zone'),
   stick: document.querySelector('#joystick'),
   thumb: document.querySelector('#joystick-thumb'),
+  home: document.querySelector('.joystick-hint'),
   fireButton: document.querySelector('#mobile-fire'),
-  onFireStart: beginSpray
+  onFireStart: beginSpray,
+  onInput() {
+    if (!usingTouchControls) { usingTouchControls = true; syncControlMode(); }
+  }
 });
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -361,10 +368,11 @@ function blip(frequency, duration) {
 
 function updateMovement(dt, firing) {
   if (keyboardSteering() || touchControls.input.x || touchControls.input.z) mouseAim.resetAim();
-  const assisted = controlMode === 'direct' && aimAssistEnabled && firing && !mouseAim.aiming && !keys.has('ShiftLeft') && !keys.has('ShiftRight');
+  const mode = usingTouchControls ? 'direct' : controlMode;
+  const assisted = mode === 'direct' && aimAssistEnabled && firing && !mouseAim.aiming && !keys.has('ShiftLeft') && !keys.has('ShiftRight');
   if (!assisted) resetAimAssist();
   return movePlayer(player, world, {
-    keys, touch: touchControls.input, mode: controlMode, dt, firing, height: HERO_HEIGHT,
+    keys, touch: touchControls.input, mode, dt, firing, height: HERO_HEIGHT,
     resolveAim: assisted ? resolveAssistedHeading : null,
     aimHeading: mouseHeading()
   });
@@ -391,7 +399,7 @@ function mouseHeading() {
 }
 
 function syncMouseAim() {
-  mouseAim.setEnabled(mouseSupported && mouseAimEnabled && playing && !controlsDialog.open);
+  mouseAim.setEnabled(mouseSupported && mouseAimEnabled && !usingTouchControls && playing && !controlsDialog.open);
 }
 
 function requestMouseAim() {
@@ -661,6 +669,7 @@ function resize() {
   const height = canvas.clientHeight;
   renderer.setSize(width, height, false);
   camera.aspect = width / height;
+  camera.fov = window.matchMedia('(pointer: coarse)').matches || width <= 680 ? 56 : 47;
   camera.updateProjectionMatrix();
 }
 
@@ -693,7 +702,7 @@ function resetInput() {
 }
 
 function syncControlMode() {
-  const direct = controlMode === 'direct';
+  const direct = usingTouchControls || controlMode === 'direct';
   for (const radio of document.querySelectorAll('[data-control-mode]')) radio.checked = radio.value === controlMode;
   for (const checkbox of document.querySelectorAll('[data-aim-assist]')) {
     checkbox.checked = aimAssistEnabled;
@@ -771,6 +780,10 @@ window.addEventListener('keydown', (event) => {
   if (!mouseAim.locked && event.target instanceof Element && event.target.closest('select, input')) return;
   if (!playing && event.target instanceof Element && event.target.closest('button, a')) return;
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code)) event.preventDefault();
+  if (usingTouchControls && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ShiftLeft', 'ShiftRight'].includes(event.code)) {
+    usingTouchControls = false;
+    syncControlMode();
+  }
   keys.add(event.code);
   if (event.code === 'Space' && !event.repeat && playing) beginSpray();
   if (event.code === 'Enter' && !playing && !startScreen.classList.contains('hidden') && player.model) { startGame(); requestMouseAim(); }
