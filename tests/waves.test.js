@@ -26,6 +26,18 @@ test('invalid campaign configuration and wave numbers fail before gameplay', () 
   for (const number of [0, -1, 1.5, NaN, Infinity]) assert.throws(() => createCampaign(['harbor']).plan(number));
 });
 
+test('choosing a starting district begins at wave one and preserves campaign rotation', () => {
+  const campaign = createCampaign(['harbor', 'senate-square', 'kamppi']);
+  campaign.setStartingMap('senate-square');
+  assert.deepEqual(campaign.plan(1), { number: 1, enemyCount: 8, healthBonus: 0, mapId: 'senate-square' });
+  assert.equal(campaign.plan(6).mapId, 'kamppi');
+  assert.equal(campaign.plan(11).mapId, 'harbor');
+  assert.throws(() => campaign.setStartingMap('missing'), /Unknown map/);
+  assert.equal(campaign.plan(1).mapId, 'senate-square');
+  campaign.setStartingMap('harbor');
+  assert.equal(campaign.plan(1).mapId, 'harbor');
+});
+
 function setup() {
   const started = [], reinforcements = [];
   const director = createWaveDirector({

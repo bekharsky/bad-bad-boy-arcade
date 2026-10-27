@@ -68,6 +68,15 @@ button { font: inherit; }
 #start { min-height: 48px; font-size: 16px; }
 .load-status { margin-bottom: 12px; color: var(--gold); font-size: 12px; line-height: 1.6; }
 .load-status.hidden { display: none; }
+.debug-maps { display: grid; gap: 8px; margin-top: 18px; text-align: left; }
+.debug-maps h3 { margin: 0 0 4px; color: var(--gold); font: 800 16px/1 "Barlow Condensed", sans-serif; letter-spacing: .1em; }
+.debug-map-button { display: grid; gap: 5px; width: 100%; min-height: 58px; padding: 12px 14px; border: 1px solid #ffffff30; border-radius: 9px; color: var(--ink); background: #ffffff08; text-align: left; cursor: pointer; }
+.debug-map-button:hover:not(:disabled) { border-color: var(--gold); background: #ffd34e15; }
+.debug-map-button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+.debug-map-button:disabled { opacity: .45; cursor: wait; }
+.debug-maps .debug-map-button small { margin: 0; color: var(--muted); text-align: left; font: 11px/1.2 monospace; }
+#start-screen.map-debug h1 { margin: 22px 0; font-size: 40px; }
+#start-screen.map-debug #start, #start-screen.map-debug .start-controls { display: none; }
 .overlay { position: absolute; z-index: 4; inset: 0; display: grid; place-items: safe center; padding: 24px; overflow-y: auto; touch-action: pan-y; background: linear-gradient(90deg, #11131bcc, #11131b44 75%); transition: opacity .25s; }
 .overlay.hidden { display: none; }
 .card { width: min(430px, 100%); margin-right: auto; margin-left: clamp(0px, 8vw, 120px); padding: clamp(24px, 4vw, 42px); border: 1px solid #ffffff20; border-radius: 20px; background: linear-gradient(145deg, rgba(32,31,45,.94), rgba(18,19,29,.94)); box-shadow: 0 24px 90px #0008; backdrop-filter: blur(14px); }

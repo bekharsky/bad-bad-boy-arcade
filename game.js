@@ -56,6 +56,8 @@ const settingsButton = document.querySelector('#open-settings');
 const settingsDone = document.querySelector('#settings-done');
 const soundSetting = document.querySelector('#sound-setting');
 const rangeHud = document.querySelector('.range-hud');
+const query = new URLSearchParams(window.location.search);
+const debugMaps = query.get('debug') === 'maps';
 const mouseSupported = typeof canvas.requestPointerLock === 'function' && window.matchMedia('(any-pointer: fine)').matches;
 const aimRay = new THREE.Raycaster();
 const aimScreen = new THREE.Vector2();
@@ -95,7 +97,7 @@ renderer.toneMappingExposure = 1.12;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#7c929f');
 scene.fog = new THREE.Fog('#7c929f', 40, 100);
-const campaign = createCampaign(mapOrder(new URLSearchParams(window.location.search).get('map')).map(map => map.id));
+const campaign = createCampaign(mapOrder(query.get('map')).map(map => map.id));
 const world = createMapManager(scene, maps, .32 * HERO_SCALE);
 world.activate(campaign.plan(1).mapId);
 
@@ -192,6 +194,34 @@ let score = 0;
 let audioContext = null;
 let frameTime = 0;
 
+if (debugMaps) {
+  startScreen.classList.add('map-debug');
+  for (const picker of document.querySelectorAll('[data-debug-maps]')) {
+    picker.hidden = false;
+    const title = document.createElement('h3');
+    title.textContent = 'MAPS';
+    picker.append(title);
+    for (const map of maps) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'debug-map-button';
+      button.dataset.debugMap = map.id;
+      button.setAttribute('aria-label', `Play ${map.name}`);
+      button.disabled = true;
+      const name = document.createElement('strong'), id = document.createElement('small');
+      name.textContent = map.name; id.textContent = map.id;
+      button.append(name, id);
+      button.addEventListener('click', () => {
+        campaign.setStartingMap(map.id);
+        if (controlsDialog.open) controlsDialog.close();
+        startGame();
+        requestMouseAim();
+      });
+      picker.append(button);
+    }
+  }
+}
+
 async function loadHero() {
   const url = new URL(MODEL_URL, import.meta.url);
   const response = await fetch(url);
@@ -252,7 +282,9 @@ async function loadModels() {
     status.classList.add('hidden');
     startButton.disabled = false;
     startButton.textContent = 'PLAY';
-    if (!controlsDialog.open && [document.body, canvas].includes(document.activeElement)) startButton.focus({ preventScroll: true });
+    for (const button of document.querySelectorAll('[data-debug-map]')) button.disabled = false;
+    const initialButton = debugMaps ? startScreen.querySelector('[data-debug-map]') : startButton;
+    if (!controlsDialog.open && [document.body, canvas].includes(document.activeElement)) initialButton.focus({ preventScroll: true });
     window.dispatchEvent(new Event('game:ready'));
   } catch (error) {
     console.error('Could not load game models:', error);
