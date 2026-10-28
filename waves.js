@@ -16,10 +16,20 @@ export function createCampaign(mapIds, { wavesPerMap = 5 } = {}) {
   if (!mapIds.length || mapIds.some(id => typeof id !== 'string' || !id)) throw new Error('Campaign requires map IDs');
   if (!Number.isSafeInteger(wavesPerMap) || wavesPerMap < 1) throw new Error('Waves per map must be a positive integer');
   const order = [...mapIds];
+  let startingMap = 0;
   return {
+    setStartingMap(id) {
+      const index = order.indexOf(id);
+      if (index < 0) throw new Error(`Unknown map: ${id}`);
+      startingMap = index;
+    },
+    nextMapWave(number) {
+      waveStats(number);
+      return (Math.floor((number - 1) / wavesPerMap) + 1) * wavesPerMap + 1;
+    },
     plan(number) {
       const stats = waveStats(number);
-      return { ...stats, mapId: order[Math.floor((number - 1) / wavesPerMap) % order.length] };
+      return { ...stats, mapId: order[(startingMap + Math.floor((number - 1) / wavesPerMap)) % order.length] };
     },
   };
 }
@@ -39,6 +49,7 @@ export function createWaveDirector({ campaign, onWave, onReinforcements }) {
   return {
     get current() { return current; },
     start() { begin(1); },
+    completeMap() { if (current) begin(campaign.nextMapWave(current.number)); },
     onKill: pressure.onKill,
     update(dt, livingEnemies) {
       if (!current) return;
