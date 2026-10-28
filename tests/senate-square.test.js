@@ -32,7 +32,7 @@ test('switching between actual districts preserves hero size, screen position an
     const scene = new THREE.Scene(), world = createMapManager(scene, maps, .736), rig = createGameCamera();
     rig.resize(width, height, touch);
     let previous;
-    for (const id of ['harbor', 'senate-square', 'kamppi', 'baana', 'harbor']) {
+    for (const id of ['harbor', 'baana', 'kamppi', 'senate-square', 'harbor']) {
       world.activate(id);
       rig.frame(world.spawn.x, world.spawn.z, 0, true);
       const next = heroProjection(rig.camera, world.spawn);
@@ -63,14 +63,14 @@ test('the common scale falls between the previous close harbor and distant squar
   }
 });
 
-test('the second district enters the campaign on wave six and a direct link can start there', () => {
+test('Senate Square is the fourth district and direct links preserve the new campaign order', () => {
   const campaign = createCampaign(maps.map(map => map.id));
   assert.equal(campaign.plan(1).mapId, 'harbor');
-  assert.equal(campaign.plan(6).mapId, 'senate-square');
+  assert.equal(campaign.plan(6).mapId, 'baana');
   assert.equal(campaign.plan(11).mapId, 'kamppi');
-  assert.equal(campaign.plan(16).mapId, 'baana');
+  assert.equal(campaign.plan(16).mapId, 'senate-square');
   assert.equal(campaign.plan(21).mapId, 'harbor');
-  assert.deepEqual(mapOrder('senate-square').map(map => map.id), ['senate-square', 'kamppi', 'baana', 'harbor']);
+  assert.deepEqual(mapOrder('senate-square').map(map => map.id), ['senate-square', 'harbor', 'baana', 'kamppi']);
   assert.deepEqual(mapOrder('unknown'), maps);
   assert.equal(maps[0].id, 'harbor', 'Previewing never mutates the campaign registry');
 });

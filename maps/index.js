@@ -4,7 +4,7 @@ import { kamppiSquareMap } from './kamppi-square.js';
 import { baanaMap } from './baana.js';
 
 // Register completed maps here. Campaign order follows this list.
-export const maps = [harborMap, senateSquareMap, kamppiSquareMap, baanaMap];
+export const maps = [harborMap, baanaMap, kamppiSquareMap, senateSquareMap];
 
 // A direct link can start in a district without changing the normal campaign.
 export function mapOrder(startId) {
