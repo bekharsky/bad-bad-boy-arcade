@@ -28,18 +28,50 @@ test('Kamppi follows Senate Square, supports direct/debug starts and retains nor
 test('Narinkkatori has open combat lanes, solid landmarks and visible perimeter markers', () => {
   const map = kamppiSquareMap.create();
   assert.equal(map.canStandAt(map.spawn.x, map.spawn.z, .736), true);
-  for (const [x, z] of [[0, -14], [0, -6], [8, 0], [12, -5], [29, 4], [-16, 5], [0, 20.5], [0, -32]]) {
+  for (const [x, z] of [[0, -14], [0, -6], [8, 0], [12, -5], [-32, 19], [33, 19], [0, 26], [0, 35], [35, 52], [0, 61.5], [0, -39]]) {
     assert.equal(map.canStandAt(x, z, .736), true, `Open lane at ${x}, ${z}`);
   }
-  for (const [x, z] of [[-7, -24], [20, -4.5], [25.2, -5.4], [-27, -2], [-15, -7], [-20, 12]]) {
+  for (const [x, z] of [[0, -29], [-22, -6.5], [-16.8, -7.4], [5, 19], [14, -8], [30, 9], [0, 52], [-27, 42], [27, 42], [8, 38], [-10, 31.5]]) {
     assert.equal(map.canStandAt(x, z, .736), false, `Solid scenery at ${x}, ${z}`);
   }
-  assert.equal(map.lineClear3D({ x: 18, y: 1, z: -4.5 }, { x: 26, y: 1, z: -4.5 }), false, 'The chapel blocks liquid');
-  assert.equal(map.lineClear3D({ x: -10, y: 1, z: -16.5 }, { x: -7, y: 1, z: -16.5 }), true, 'Actors can pass under the mall canopy');
-  assert.equal(map.lineClear3D({ x: 10, y: .4, z: 13 }, { x: 10, y: .4, z: 15 }), false);
-  assert.equal(map.lineClear3D({ x: 10, y: 1.5, z: 13 }, { x: 10, y: 1.5, z: 15 }), true, 'Liquid clears the low bench');
+  assert.equal(map.lineClear3D({ x: -27, y: 1, z: -6.5 }, { x: -15, y: 1, z: -6.5 }), false, 'The chapel blocks liquid');
+  assert.equal(map.lineClear3D({ x: -10, y: 1, z: -19 }, { x: -7, y: 1, z: -19 }), true, 'Actors can pass under the mall canopy');
+  assert.equal(map.lineClear3D({ x: -31, y: .4, z: 4 }, { x: -31, y: .4, z: 6 }), false);
+  assert.equal(map.lineClear3D({ x: -31, y: 1.5, z: 4 }, { x: -31, y: 1.5, z: 6 }), true, 'Liquid clears the low bench');
   assert.ok(map.root.getObjectByName('Kamppi Square boundary'));
-  for (const [x, z] of [[35, 0], [-35, 0], [0, -35], [0, 36]]) assert.equal(map.canStandAt(x, z, .736), false);
+  for (const [x, z] of [[43, 0], [-43, 0], [0, -43], [0, 68.5]]) assert.equal(map.canStandAt(x, z, .736), false);
+  map.dispose();
+});
+
+test('the chapel is left of the mall and Kasarmi, Lasipalatsi and tram form successive districts', () => {
+  const map = kamppiSquareMap.create();
+  const centre = name => new THREE.Box3().setFromObject(map.root.getObjectByName(name)).getCenter(new THREE.Vector3());
+  const chapel = centre('Kamppi Chapel of Silence'), mall = centre('Kamppi shopping centre');
+  const kasarmi = centre('Kulttuurikasarmi'), lasipalatsi = centre('Lasipalatsi'), clock = centre('Lasipalatsi clock tower');
+  assert.ok(chapel.x < mall.x - 10, 'The chapel belongs on the left when facing the mall');
+  assert.ok(kasarmi.z > map.spawn.z && kasarmi.z - map.spawn.z < 15, 'The barracks sit close to the player');
+  assert.ok(kasarmi.z < clock.z && clock.z < lasipalatsi.z, 'The clock courtyard sits behind Kasarmi');
+  assert.ok(lasipalatsi.z < map.root.getObjectByName('Helsinki tram').position.z);
+  const bounds = kamppiSquareMap.bounds;
+  assert.ok((bounds.maxX - bounds.minX) * (bounds.maxZ - bounds.minZ) > 70 * 71 * 1.8, 'The playable footprint grows substantially');
+  assert.ok(bounds.maxZ - map.root.getObjectByName('Helsinki tram').position.z < 10, 'The map ends just behind the tram corridor');
+  const mallBounds = new THREE.Box3().setFromObject(map.root.getObjectByName('Kamppi shopping centre'));
+  assert.ok(mallBounds.max.x - mallBounds.min.x > 54, 'The mall itself is larger too');
+  map.dispose();
+});
+
+test('both sides of Kasarmi connect the playable squares and the far tram edge', () => {
+  const map = kamppiSquareMap.create();
+  for (const point of [{ x: -22, z: 27 }, { x: 33, z: 27 }, { x: 0, z: 35 }, { x: 8, z: 43 }, { x: 35, z: 61.5 }, { x: -35, z: 61.5 }]) {
+    map.routeTo(point.x, point.z);
+    const actor = { ...map.spawn };
+    for (let step = 0; step < 7000 && Math.hypot(actor.x - point.x, actor.z - point.z) > .5; step++) {
+      const direction = map.chase(actor.x, actor.z, point.x, point.z), length = Math.hypot(direction.x, direction.z);
+      if (!length) break;
+      map.move(actor, direction.x / length * .05, direction.z / length * .05, .736);
+    }
+    assert.ok(Math.hypot(actor.x - point.x, actor.z - point.z) <= .5, `Walk to ${point.x}, ${point.z} stopped at ${actor.x}, ${actor.z}`);
+  }
   map.dispose();
 });
 
@@ -64,16 +96,16 @@ test('all nine Kamppi pickups are reachable by the full-size hero and eight stay
   map.dispose();
 });
 
-test('Simonkatu tram clears player and enemies, blocks liquid and resets with the map', () => {
+test('Mannerheimintie tram clears player and enemies, blocks liquid and resets with the map', () => {
   const map = kamppiSquareMap.create();
   const tram = map.root.getObjectByName('Helsinki tram');
-  const actors = [{ x: 0, z: 20.5, radius: .736, root: new THREE.Group() }, { x: 0, z: 20.5, size: .52, alive: true, root: new THREE.Group() }];
-  const crossing = () => map.lineClear3D({ x: 0, y: 1, z: 18 }, { x: 0, y: 1, z: 23 });
+  const actors = [{ x: 0, z: 61.5, radius: .736, root: new THREE.Group() }, { x: 0, z: 61.5, size: .52, alive: true, root: new THREE.Group() }];
+  const crossing = () => map.lineClear3D({ x: 0, y: 1, z: 59 }, { x: 0, y: 1, z: 64 });
   assert.equal(tram.visible, false); assert.equal(crossing(), true);
-  for (let i = 0; i < 16 * 60; i++) map.update(1 / 60, actors);
+  for (let i = 0; i < 17 * 60; i++) map.update(1 / 60, actors);
   assert.equal(tram.visible, true); assert.equal(crossing(), false);
   for (const actor of actors) {
-    assert.ok(Math.abs(actor.z - 20.5) > 1.4);
+    assert.ok(Math.abs(actor.z - 61.5) > 1.4);
     assert.equal(map.canStandAt(actor.x, actor.z, actor.radius ?? actor.size), true);
   }
   for (let i = 0; i < 11 * 60; i++) map.update(1 / 60, []);
@@ -82,11 +114,11 @@ test('Simonkatu tram clears player and enemies, blocks liquid and resets with th
   map.dispose();
 });
 
-test('switching away from Kamppi releases landmark geometry and sign textures exactly once', () => {
+test('switching away from Kamppi releases landmark geometry and paving textures exactly once', () => {
   const scene = new THREE.Scene(), world = createMapManager(scene, maps, .736);
   world.activate('kamppi');
   const root = scene.children[0];
-  for (const name of ['Kamppi shopping centre', 'Kamppi Chapel of Silence', 'Old Kamppi bus station', 'Entrepreneurs monument', 'Narinkkatori cafe terrace']) {
+  for (const name of ['Kamppi shopping centre', 'Kamppi Chapel of Silence', 'Kulttuurikasarmi', 'Lasipalatsi', 'Lasipalatsi clock tower', 'Amos Rex skylight mound', 'Entrepreneurs monument', 'Narinkkatori cafe terrace']) {
     assert.ok(root.getObjectByName(name), `${name} is present`);
   }
   const owned = new Set();

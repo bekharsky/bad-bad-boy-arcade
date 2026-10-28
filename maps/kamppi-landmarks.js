@@ -2,23 +2,6 @@ import * as THREE from 'three';
 import { createSceneryModel } from './scenery-model.js';
 
 // Original procedural scenery, guided by the Narinkkatori photo references in README.
-// Each building owns its geometry and sign textures, including when it fades.
-export function addSign(group, text, x, y, z, width, height, { background = '#253b40', color = '#f8f2dc', turn = 0 } = {}) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 1024; canvas.height = 192;
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = background; ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = color; ctx.font = 'bold 100px sans-serif';
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(text, 512, 100, 970);
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, height), new THREE.MeshStandardMaterial({ map: texture, roughness: .8 }));
-  mesh.name = text; mesh.position.set(x, y, z); mesh.rotation.y = turn;
-  group.add(mesh);
-  return mesh;
-}
-
 export function createKamppiCentre() {
   const model = createSceneryModel('Kamppi shopping centre');
   const { box } = model;
@@ -69,19 +52,9 @@ export function createKamppiCentre() {
   box('#63828b', 2.8, 8.25, 5.5, 2.4, 12.1, 1.05);
   for (let y = 3; y <= 14.2; y += .8) box(frame, 2.8, y, 6.08, 2.45, .055, .06);
   for (const x of [1.57, 2.8, 4.03]) box(frame, x, 8.25, 6.08, .06, 12.2, .06);
-  // A restrained graphic billboard is drawn locally; no advertisements are downloaded.
-  box('#263942', -1.9, 7.35, 5.4, 5.3, 6.7, .45);
   const group = model.finish({ vertexColors: true });
-  addSign(group, 'KAMPPI HELSINKI', -1, 2.45, 7.48, 11.5, .87);
-  addSign(group, 'CITY / BREAK', -1.9, 8.8, 5.65, 4.85, 1.5, { background: '#8c415a' });
-  addSign(group, 'KAMPPI', -1.9, 6.8, 5.65, 4.85, 1.15, { background: '#bf8052' });
-  addSign(group, 'MEET · EAT · REPEAT', -1.9, 5.1, 5.65, 4.85, .7, { background: '#8c415a' });
-  for (const [text, x] of [['KAHVI', -17], ['KAUPPA', -10], ['KORTTELI', 10], ['KUKKIA', 17]]) {
-    addSign(group, text, x, 2.35, 5.36, 4.8, .49);
-  }
-  addSign(group, 'M', -7.3, 1.55, 7.5, .8, .8, { background: '#cf542c' });
-  addSign(group, 'METRO  /  BUS', 6.8, 1.4, 5.36, 3.5, .48);
-  group.position.set(-7, 0, -24);
+  group.scale.setScalar(1.25);
+  group.position.set(0, 0, -29);
   return group;
 }
 
@@ -125,8 +98,7 @@ export function createKamppiChapel() {
   model.box('#e0cfac', 5.2, 1.1, 2.05, .035, .7, .03);
   model.box('#e0cfac', 5.2, 1.2, 2.05, .22, .035, .03);
   const group = model.finish({ vertexColors: true });
-  addSign(group, 'KAMPIN KAPPELI', 5.2, 2.27, 2.02, 3.4, .3, { background: '#9c9f91', color: '#334b4e' });
-  group.position.set(20, 0, -4.5);
+  group.position.set(-22, 0, -6.5);
   return group;
 }
 
@@ -159,27 +131,151 @@ export function createEntrepreneursMonument() {
   model.box('#e9d798', 0, .32, 0, .5, .035, .5);
   model.box('#969e94', 0, .035, 0, 3.8, .07, 3.8);
   const group = model.finish({ vertexColors: true });
-  group.position.set(-15, 0, -7);
+  group.position.set(14, 0, -8);
   return group;
 }
 
-export function createOldBusStation() {
-  const model = createSceneryModel('Old Kamppi bus station');
+export function createKasarmi() {
+  const model = createSceneryModel('Kulttuurikasarmi');
   const { box } = model;
-  box('#d6caa4', 0, 1.85, 0, 8.6, 3.7, 23);
-  box('#83897f', 0, .25, 0, 8.75, .5, 23.1);
-  box('#dfdbbc', 0, 3.65, 0, 9, .22, 23.4);
-  box('#697b72', 0, 3.9, 0, 9.1, .32, 23.5);
-  for (const side of [-1, 1]) for (let z = -10; z <= 10; z += 2) {
-    box('#ebe0bc', side * 4.35, 1.9, z, .1, 1.85, 1.45);
-    box('#4a6865', side * 4.43, 1.9, z, .06, 1.6, 1.2);
-    box('#c9c9ad', side * 4.48, 1.9, z, .05, 1.6, .045);
+  box('#dfc78e', 0, 2.65, 0, 50, 5.3, 8.6);
+  box('#90968a', 0, .25, 0, 50.1, .5, 8.7);
+  box('#e6e0c5', 0, 5.2, 0, 50.4, .22, 8.9);
+  box('#657568', 0, 5.48, 0, 50.6, .34, 9.1);
+  for (const y of [.5, 2.65, 5]) box('#eae3c5', 0, y, 0, 50.2, .12, 8.8);
+  for (const side of [-1, 1]) for (let x = -23; x <= 23; x += 2.3) {
+    for (const y of [1.55, 3.8]) {
+      box('#efe7cf', x, y, side * 4.35, 1.1, 1.65, .12);
+      box('#567574', x, y, side * 4.43, .84, 1.41, .05);
+      box('#dcdcc5', x, y, side * 4.48, .045, 1.43, .04);
+      for (const dy of [-.35, .15]) box('#dcdcc5', x, y + dy, side * 4.48, .85, .035, .04);
+      box('#e8e0c5', x, y - .89, side * 4.44, 1.25, .12, .23);
+    }
   }
-  box('#405954', 4.5, 1.3, 0, .1, 2.6, 2.25);
-  box('#9a9780', 5.2, 2.9, 0, 1.8, .14, 5);
+  for (const side of [-1, 1]) {
+    box('#567371', 5.5, 1.35, side * 4.48, 3.1, 2.7, .16);
+    for (const x of [3.8, 5.5, 7.2]) box('#e1dec2', x, 1.35, side * 4.6, .09, 2.7, .1);
+    // Three shallow barrel canopies echo the entrance in the supplied street view.
+    for (const x of [3.8, 5.5, 7.2]) {
+      const canopy = new THREE.CylinderGeometry(.85, .85, 1.6, 16, 1, true, 0, Math.PI);
+      canopy.rotateZ(Math.PI / 2).rotateY(Math.PI / 2).translate(x, 2.85, side * 5.1);
+      model.geometry('#d5d5c1', canopy);
+      for (const dx of [-.8, .8]) box('#c8cbbb', x + dx, 1.4, side * 5.7, .06, 2.8, .06);
+    }
+  }
   const group = model.finish({ vertexColors: true });
-  addSign(group, 'VANHA LINJA-AUTOASEMA', 4.56, 3.18, 0, 10, .46, { turn: Math.PI / 2 });
-  addSign(group, 'KAHVI', 4.56, 2.9, 7, 2.8, .4, { turn: Math.PI / 2, background: '#826244' });
-  group.position.set(-27, 0, -2);
+  group.position.set(5, 0, 19);
+  return group;
+}
+
+export function createLasipalatsi() {
+  // Separate wings have their own fade bounds; the open courtyard stays visible.
+  function wing(name, x, z, width, depth, height, turn = 0) {
+    const model = createSceneryModel(name), { box } = model;
+    box('#e8e7d4', 0, height / 2, 0, width, height, depth);
+    box('#b6bdb1', 0, .17, 0, width + .08, .34, depth + .08);
+    box('#f0eedb', 0, height + .05, 0, width + .3, .16, depth + .3);
+    box('#a5b2a6', 0, height + .17, 0, width + .1, .1, depth + .1);
+    for (const side of [-1, 1]) {
+      box('#a5b6b1', 0, 2.8, side * (depth / 2 + .07), width - .8, .97, .1);
+      box('#eee9d1', 0, 3.36, side * (depth / 2 + .13), width - .3, .15, .2);
+      box('#e4ddc3', 0, 2.26, side * (depth / 2 + .13), width - .3, .12, .2);
+      for (let px = -width / 2 + 1; px < width / 2; px += 1.5) {
+        box('#567d7b', px, 2.8, side * (depth / 2 + .14), 1.37, .75, .04);
+        box('#526f70', px, 1.03, side * (depth / 2 + .1), 1.25, 1.65, .08);
+        box('#d5d5be', px + .71, 1.05, side * (depth / 2 + .15), .1, 2.1, .14);
+        box('#d5d5be', px + .71, 2.81, side * (depth / 2 + .18), .07, .94, .08);
+      }
+      // Orange sun blinds distinguish the low functionalist building.
+      box('#c27747', 0, 2.02, side * (depth / 2 + .55), width - .6, .1, 1.1);
+      box('#ddcba4', 0, 1.94, side * (depth / 2 + 1.05), width - .6, .2, .07);
+    }
+    const group = model.finish({ vertexColors: true });
+    group.position.set(x, 0, z); group.rotation.y = turn;
+    return group;
+  }
+  return [
+    wing('Lasipalatsi', 0, 52, 60, 7, 4.1),
+    wing('Lasipalatsi cinema wing', -27, 41.5, 20, 6, 5.2, Math.PI / 2),
+    wing('Lasipalatsi cafe wing', 27, 41.5, 20, 6, 4.1, Math.PI / 2),
+  ];
+}
+
+export function createLasipalatsiClockTower() {
+  const model = createSceneryModel('Lasipalatsi clock tower'), { box } = model;
+  box('#dadfce', 0, 1.25, 0, 1.8, 2.5, 1.8);
+  model.geometry('#e3e6d6', new THREE.CylinderGeometry(.64, .8, 4.2, 24).translate(0, 3.2, 0));
+  box('#ebe9d4', 0, 5.1, 0, 2.15, 1.65, 2.15);
+  for (const turn of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
+    const face = new THREE.Group(), clock = createSceneryModel('Clock face');
+    clock.geometry('#a86650', new THREE.CylinderGeometry(.47, .47, .05, 32).rotateX(Math.PI / 2));
+    clock.geometry('#ece6cd', new THREE.CircleGeometry(.4, 32).translate(0, 0, .035));
+    for (let hour = 0; hour < 12; hour++) {
+      const angle = hour * Math.PI / 6;
+      clock.box('#4e6767', Math.sin(angle) * .33, Math.cos(angle) * .33, .047, .025, .065, .018, -angle);
+    }
+    clock.box('#354f50', .1, .05, .065, .25, .035, .02, .45);
+    clock.box('#354f50', 0, .14, .067, .035, .3, .02);
+    face.add(clock.finish({ vertexColors: true }));
+    face.position.set(Math.sin(turn) * 1.095, 5.1, Math.cos(turn) * 1.095); face.rotation.y = turn;
+    // Keep the small clock faces coloured independently of the white shaft.
+    face.updateMatrixWorld(true);
+    face.traverse(node => {
+      if (!node.isMesh) return;
+      const piece = node.geometry.clone().applyMatrix4(node.matrixWorld);
+      // Preserve colours from the small clock, unlike the solid-colour batch API.
+      model.group.add(new THREE.Mesh(piece, node.material.clone()));
+      node.geometry.dispose(); node.material.dispose();
+    });
+  }
+  model.geometry('#e5e8da', new THREE.CylinderGeometry(.51, .62, 8.6, 24).translate(0, 10.2, 0));
+  for (const y of [6.1, 13.7, 14.5]) model.geometry('#c0cbbb', new THREE.CylinderGeometry(.63, .63, .12, 24).translate(0, y, 0));
+  for (let y = 6.5; y < 14.2; y += .45) box('#a5b2a9', -.54, y, 0, .05, .035, .5);
+  model.geometry('#d4dccd', new THREE.ConeGeometry(.58, .35, 24).translate(0, 14.75, 0));
+  // A plain open spiral tops the chimney; no lettering or advertising remains.
+  const points = Array.from({ length: 65 }, (_, i) => {
+    const angle = i / 64 * Math.PI * 5;
+    return new THREE.Vector3(Math.cos(angle) * .28, 15 + i / 64 * 1.15, Math.sin(angle) * .28);
+  });
+  model.geometry('#a46c59', new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), 64, .025, 5, false));
+  const group = model.finish({ vertexColors: true }); group.position.set(8, 0, 38);
+  return group;
+}
+
+export function createAmosRexMound(x, z, radius, height) {
+  const model = createSceneryModel('Amos Rex skylight mound');
+  const segments = 48, rings = 16, positions = [], uvs = [], indices = [];
+  const topRadius = radius * .29;
+  for (let row = 0; row <= rings; row++) {
+    const t = row / rings, r = topRadius + (radius - topRadius) * (1 - t) ** 1.65;
+    for (let col = 0; col <= segments; col++) {
+      const angle = col / segments * Math.PI * 2;
+      positions.push(Math.cos(angle) * r, height * t + Math.sin(angle) * topRadius * .48 * t ** 4, Math.sin(angle) * r);
+      uvs.push(col / segments * radius * 3, t * height * 4);
+    }
+  }
+  for (let row = 0; row < rings; row++) for (let col = 0; col < segments; col++) {
+    const a = row * (segments + 1) + col, b = a + 1, c = a + segments + 1;
+    indices.push(a, c, b, b, c, c + 1);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setIndex(indices); geometry.computeVertexNormals();
+  const canvas = document.createElement('canvas'); canvas.width = canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#9fa89e'; ctx.fillRect(0, 0, 128, 128);
+  for (let row = 0; row < 8; row++) for (let col = -1; col < 8; col++) {
+    ctx.fillStyle = (row + col) % 3 ? '#e1e1cf' : '#d2d6c5';
+    ctx.fillRect(col * 16 + row % 2 * 8 + 1, row * 16 + 1, 14, 14);
+  }
+  const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  const shell = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ map: texture, roughness: .85 }));
+  shell.castShadow = shell.receiveShadow = true; model.group.add(shell);
+  const tilt = Math.atan(.48);
+  model.geometry('#e7e8d6', new THREE.TorusGeometry(topRadius, .14, 8, 48).rotateX(-Math.PI / 2 - tilt).translate(0, height, 0));
+  model.geometry('#739e9b', new THREE.CircleGeometry(topRadius - .08, 48).rotateX(-Math.PI / 2 - tilt).translate(0, height + .015, 0));
+  const group = model.finish({ vertexColors: true }); group.position.set(x, 0, z);
   return group;
 }
