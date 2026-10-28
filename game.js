@@ -16,6 +16,8 @@ import { createAimAssist } from './aim-assist.js';
 import { createMouseAim } from './mouse-aim.js';
 import { bindGameInput } from './game-input.js';
 import { preventGameZoom } from './gesture-guard.js';
+import { createBaanaRun, RUN_LANES } from './runner/baana-run.js';
+import { bindRunnerInput } from './runner/runner-input.js';
 
 const MODEL_URL = './assets/bad-bad-boy.glb?v=20261025-opt1';
 // World metres; the hero keeps the same physical size across every map.
@@ -56,6 +58,9 @@ const settingsButton = document.querySelector('#open-settings');
 const settingsDone = document.querySelector('#settings-done');
 const soundSetting = document.querySelector('#sound-setting');
 const rangeHud = document.querySelector('.range-hud');
+const runnerControls = document.querySelector('#runner-controls');
+const waveStatLabel = document.querySelector('#wave-stat-label');
+const runnerProgress = document.querySelector('#runner-progress');
 const query = new URLSearchParams(window.location.search);
 const debugMaps = query.get('debug') === 'maps';
 const mouseSupported = typeof canvas.requestPointerLock === 'function' && window.matchMedia('(any-pointer: fine)').matches;
@@ -193,6 +198,23 @@ let gameTime = 0;
 let score = 0;
 let audioContext = null;
 let frameTime = 0;
+const baanaRun = createBaanaRun();
+let runnerComplete = false, runnerBaseScore = 0;
+const isRunner = () => world.mode === 'runner';
+const runnerInput = bindRunnerInput({
+  canvas, left: document.querySelector('#runner-left'), right: document.querySelector('#runner-right'),
+  canInteract: () => playing && isRunner() && !controlsDialog.open,
+  dodge: direction => baanaRun.dodge(direction),
+});
+
+function syncLevelUI() {
+  const runner = isRunner();
+  document.querySelector('.game-shell').classList.toggle('runner-mode', runner);
+  waveStatLabel.textContent = runner ? 'BAANA' : 'WAVE';
+  runnerControls.hidden = !runner || !playing;
+  runnerProgress.hidden = !runner || !playing;
+  rangeHud.hidden = runner || !playing;
+}
 
 if (debugMaps) {
   startScreen.classList.add('map-debug');
@@ -318,8 +340,16 @@ function spawnWave(plan) {
     clearArena();
     world.reset();
     placePlayerAtSpawn();
-    medkits.reset(player);
-    batteries.reset(player);
+    if (!isRunner()) { medkits.reset(player); batteries.reset(player); }
+  }
+  runnerComplete = false;
+  syncLevelUI();
+  if (isRunner()) {
+    baanaRun.reset(); runnerBaseScore = score; player.invulnerable = 0;
+    waveLabel.textContent = '0 m';
+    world.updateRunner(baanaRun.state);
+    showToast('BAANA · ← →');
+    return;
   }
   waveLabel.textContent = String(plan.number).padStart(2, '0');
   spawnEnemies(plan.enemyCount, plan.number);
@@ -429,7 +459,7 @@ function mouseHeading() {
 }
 
 function syncMouseAim() {
-  mouseAim.setEnabled(mouseSupported && mouseAimEnabled && !usingTouchControls && playing && !controlsDialog.open);
+  mouseAim.setEnabled(mouseSupported && mouseAimEnabled && !usingTouchControls && playing && !controlsDialog.open && !isRunner());
 }
 
 function requestMouseAim() {
@@ -453,6 +483,7 @@ function update(dt) {
   // Finish the final bite's splash even after the round ends.
   biteEffects.update(dt);
   if (!playing) return;
+  if (isRunner()) { updateRunner(dt); return; }
   const announcement = world.update(dt, [player, ...enemies]);
   if (announcement) showToast(announcement);
 
@@ -561,6 +592,38 @@ function update(dt) {
   cameraRig.frame(player.x, player.z, dt);
 }
 
+function updateRunner(dt) {
+  const result = baanaRun.update(dt), state = baanaRun.state;
+  player.x = state.x; player.z = 0;
+  player.heading = Math.PI; player.dx = 0; player.dz = -1;
+  player.root.position.set(player.x, 0, 0); player.root.rotation.y = Math.PI;
+  player.runTime += state.speed * dt * Math.PI * 2 / (HERO_HEIGHT * .45);
+  player.runBlend = 1; player.moveSpeed = state.speed;
+  player.body.position.y = Math.abs(Math.sin(player.runTime)) * .035 * HERO_SCALE;
+  player.body.rotation.x = -.05;
+  player.body.rotation.z = THREE.MathUtils.damp(player.body.rotation.z, (RUN_LANES[state.lane] - state.x) * -.055, 12, dt);
+  animateHero(player.rig, player.runTime, 1);
+  world.updateRunner(state);
+  score = runnerBaseScore + Math.floor(state.distance) * 2 + state.passed * 25;
+  scoreLabel.textContent = String(score).padStart(4, '0');
+  waveLabel.textContent = `${Math.floor(state.distance)} m`;
+  runnerProgress.firstElementChild.style.transform = `scaleX(${state.distance / baanaRun.length})`;
+  runnerProgress.setAttribute('aria-valuenow', String(Math.floor(state.distance)));
+  if (result.hits) {
+    player.hp = Math.max(0, player.hp - result.hits); updateHealth(); blip(110, .12);
+    if (player.hp === 0) { endGame(); return; }
+  }
+  player.invulnerable = state.invulnerable;
+  player.model.material.opacity = state.invulnerable > 0 && Math.floor(state.elapsed * 18) % 2 === 0 ? .4 : 1;
+  player.model.material.transparent = state.invulnerable > 0;
+  // Lane changes move the hero across the screen; the camera holds the route centre.
+  cameraRig.frame(0, 0, dt);
+  if (state.finished) {
+    score += 500; scoreLabel.textContent = String(score).padStart(4, '0');
+    runnerComplete = true; endGame();
+  }
+}
+
 function updateHealth() {
   const ratio = Math.max(0, player.hp / player.maxHp);
   heroHpFill.style.width = `${ratio * 100}%`;
@@ -649,7 +712,7 @@ function startGame() {
   updateHealth();
   waves.start();
   playing = true;
-  rangeHud.hidden = false;
+  syncLevelUI();
   touchControls.setEnabled(true);
   startScreen.classList.add('hidden');
   endScreen.classList.add('hidden');
@@ -682,12 +745,17 @@ function endGame() {
   syncMouseAim();
   resetAimAssist();
   rangeHud.hidden = true;
+  runnerControls.hidden = runnerProgress.hidden = true;
   touchControls.setEnabled(false);
   stream.clear();
   player.tapTimer = 0;
   player.moveSpeed = 0;
   player.turnSpeed = 0;
   endScreen.classList.remove('hidden');
+  document.querySelector('#end-title').textContent = runnerComplete ? 'BAANA CLEAR' : 'WASTED';
+  restartButton.textContent = runnerComplete ? 'CONTINUE' : 'PLAY AGAIN';
+  player.model.material.opacity = 1;
+  player.model.material.transparent = false;
   blip(80, 0.25);
   keys.clear();
 }
@@ -710,11 +778,13 @@ function animate(now) {
 }
 
 function beginSpray() {
+  if (isRunner()) return;
   player.tapTimer = 0.075;
   stream.resetPressure();
 }
 
 function resetInput() {
+  runnerInput.reset();
   resetAimAssist();
   mouseAim.resetAim();
   keys.clear();
@@ -803,6 +873,11 @@ window.addEventListener('keydown', (event) => {
     return;
   }
   if (controlsDialog.open) return;
+  if (playing && isRunner() && ['ArrowLeft', 'ArrowRight', 'KeyA', 'KeyD'].includes(event.code)) {
+    event.preventDefault();
+    if (!event.repeat) baanaRun.dodge(event.code === 'ArrowLeft' || event.code === 'KeyA' ? -1 : 1);
+    return;
+  }
   if (!mouseAim.locked && event.target instanceof Element && event.target.closest('select, input')) return;
   if (!playing && event.target instanceof Element && event.target.closest('button, a')) return;
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code)) event.preventDefault();
@@ -815,22 +890,27 @@ window.addEventListener('keydown', (event) => {
   if (event.code === 'Enter' && !playing && !startScreen.classList.contains('hidden') && player.model) { startGame(); requestMouseAim(); }
 });
 window.addEventListener('keyup', (event) => keys.delete(event.code));
-window.addEventListener('blur', () => { resetInput(); if (mouseAim.locked && playing) openSettings(); });
+window.addEventListener('blur', () => { resetInput(); if (playing && (mouseAim.locked || isRunner())) openSettings(); });
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) { resetInput(); if (mouseAim.locked && playing) openSettings(); }
+  if (document.hidden) { resetInput(); if (playing && (mouseAim.locked || isRunner())) openSettings(); }
 });
 window.addEventListener('resize', resize);
 bindGameInput({
   canvas,
   movementZone: document.querySelector('#joystick-zone'),
   movementHandle: document.querySelector('.joystick-hint'),
-  canInteract: () => playing && !controlsDialog.open,
+  canInteract: () => playing && !controlsDialog.open && !isRunner(),
   setFiring: firing => firing ? keys.add('Fire') : keys.delete('Fire'),
   beginSpray,
   requestMouseAim,
 });
 startButton.addEventListener('click', () => { startGame(); requestMouseAim(); });
-restartButton.addEventListener('click', () => { startGame(); requestMouseAim(); });
+restartButton.addEventListener('click', () => {
+  if (runnerComplete) {
+    playing = true; waves.completeMap(); endScreen.classList.add('hidden');
+    touchControls.setEnabled(true); syncLevelUI(); canvas.focus({ preventScroll: true }); requestMouseAim();
+  } else { startGame(); requestMouseAim(); }
+});
 soundSetting.checked = soundEnabled;
 soundSetting.addEventListener('change', () => {
   soundEnabled = soundSetting.checked;
@@ -839,6 +919,7 @@ soundSetting.addEventListener('change', () => {
 });
 
 syncControlMode();
+syncLevelUI();
 resize();
 loadModels();
 requestAnimationFrame(animate);

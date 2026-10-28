@@ -59,7 +59,7 @@ On devices with a coarse primary pointer, the stream keeps its glossy coating an
 
 ## City and enemies
 
-The campaign moves from West Harbor to **Senate Square** on wave 6 and **Kamppi / Narinkkatori** on wave 11, then repeats the three districts in five-wave blocks. Health and score continue across each move; enemies, scenery and pickups reset for the new district while camera scale stays the same. Direct local starts are available for [Senate Square](http://localhost:8000/?map=senate-square) and [Kamppi](http://localhost:8000/?map=kamppi). An unknown `map` parameter uses the normal harbor start.
+The campaign moves from West Harbor to **Senate Square** on wave 6, **Kamppi / Narinkkatori** on wave 11, and **Baana Run** on wave 16. Baana replaces its five-wave block with one 1,300-metre runner course; finishing it and choosing **CONTINUE** returns to West Harbor on wave 21. The four districts then repeat. Health and score continue across each move; enemies, scenery and pickups reset for the new district while camera scale stays the same. Direct local starts are available for [Senate Square](http://localhost:8000/?map=senate-square), [Kamppi](http://localhost:8000/?map=kamppi), and [Baana](http://localhost:8000/?map=baana). An unknown `map` parameter uses the normal harbor start.
 
 For map testing, open [the map picker](http://localhost:8000/?debug=maps) with `?debug=maps`. It lists every registered map on the title screen, pause menu and game-over screen. Clicking a map immediately starts a fresh round there at wave 1, without reloading or waiting through earlier waves. New entries in `maps/index.js` appear automatically. The ordinary interface stays unchanged when this parameter is absent.
 
@@ -76,6 +76,10 @@ Kamppi includes two connected squares across an 86 × 111.5 metre playable area.
 One medkit stays on Narinkkatori; four medkits and all four Battery cans are hidden behind the mall, chapel, Kasarmi and Lasipalatsi. Both squares and every pickup are reachable by the full-size hero. The skylight hills remain solid scenery with flat combat paths around them.
 
 The Kamppi scenery draws on the supplied street-view references, [the mall and Narinkkatori photograph](https://commons.wikimedia.org/wiki/File:Kamppi_Centre_by_Narinkka_Square_in_Helsinki_Finland_02.jpg), [a street-level chapel photograph](https://enmodoviajero.cl/wp-content/uploads/2020/08/capilla-kamppi-helsinki5.jpg), the [chapel's architecture guide](https://kampinkappeli.fi/en/index/architectureanddesign.html), [HAM's photograph and description of Eva Löfdahl's Entrepreneurs Monument](https://www.hamhelsinki.fi/en/sculptures/yrittajaveistos-entrepreneurs-monument/), and [JKMM's Amos Rex / Lasipalatsi project](https://jkmm.fi/work/amos-rex-museum/). Distances and the street alignment are adapted for gameplay while retaining the order of the landmarks. All meshes and paving are generated locally; reference photographs are not included as game assets.
+
+Baana is an automatic forward run through a former railway cutting, with granite retaining walls, exposed rock, overhead road bridges, cycle markings, murals, trees and city buildings above the route. Its 1,300-metre length draws on the [City of Helsinki cycling guide](https://www.hel.fi/en/urban-environment-and-traffic/cycling/cycling-routes), and the scenery follows [this Helsinki City Museum photograph](https://commons.wikimedia.org/wiki/File:Kevyen_liikenteen_väylä_Baana_-_G8541_-_hkm.HKMS000005-km0000n5jx.jpg). It uses the same hero and camera scale as the arena maps, with five recyclable scenery sections and a fixed pool of traffic models.
+
+Use **← / →**, **A / D**, a horizontal swipe, or the two arrow buttons to change between three lanes. Cyclists and standing scooter riders approach in green, light blue and red. Speed increases during the run, with gentle initial traffic and at least one open lane in each group; consecutive groups never require jumping directly across two lanes. Collisions cost one health point and grant 1.2 seconds of protection. Score is two points per metre, 25 per cleanly passed rider and 500 for reaching the finish. **Esc** pauses, and switching tabs pauses automatically. Combat, aim settings and the spray HUD are hidden during Baana; health and score carry into the next district after finishing.
 
 The harbour neighbourhood has a 22 × 15 metre cobbled square and a playable area spanning 55.6 metres in each direction. The hero starts beside the silver Verkkopaukka department store with its glass frontage. A continuous road and tram corridor runs parallel to the shoreline along the edge of the square, with crossings connecting the neighbourhood to the waterfront. Red-brick warehouses, a glass ferry terminal, dock cranes, and a broad quay occupy the water side; homes, cafés, bakery windows, and outdoor tables line the inland side. A white cruise ferry sits on Baltic water beyond the quay, and a miniature Clarion Hotel Helsinki with twin silver towers, a glass connection, and a rooftop pool marks the western backdrop. Building signs are temporarily omitted. The hotel follows the [architect’s reference](https://dtsa.fi/project/clarion-hotel). This is a playful interpretation of the harbour rather than a scale reconstruction.
 
@@ -110,6 +114,8 @@ Four Battery energy drinks are hidden behind the outer houses instead of droppin
 - `maps/harbor-scenery.js`: cruise ferry, water, dock cranes, and Clarion Hotel.
 - `maps/senate-square.js` and `maps/senate-landmarks.js`: Senate Square, cathedral, stairs, monument, merchant blocks and market rows.
 - `maps/kamppi-square.js` and `maps/kamppi-landmarks.js`: Narinkkatori, Kamppi shopping centre, Chapel of Silence, Kulttuurikasarmi, Lasipalatsi, Amos Rex courtyard, clock tower and cafe terraces.
+- `maps/baana.js`: scrolling rock cutting, bridges, skyline, finish line and pooled traffic rendering.
+- `runner/baana-run.js`, `runner/runner-input.js`, and `runner/traffic-models.js`: runner simulation, lane controls and animated cyclists/scooters.
 - `maps/tram.js` and `maps/scenery-model.js`: shared animated tram and merged scenery geometry.
 - `world/map.js`: map instance creation, reset, pickup placement, and resource ownership.
 - `world/map-manager.js`: active map replacement and the stable spatial query API used by gameplay.
@@ -132,15 +138,15 @@ Four Battery energy drinks are hidden behind the outer houses instead of droppin
 
 ## Maps and wave progression
 
-The game uses plain JavaScript modules and Three.js for rendering. Map content is separate from movement, combat, and campaign rules. Only West Harbor is implemented and registered today; Senate Square and Kamppi can be added without changing combat or copying navigation code.
+The game uses plain JavaScript modules and Three.js for rendering. Map content is separate from movement, combat, and campaign rules. West Harbor, Senate Square and Kamppi use arena combat; Baana uses the runner mode. All four are registered in the same campaign and debug picker.
 
 Each map definition provides a unique `id`, a display `name`, rectangular `bounds`, a `spawn` with an optional heading in radians, and `pickups.medkit` / `pickups.battery` anchors. Coordinates use world metres, with Y up and the map root at the origin. An anchor may specify a `jitter` width; placement checks clearance and reachability. Medkit instance capacity is sized for the largest registered map, rather than a harbor-specific count.
 
-A definition's `create()` calls `createMap(definition, build)`. The builder adds only map-owned scenery to the supplied root and returns collision boxes (`minX`, `maxX`, `minZ`, `maxZ`, `height`). It can also supply `buildings` for camera fading, a `dynamicColliders()` callback, `reset()`, and `update(dt, actors, navigation)`. Moving obstacles call `navigation.refresh()` when their occupied space changes; `update` may return a player-facing announcement. Harbor-specific tram rules stay in the harbor module.
+A definition's `create()` calls `createMap(definition, build)`. The builder adds only map-owned scenery to the supplied root and returns collision boxes (`minX`, `maxX`, `minZ`, `maxZ`, `height`). It can also supply `buildings` for camera fading, a `dynamicColliders()` callback, `reset()`, and `update(dt, actors, navigation)`. Moving obstacles call `navigation.refresh()` when their occupied space changes; `update` may return a player-facing announcement. Harbor-specific tram rules stay in the harbor module. A runner definition sets `mode: 'runner'` and supplies `updateRunner(state)`; the runner simulation drives scenery and traffic independently of arena navigation.
 
 Register completed definitions in `maps/index.js`. `createCampaign` follows that order in blocks of five waves by default, then loops back to the first map while difficulty keeps increasing. `wavesPerMap` can be set when constructing the campaign; map rotation is independent of enemy health progression. With only one registered map, every wave remains in West Harbor.
 
-`createWaveDirector` advances only after a wave stays empty for 1.4 seconds and manages reinforcement pressure. It receives simulation time from the existing game loop, so pausing cannot trigger a delayed wave. Restart begins at wave 1 and clears both the transition delay and reinforcement pressure.
+`createWaveDirector` advances only after a wave stays empty for 1.4 seconds and manages reinforcement pressure. It receives simulation time from the existing game loop, so pausing cannot trigger a delayed wave. Restart begins at wave 1 and clears both the transition delay and reinforcement pressure. `completeMap()` advances a finished runner directly to the next district block.
 
 `game.js` coordinates a map transition at a wave boundary: keep score and health, clear active attacks and effects, reset Battery power and inputs, place the player and camera at the new spawn, refill that map's pickups, then spawn the new wave. Pickups stay consumed between waves on the same map. Restart resets the current map or returns to the campaign's first map.
 
@@ -152,7 +158,7 @@ Run the tests with Node 24 or newer:
 node --test
 ```
 
-The suite checks real harbor navigation and tram behavior, map replacement with different bounds, GPU disposal events, pickup relocation, safe spawn fallback, campaign rotation, and restart timing. New map geometry should also be inspected in the browser.
+The suite checks real harbor navigation and tram behavior, map replacement with different bounds, GPU disposal events, pickup relocation, safe spawn fallback, campaign rotation, restart timing, runner collision and safe routes at multiple refresh rates, swipe/button input, and runner traffic-pool disposal. New map geometry should also be inspected in the browser.
 
 ## Prepare the character model
 

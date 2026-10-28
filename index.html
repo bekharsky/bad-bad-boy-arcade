@@ -5,17 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#12151f" />
     <title>Golden Blast Helsinki — Bad Bad Boy Arcade</title>
-    <link rel="stylesheet" href="./style.css?v=20261027-debug-maps1" />
+    <link rel="stylesheet" href="./style.css?v=20261028-baana1" />
     <script type="importmap">
       {
         "imports": {
           "three": "./vendor/three-0.180.0/build/three.module.min.js",
           "three/addons/": "./vendor/three-0.180.0/examples/jsm/",
-          "game": "./game.js?v=20261027-debug-maps1",
+          "game": "./game.js?v=20261028-baana1",
           "./gesture-guard.js": "./gesture-guard.js?v=20261027-mobile1",
-          "./waves.js": "./waves.js?v=20261027-debug-maps1",
+          "./waves.js": "./waves.js?v=20261028-baana1",
           "./batteries.js": "./batteries.js?v=20261027-maps1",
-          "./maps/index.js": "./maps/index.js?v=20261028-kamppi4",
+          "./maps/index.js": "./maps/index.js?v=20261028-baana1",
+          "./maps/baana.js": "./maps/baana.js?v=20261028-baana1",
+          "./runner/baana-run.js": "./runner/baana-run.js?v=20261028-baana1",
+          "./runner/traffic-models.js": "./runner/traffic-models.js?v=20261028-baana1",
+          "./runner/runner-input.js": "./runner/runner-input.js?v=20261028-baana1",
           "./maps/kamppi-square.js": "./maps/kamppi-square.js?v=20261028-kamppi4",
           "./maps/kamppi-landmarks.js": "./maps/kamppi-landmarks.js?v=20261028-kamppi4",
           "./maps/senate-square.js": "./maps/senate-square.js?v=20261027-shared-camera1",
@@ -25,9 +29,9 @@
           "./maps/harbor.js": "./maps/harbor.js?v=20261027-maps1",
           "./maps/harbor-scenery.js": "./maps/harbor-scenery.js?v=20261027-senate1",
           "./world/navigation.js": "./world/navigation.js?v=20261027-maps1",
-          "./world/map.js": "./world/map.js?v=20261027-shared-camera1",
+          "./world/map.js": "./world/map.js?v=20261028-baana1",
           "./world/game-camera.js": "./world/game-camera.js?v=20261027-shared-camera1",
-          "./world/map-manager.js": "./world/map-manager.js?v=20261027-shared-camera1",
+          "./world/map-manager.js": "./world/map-manager.js?v=20261028-baana1",
           "./world/dispose.js": "./world/dispose.js?v=20261027-maps1",
           "./world/building-visibility.js": "./world/building-visibility.js?v=20261027-maps1",
           "./game-input.js": "./game-input.js?v=20261027-input3",
@@ -53,7 +57,7 @@
 
       <header class="hud">
         <div class="brand"><span class="brand-mark" aria-hidden="true">✦</span><span>GOLDEN BLAST <span class="brand-city">HELSINKI</span></span></div>
-        <div class="stat"><span class="stat-label">WAVE</span><strong id="wave">1</strong></div>
+        <div class="stat"><span class="stat-label" id="wave-stat-label">WAVE</span><strong id="wave">1</strong></div>
         <div class="stat"><span class="stat-label">SCORE</span><strong id="score">0000</strong></div>
       </header>
 
@@ -74,6 +78,7 @@
               <span class="start-control-label">FIRE</span>
             </div>
           </div>
+          <div class="runner-start-hint"><kbd>←</kbd> <kbd>→</kbd><span>DODGE</span></div>
           <button id="open-settings" class="settings-button" type="button" aria-label="Controls" aria-haspopup="dialog" aria-controls="controls-dialog">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 3-.5 2.1-1.6.9-2.1-.6-2 3.4 1.6 1.5v1.9l-1.6 1.5 2 3.4 2.1-.6 1.6.9L9 20h4l.5-2.1 1.6-.9 2.1.6 2-3.4-1.6-1.5v-1.9l1.6-1.5-2-3.4-2.1.6-1.6-.9L13 3Z"/><circle cx="11" cy="11.5" r="3"/></svg>
           </button>
@@ -122,6 +127,11 @@
         </button>
       </div>
       <div id="toast" class="toast" aria-live="polite"></div>
+      <div id="runner-progress" class="runner-progress" role="progressbar" aria-label="Baana distance" aria-valuemin="0" aria-valuemax="1300" aria-valuenow="0" hidden><span></span></div>
+      <div id="runner-controls" class="runner-controls" aria-label="Dodge traffic" hidden>
+        <button id="runner-left" type="button" aria-label="Dodge left">←</button>
+        <button id="runner-right" type="button" aria-label="Dodge right">→</button>
+      </div>
     </main>
   </body>
 </html>

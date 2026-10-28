@@ -125,6 +125,17 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 900 clamp(52px, 8vw, 78px
 .toast { position: absolute; z-index: 3; top: 82px; left: 50%; transform: translate(-50%, -10px); padding: 9px 15px; border: 1px solid #ffffff20; border-radius: 999px; color: var(--gold); background: #181925df; font: 700 12px/1 "Barlow Condensed", sans-serif; letter-spacing: .12em; opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; }
 .toast.visible { transform: translate(-50%, 0); opacity: 1; }
 .mobile-controls { display: none; }
+.runner-start-hint { display: none; }
+.runner-mode .runner-start-hint { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 20px; color: var(--muted); font-size: 12px; letter-spacing: .1em; }
+.runner-start-hint kbd { padding: 4px 8px; border: 1px solid #ffffff40; border-radius: 5px; font: 700 20px/1 sans-serif; }
+.runner-mode .start-controls, .runner-mode .mobile-controls, .runner-mode .control-setting, .runner-mode .assist-setting:has([data-aim-assist]), .runner-mode .assist-setting:has([data-mouse-aim]) { display: none !important; }
+.runner-mode #start-screen.map-debug .runner-start-hint { display: none; }
+.runner-controls { position: absolute; z-index: 3; bottom: var(--control-bottom); inset-inline: max(24px, env(safe-area-inset-left)); display: flex; justify-content: space-between; pointer-events: none; }
+.runner-controls button { width: 72px; height: 72px; border: 1px solid #fff3; border-radius: 50%; background: linear-gradient(135deg, #ffe580, #ffc639); color: #3b381e; font: 700 36px/1 sans-serif; cursor: pointer; pointer-events: auto; touch-action: manipulation; box-shadow: 0 5px 20px #0003; }
+.runner-controls button:active { transform: scale(.94); }
+.runner-controls button:focus-visible { outline: 3px solid white; outline-offset: 4px; }
+.runner-progress { position: absolute; z-index: 2; top: 76px; left: 50%; width: min(160px, 32vw); height: 4px; border-radius: 3px; overflow: hidden; background: #132a3c66; pointer-events: none; transform: translateX(-50%); }
+.runner-progress span { display: block; height: 100%; background: var(--gold); transform-origin: left; transform: scaleX(0); }
 .range-hud { position: absolute; z-index: 3; bottom: calc(var(--control-bottom) + 20px); left: 50%; transform: translateX(-50%); width: clamp(80px, calc(100vw - 264px), 148px); padding: 9px 10px; border: 1px solid #ffffff20; border-radius: 10px; background: #182029c9; text-align: center; pointer-events: none; }
 .range-hud strong { display: block; color: var(--gold); font: 800 16px/1 "Barlow Condensed", sans-serif; letter-spacing: .04em; }
 .pressure-track { height: 5px; margin-top: 8px; overflow: hidden; border-radius: 4px; background: #ffffff20; }
