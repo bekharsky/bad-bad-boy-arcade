@@ -12,7 +12,7 @@ export function enemyHealth(kind, wave) {
   return ENEMY_HEALTH[kind] + waveStats(wave).healthBonus;
 }
 
-export function createCampaign(mapIds, { wavesPerMap = 5 } = {}) {
+export function createCampaign(mapIds, { wavesPerMap = 3 } = {}) {
   if (!mapIds.length || mapIds.some(id => typeof id !== 'string' || !id)) throw new Error('Campaign requires map IDs');
   if (!Number.isSafeInteger(wavesPerMap) || wavesPerMap < 1) throw new Error('Waves per map must be a positive integer');
   const order = [...mapIds];
