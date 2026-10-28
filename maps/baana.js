@@ -70,6 +70,7 @@ function buildBaana(root) {
   }
   const templates = [];
   for (const kind of ['bike', 'scooter']) for (const color of TRAFFIC_COLORS) templates.push(createTrafficModel(kind, color));
+  for (const kind of ['cone', 'tractor']) templates.push(createTrafficModel(kind, 'roadwork'));
   for (let i = 0; i < TRAFFIC_CAPACITY; i++) {
     const object = new THREE.Group(); object.name = 'Baana traffic'; object.visible = false;
     for (const template of templates) { const variant = template.clone(true); variant.visible = false; object.add(variant); }
@@ -86,9 +87,12 @@ function buildBaana(root) {
     for (let i = 0; i < trafficPool.length; i++) {
       const object = trafficPool[i], agent = state.traffic[i]; object.visible = !!agent;
       if (!agent) continue;
-      object.position.set(RUN_LANES[agent.lane], 0, state.distance - agent.progress);
+      const cleared = agent.cleared ? Math.min(1, (state.elapsed - agent.clearedAt) / .6) : 0;
+      object.position.set(RUN_LANES[agent.lane] + cleared * (agent.lane === 0 ? -2 : 2), 0, state.distance - agent.progress);
+      object.scale.setScalar(1 - cleared);
+      object.rotation.z = cleared * -.8 + (agent.wetUntil > state.elapsed ? Math.sin(state.elapsed * 60) * .08 : 0);
       for (const variant of object.children) {
-        variant.visible = variant.name === `${agent.color} ${agent.kind}`;
+        variant.visible = variant.name === `${agent.kind === 'cone' || agent.kind === 'tractor' ? 'roadwork' : agent.color} ${agent.kind}`;
         if (variant.visible) animateTraffic(variant, state.elapsed + agent.id, agent.speed + state.speed);
       }
     }

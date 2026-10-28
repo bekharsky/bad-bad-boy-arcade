@@ -12,6 +12,31 @@ export function createTrafficModel(kind, color) {
     geometry.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), delta.clone().normalize()));
     model.geometry(shade, geometry.translate(...start.addScaledVector(delta, .5).toArray()));
   }
+  if (kind === 'cone') {
+    box('#303e41', 0, .08, 0, 1.15, .16, 1.15);
+    for (const [y, radius, height, shade] of [[.37, .42, .5, '#f58632'], [.73, .27, .22, '#f4ebd3'], [.98, .18, .28, '#f58632']]) {
+      model.geometry(shade, new THREE.CylinderGeometry(radius * .55, radius, height, 12).translate(0, y, 0));
+    }
+    return model.finish({ vertexColors: true });
+  }
+  if (kind === 'tractor') {
+    for (const x of [-.87, .87]) for (const z of [-.85, .9]) {
+      const radius = z < 0 ? .68 : .48;
+      model.geometry('#2d3537', new THREE.CylinderGeometry(radius, radius, .4, 14).rotateZ(Math.PI / 2).translate(x, radius, z));
+      model.geometry('#b7a67b', new THREE.CylinderGeometry(radius * .45, radius * .45, .42, 12).rotateZ(Math.PI / 2).translate(x, radius, z));
+    }
+    box('#d5a044', 0, .95, .15, 1.45, .65, 2.35);
+    box('#e5b853', 0, 1.4, .65, 1.2, .5, 1.4);
+    box('#547b83', 0, 1.9, -.6, 1.25, 1.2, 1.15);
+    for (const x of [-.66, .66]) for (const z of [-1.2, 0]) box('#e6ba66', x, 1.95, z, .1, 1.35, .1);
+    box('#e4b65b', 0, 2.62, -.6, 1.7, .18, 1.65);
+    box('#31494b', 0, 1.3, 1.39, .98, .45, .06);
+    for (const x of [-.44, .44]) box('#f2e9bd', x, 1.58, 1.4, .25, .2, .08);
+    box('#434c49', .45, 2.08, .65, .12, .9, .12);
+    box('#b0a185', 0, .35, 1.67, 2.2, .58, .4);
+    model.geometry('#f38d38', new THREE.SphereGeometry(.13, 10, 6).translate(.5, 2.83, -.6));
+    return model.finish({ vertexColors: true });
+  }
   const wheelRadius = kind === 'bike' ? .4 : .22, wheelZ = kind === 'bike' ? .92 : .72;
   for (const z of [-wheelZ, wheelZ]) {
     const wheel = createSceneryModel('Traffic wheel');

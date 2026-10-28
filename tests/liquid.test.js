@@ -177,3 +177,25 @@ test('disabling refraction preserves gloss, pressure, range, and collision damag
   assert.ok(mobile.hits.length > 0);
   assert.deepEqual(mobile.hits, desktop.hits);
 });
+
+test('runner liquid can clear approaching riders, cones and tractors before contact', async () => {
+  const { createBaanaRun } = await import('../runner/baana-run.js');
+  for (const kind of ['bike', 'scooter', 'cone', 'tractor']) {
+    const run = createBaanaRun();
+    const agent = { id: -1, kind, lane: 1, speed: kind === 'cone' || kind === 'tractor' ? 0 : 5.2,
+      progress: 38, hp: kind === 'tractor' ? 4 : kind === 'cone' ? 1 : 1.5,
+      hitHeight: kind === 'cone' ? .55 : 1.2, size: kind === 'tractor' ? 1.1 : kind === 'cone' ? .55 : .7,
+      x: 0, z: -38, alive: true, hit: false, passed: false };
+    run.state.traffic.push(agent);
+    const scene = new THREE.Scene(), emitter = new THREE.Object3D();
+    emitter.position.set(.083, 1.228, -.356);
+    const stream = createLiquidStream(scene, { lineClear3D: () => true }, (target, direction, impact) => run.sprayHit(target.id, impact), { refraction: false });
+    for (let frame = 0; frame < 240 && agent.alive; frame++) {
+      run.update(1 / 60);
+      stream.update(1 / 60, true, emitter, { dx: 0, dz: -1 }, [agent]);
+    }
+    assert.equal(agent.alive, false, kind);
+    assert.equal(agent.hit, false, `${kind} clears before colliding`);
+    assert.equal(run.state.cleared, 1);
+  }
+});

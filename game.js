@@ -154,6 +154,7 @@ player.root.position.set(player.x, 0, player.z);
 scene.add(player.root);
 
 function hitEnemy(enemy, direction, impact) {
+  if (isRunner()) { baanaRun.sprayHit(enemy.id, impact); return; }
   enemy.hp -= impact.damage;
   enemy.hit = 0.18;
   world.move(enemy, direction.x * impact.knockback, direction.z * impact.knockback, enemy.size);
@@ -205,6 +206,8 @@ const runnerInput = bindRunnerInput({
   canvas, left: document.querySelector('#runner-left'), right: document.querySelector('#runner-right'),
   canInteract: () => playing && isRunner() && !controlsDialog.open,
   dodge: direction => baanaRun.dodge(direction),
+  fire: document.querySelector('#runner-fire'),
+  setFiring: firing => firing ? keys.add('Fire') : keys.delete('Fire'), beginSpray,
 });
 
 function syncLevelUI() {
@@ -213,7 +216,7 @@ function syncLevelUI() {
   waveStatLabel.textContent = runner ? 'BAANA' : 'WAVE';
   runnerControls.hidden = !runner || !playing;
   runnerProgress.hidden = !runner || !playing;
-  rangeHud.hidden = runner || !playing;
+  rangeHud.hidden = !playing;
 }
 
 if (debugMaps) {
@@ -603,8 +606,15 @@ function updateRunner(dt) {
   player.body.rotation.x = -.05;
   player.body.rotation.z = THREE.MathUtils.damp(player.body.rotation.z, (RUN_LANES[state.lane] - state.x) * -.055, 12, dt);
   animateHero(player.rig, player.runTime, 1);
+  player.root.updateMatrixWorld(true);
+  const firing = keys.has('Space') || keys.has('Fire') || player.tapTimer > 0;
+  player.tapTimer = Math.max(0, player.tapTimer - dt);
+  const spray = stream.update(dt, firing, player.rig.emitter, player, state.traffic);
+  pressureFill.style.transform = `scaleX(${spray.charge})`;
+  sprayRange.textContent = `${spray.range.toFixed(1)} m`;
+  rangeHud.setAttribute('aria-label', `Spray range ${spray.range.toFixed(1)} metres`);
   world.updateRunner(state);
-  score = runnerBaseScore + Math.floor(state.distance) * 2 + state.passed * 25;
+  score = runnerBaseScore + Math.floor(state.distance) * 2 + state.passed * 25 + state.bonus;
   scoreLabel.textContent = String(score).padStart(4, '0');
   waveLabel.textContent = `${Math.floor(state.distance)} m`;
   runnerProgress.firstElementChild.style.transform = `scaleX(${state.distance / baanaRun.length})`;
@@ -778,7 +788,6 @@ function animate(now) {
 }
 
 function beginSpray() {
-  if (isRunner()) return;
   player.tapTimer = 0.075;
   stream.resetPressure();
 }
