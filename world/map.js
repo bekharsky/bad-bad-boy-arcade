@@ -21,6 +21,7 @@ export function createMap(definition, build) {
       ...navigation,
       id: definition.id,
       name: definition.name,
+      mode: definition.mode ?? 'arena',
       spawn: definition.spawn,
       root,
       pickupCapacity(kind) { return definition.pickups?.[kind]?.length ?? 0; },
@@ -29,6 +30,7 @@ export function createMap(definition, build) {
       },
       updateVisibility: visibility.update,
       update: (dt, actors) => content.update?.(dt, actors, navigation),
+      updateRunner: state => content.updateRunner?.(state),
       reset() {
         content.reset?.();
         visibility.reset();

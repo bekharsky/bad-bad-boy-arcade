@@ -3,7 +3,7 @@ export function createTouchControls({ zone, stick, thumb, home, fireButton, onFi
   const radius = 44;
   const deadzone = 0.1;
   const input = { x: 0, z: 0, firing: false };
-  let enabled = false;
+  let enabled = false, horizontalOnly = false;
   let movePointer = null, firePointer = null;
   let originX = 0, originY = 0;
 
@@ -33,7 +33,7 @@ export function createTouchControls({ zone, stick, thumb, home, fireButton, onFi
   function move(event) {
     if (event.pointerId !== movePointer) return;
     event.preventDefault();
-    let dx = event.clientX - originX, dy = event.clientY - originY;
+    let dx = event.clientX - originX, dy = horizontalOnly ? 0 : event.clientY - originY;
     const distance = Math.hypot(dx, dy);
     if (distance > radius) {
       // Keep a stable centre for the whole gesture, like a physical stick.
@@ -101,6 +101,11 @@ export function createTouchControls({ zone, stick, thumb, home, fireButton, onFi
   return {
     input,
     reset,
+    setHorizontalOnly(value) {
+      if (horizontalOnly === value) return;
+      horizontalOnly = value;
+      resetMove();
+    },
     setEnabled(value) {
       enabled = value;
       zone.parentElement.classList.toggle('enabled', value);
