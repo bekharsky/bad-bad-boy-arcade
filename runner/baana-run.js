@@ -1,4 +1,4 @@
-export const BAANA_LENGTH = 1300;
+export const BAANA_LENGTH = 700;
 export const RIDER_BONUS = 150;
 export const RIDER_HEALTH = .4;
 export const RUN_LANES = Object.freeze([-3, 0, 3]);

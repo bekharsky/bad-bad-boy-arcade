@@ -5,47 +5,46 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#12151f" />
     <title>Golden Blast Helsinki — Bad Bad Boy Arcade</title>
-    <link rel="stylesheet" href="./style.css?v=20261028-baana6" />
+    <link rel="stylesheet" href="./style.css?v=20261028-map-polish1" />
     <script type="importmap">
       {
         "imports": {
           "three": "./vendor/three-0.180.0/build/three.module.min.js",
           "three/addons/": "./vendor/three-0.180.0/examples/jsm/",
-          "game": "./game.js?v=20261028-baana6",
+          "game": "./game.js?v=20261028-map-polish1",
           "./gesture-guard.js": "./gesture-guard.js?v=20261027-mobile1",
           "./waves.js": "./waves.js?v=20261028-three-waves1",
-          "./batteries.js": "./batteries.js?v=20261027-maps1",
+          "./batteries.js": "./batteries.js?v=20261028-map-polish1",
           "./maps/index.js": "./maps/index.js?v=20261028-campaign-order1",
-          "./maps/baana.js": "./maps/baana.js?v=20261028-baana6",
-          "./runner/baana-run.js": "./runner/baana-run.js?v=20261028-baana6",
-          "./runner/traffic-models.js": "./runner/traffic-models.js?v=20261028-baana6",
-          "./touch-controls.js": "./touch-controls.js?v=20261028-baana6",
-          "./runner/runner-input.js": "./runner/runner-input.js?v=20261028-baana6",
+          "./maps/baana.js": "./maps/baana.js?v=20261028-map-polish1",
+          "./runner/baana-run.js": "./runner/baana-run.js?v=20261028-map-polish1",
+          "./runner/traffic-models.js": "./runner/traffic-models.js?v=20261028-map-polish1",
+          "./touch-controls.js": "./touch-controls.js?v=20261028-map-polish1",
+          "./runner/runner-input.js": "./runner/runner-input.js?v=20261028-map-polish1",
           "./maps/kamppi-square.js": "./maps/kamppi-square.js?v=20261028-kamppi4",
           "./maps/kamppi-landmarks.js": "./maps/kamppi-landmarks.js?v=20261028-kamppi4",
           "./maps/senate-square.js": "./maps/senate-square.js?v=20261027-shared-camera1",
           "./maps/senate-landmarks.js": "./maps/senate-landmarks.js?v=20261027-cupolas3",
           "./maps/scenery-model.js": "./maps/scenery-model.js?v=20261027-cathedral2",
           "./maps/tram.js": "./maps/tram.js?v=20261027-senate1",
-          "./maps/harbor.js": "./maps/harbor.js?v=20261027-maps1",
-          "./maps/harbor-scenery.js": "./maps/harbor-scenery.js?v=20261027-senate1",
-          "./world/navigation.js": "./world/navigation.js?v=20261027-maps1",
-          "./world/map.js": "./world/map.js?v=20261028-baana6",
+          "./maps/harbor.js": "./maps/harbor.js?v=20261028-map-polish1",
+          "./maps/harbor-scenery.js": "./maps/harbor-scenery.js?v=20261028-map-polish1",
+          "./world/navigation.js": "./world/navigation.js?v=20261028-map-polish1",
+          "./world/map.js": "./world/map.js?v=20261028-map-polish1",
           "./world/game-camera.js": "./world/game-camera.js?v=20261027-shared-camera1",
-          "./world/map-manager.js": "./world/map-manager.js?v=20261028-baana6",
-          "./world/dispose.js": "./world/dispose.js?v=20261027-maps1",
-          "./world/building-visibility.js": "./world/building-visibility.js?v=20261027-maps1",
+          "./world/map-manager.js": "./world/map-manager.js?v=20261028-map-polish1",
+          "./world/dispose.js": "./world/dispose.js?v=20261028-map-polish1",
+          "./world/building-visibility.js": "./world/building-visibility.js?v=20261028-map-polish1",
           "./game-input.js": "./game-input.js?v=20261027-input3",
           "./enemy-pressure.js": "./enemy-pressure.js?v=20261026-harbor2",
           "./movement.js": "./movement.js?v=20261027-mobile1",
           "./mouse-aim.js": "./mouse-aim.js?v=20261027-ground-aim1",
           "./aim-assist.js": "./aim-assist.js?v=20261026-assist1",
-          "./touch-controls.js": "./touch-controls.js?v=20261027-mobile1",
           "./hero.js": "./hero.js?v=20261025-medkits1",
-          "./enemies.js": "./enemies.js?v=20261027-maps1",
+          "./enemies.js": "./enemies.js?v=20261028-map-polish1",
           "./liquid.js": "./liquid.js?v=20261027-clarion1",
           "./bites.js": "./bites.js?v=20261025-medkits1",
-          "./medkits.js": "./medkits.js?v=20261027-maps1"
+          "./medkits.js": "./medkits.js?v=20261028-map-polish1"
         }
       }
     </script>
@@ -110,17 +109,17 @@
         <a class="credits-link" href="./credits.html" target="_blank" rel="noopener">Models & credits ↗</a>
       </dialog>
 
-      <div class="range-hud" aria-label="Spray range" hidden>
-        <strong id="spray-range">0.9 m</strong>
-        <div class="pressure-track"><span id="pressure-fill"></span></div>
-      </div>
       <div class="mobile-controls" aria-label="Touch controls">
         <div id="joystick-zone" class="joystick-zone" aria-label="Drag to move and aim">
           <div class="joystick-hint" aria-hidden="true"><span class="joystick-idle-thumb"></span></div>
           <div id="joystick" class="joystick" aria-hidden="true" hidden><div id="joystick-thumb" class="joystick-thumb"></div></div>
         </div>
         <button id="mobile-fire" class="fire-button touch-control" type="button" aria-label="Fire spray">
-          <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <svg class="spray-gauge" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+            <circle class="spray-gauge-track" cx="50" cy="50" r="46" />
+            <circle id="spray-gauge-fill" class="spray-gauge-fill" cx="50" cy="50" r="46" pathLength="100" />
+          </svg>
+          <svg class="spray-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true" focusable="false">
             <circle cx="24" cy="24" r="15" />
             <path d="M24 4v9m0 22v9M4 24h9m22 0h9" />
             <path d="M24 15c-2.5 3.7-6 7.3-6 10.5a6 6 0 0 0 12 0c0-3.2-3.5-6.8-6-10.5Z" fill="currentColor" stroke="none" />
@@ -128,7 +127,7 @@
         </button>
       </div>
       <div id="toast" class="toast" aria-live="polite"></div>
-      <div id="runner-progress" class="runner-progress" role="progressbar" aria-label="Baana distance" aria-valuemin="0" aria-valuemax="1300" aria-valuenow="0" hidden><span></span></div>
+      <div id="runner-progress" class="runner-progress" role="progressbar" aria-label="Baana progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden><span></span></div>
     </main>
   </body>
 </html>

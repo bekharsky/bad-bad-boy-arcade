@@ -53,8 +53,8 @@ test('generated traffic always permits a complete run at multiple refresh rates 
       for (const agent of run.state.traffic) { colors.add(agent.color); kinds.add(agent.kind); }
     }
     assert.equal(hits, 0, `A safe path exists at ${fps} FPS, seed ${seed}`);
-    assert.equal(run.state.finished, true); assert.equal(run.state.distance, 1300);
-    assert.ok(run.state.passed > 150); assert.ok(peakTraffic <= TRAFFIC_CAPACITY);
+    assert.equal(run.state.finished, true); assert.equal(run.state.distance, 700); assert.ok(run.state.elapsed < 75);
+    assert.ok(run.state.passed > 70); assert.ok(peakTraffic <= TRAFFIC_CAPACITY);
     assert.deepEqual([...colors].sort(), ['blue', 'green', 'red']);
     assert.deepEqual([...kinds].sort(), ['barrier', 'bike', 'cone', 'scooter', 'tractor', 'trench']);
     assert.ok(RUN_LANES.includes(run.state.x));

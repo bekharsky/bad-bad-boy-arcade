@@ -51,13 +51,12 @@ const heroHeadPosition = new THREE.Vector3();
 const scoreLabel = document.querySelector('#score');
 const waveLabel = document.querySelector('#wave');
 const toast = document.querySelector('#toast');
-const sprayRange = document.querySelector('#spray-range');
-const pressureFill = document.querySelector('#pressure-fill');
+const sprayButton = document.querySelector('#mobile-fire');
+const sprayGauge = document.querySelector('#spray-gauge-fill');
 const controlsDialog = document.querySelector('#controls-dialog');
 const settingsButton = document.querySelector('#open-settings');
 const settingsDone = document.querySelector('#settings-done');
 const soundSetting = document.querySelector('#sound-setting');
-const rangeHud = document.querySelector('.range-hud');
 const waveStatLabel = document.querySelector('#wave-stat-label');
 const runnerProgress = document.querySelector('#runner-progress');
 const query = new URLSearchParams(window.location.search);
@@ -221,11 +220,10 @@ const laneSteering = createLaneSteering(direction => baanaRun.dodge(direction));
 function syncLevelUI() {
   const runner = isRunner();
   document.querySelector('.game-shell').classList.toggle('runner-mode', runner);
-  waveStatLabel.textContent = runner ? 'BAANA' : 'WAVE';
+  waveStatLabel.parentElement.hidden = runner;
   touchControls.setHorizontalOnly(runner);
   document.querySelector('#joystick-zone').setAttribute('aria-label', runner ? 'Drag left or right to dodge' : 'Drag to move and aim');
   runnerProgress.hidden = !runner || !playing;
-  rangeHud.hidden = !playing;
 }
 
 if (debugMaps) {
@@ -313,6 +311,7 @@ async function loadModels() {
     player.model = player.rig.mesh;
     player.model.scale.setScalar(HERO_SCALE);
     player.body.add(player.model);
+    placePlayerAtSpawn();
     status.classList.add('hidden');
     startButton.disabled = false;
     startButton.textContent = 'PLAY';
@@ -347,9 +346,12 @@ function spawnEnemies(count, level) {
 function spawnWave(plan) {
   const changedMap = world.activate(plan.mapId);
   if (changedMap || plan.number === 1) {
-    // Preserve score and health between maps; no old attacks or pickups travel
-    // with the player. Reset also rebuilds navigation before placing pickups.
+    // Keep score, but begin every district at full health with no old attacks.
+    // Reset also rebuilds navigation before placing pickups.
     clearArena();
+    player.hp = player.maxHp; player.invulnerable = 0;
+    player.model.material.opacity = 1; player.model.material.transparent = false;
+    updateHealth();
     world.reset();
     placePlayerAtSpawn();
     if (!isRunner()) { medkits.reset(player); batteries.reset(player); }
@@ -358,7 +360,8 @@ function spawnWave(plan) {
   syncLevelUI();
   if (isRunner()) {
     baanaRun.reset(); runnerBaseScore = score; player.invulnerable = 0;
-    waveLabel.textContent = '0 m';
+    runnerProgress.firstElementChild.style.transform = 'scaleX(0)';
+    runnerProgress.setAttribute('aria-valuenow', '0');
     world.updateRunner(baanaRun.state);
     showToast('BAANA · ← →');
     return;
@@ -521,9 +524,7 @@ function update(dt) {
   const spray = stream.update(dt, firing, player.rig.emitter, player, enemies);
   player.powerTimer = Math.max(0, player.powerTimer - dt);
   updateSpread(dt, firing);
-  pressureFill.style.transform = `scaleX(${spray.charge})`;
-  sprayRange.textContent = spray.blocked ? '×' : `${spray.range.toFixed(1)} m`;
-  rangeHud.setAttribute('aria-label', spray.blocked ? 'Spray blocked' : `Spray range ${spray.range.toFixed(1)} metres`);
+  updateSprayGauge(spray);
   player.fireTimer -= dt;
   if (firing && player.fireTimer <= 0) {
     blip(180 + Math.random() * 35, 0.035);
@@ -624,15 +625,12 @@ function updateRunner(dt) {
   const firing = keys.has('Space') || keys.has('Fire') || touchControls.input.firing || player.tapTimer > 0;
   player.tapTimer = Math.max(0, player.tapTimer - dt);
   const spray = stream.update(dt, firing, player.rig.emitter, player, state.traffic);
-  pressureFill.style.transform = `scaleX(${spray.charge})`;
-  sprayRange.textContent = `${spray.range.toFixed(1)} m`;
-  rangeHud.setAttribute('aria-label', `Spray range ${spray.range.toFixed(1)} metres`);
+  updateSprayGauge(spray);
   world.updateRunner(state);
   score = runnerBaseScore + Math.floor(state.distance) * 2 + state.passed * 25 + state.bonus;
   scoreLabel.textContent = String(score).padStart(4, '0');
-  waveLabel.textContent = `${Math.floor(state.distance)} m`;
   runnerProgress.firstElementChild.style.transform = `scaleX(${state.distance / baanaRun.length})`;
-  runnerProgress.setAttribute('aria-valuenow', String(Math.floor(state.distance)));
+  runnerProgress.setAttribute('aria-valuenow', String(Math.round(state.distance / baanaRun.length * 100)));
   if (result.hits) {
     player.hp = Math.max(0, player.hp - result.hits); updateHealth(); blip(110, .12);
     if (player.hp === 0) { endGame(); return; }
@@ -646,6 +644,12 @@ function updateRunner(dt) {
     score += 500; scoreLabel.textContent = String(score).padStart(4, '0');
     runnerComplete = true; endGame();
   }
+}
+
+function updateSprayGauge(spray) {
+  sprayGauge.style.strokeDashoffset = String(100 * (1 - spray.charge));
+  sprayButton.dataset.blocked = String(spray.blocked);
+  sprayButton.setAttribute('aria-label', spray.blocked ? 'Fire spray, blocked' : `Fire spray, range ${spray.range.toFixed(1)} metres`);
 }
 
 function updateHealth() {
@@ -768,7 +772,6 @@ function endGame() {
   playing = false;
   syncMouseAim();
   resetAimAssist();
-  rangeHud.hidden = true;
   runnerProgress.hidden = true;
   touchControls.setEnabled(false);
   stream.clear();

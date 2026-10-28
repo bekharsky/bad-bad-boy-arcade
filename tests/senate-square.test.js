@@ -163,3 +163,18 @@ test('the cathedral fits the shared camera and real map switches dispose their o
   assert.equal(world.canStandAt(world.spawn.x, world.spawn.z, .736), true);
   world.dispose();
 });
+
+
+test('only harbor replaces the fog with open water, and all other districts restore the original environment', () => {
+  const scene = new THREE.Scene();
+  const background = scene.background = new THREE.Color('#7c929f');
+  const fog = scene.fog = new THREE.Fog('#7c929f', 40, 100);
+  const world = createMapManager(scene, maps, .736);
+  for (const id of ['baana', 'kamppi', 'senate-square']) {
+    world.activate('harbor'); assert.equal(scene.fog, null); assert.equal(scene.background.getHexString(), '376b7c');
+    world.activate(id); assert.equal(scene.fog, fog); assert.equal(scene.background, background);
+    assert.equal(scene.fog.near, 40); assert.equal(scene.fog.far, 100);
+  }
+  world.activate('harbor'); world.dispose();
+  assert.equal(scene.fog, fog); assert.equal(scene.background, background);
+});

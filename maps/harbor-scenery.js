@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { createSceneryModel as model, destination } from './scenery-model.js';
+import { createSceneryModel as model } from './scenery-model.js';
 export { createTram } from './tram.js';
 
 export function createHarbor(scene) {
@@ -18,10 +18,10 @@ export function createHarbor(scene) {
   }
   scene.add(cranes.finish());
   createClarionHotel(scene);
-  const water = new THREE.Mesh(new THREE.PlaneGeometry(140, 58), new THREE.MeshStandardMaterial({ color: '#376b7c', metalness: .35, roughness: .3 }));
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(800, 800), new THREE.MeshStandardMaterial({ color: '#376b7c', metalness: .35, roughness: .3 }));
   water.name = 'Baltic harbor water';
   water.rotation.x = -Math.PI / 2;
-  water.position.set(0, -.2, -58);
+  water.position.set(0, -.2, 0);
   water.receiveShadow = true;
   scene.add(water);
   const boat = model('Cruise ferry');
@@ -61,18 +61,16 @@ export function createHarbor(scene) {
   box('#f4edda', 7.1, 6.55, 0, .09, 1.6, .09);
   box('#dce7df', 7.1, 7.3, 0, 1.8, .08, .09);
   box('#628ba2', 7.1, 6.9, 0, .5, .3, .5);
-  const name = destination('HELSINKI  CRUISE', 7, .65);
-  name.position.set(-3, 1.1, 3.12);
-  boat.group.add(name);
   const ferry = boat.finish();
   ferry.position.set(0, 0, -39);
   scene.add(ferry);
 
   // Broken reflections and ripples stay outside the playable quay.
   const ripples = model('Harbor ripples');
-  for (let n = 0; n < 75; n++) {
-    const x = Math.sin(n * 8.13) * 55;
-    const z = -31 - (n * 7.37 % 40);
+  for (let n = 0; n < 220; n++) {
+    const x = Math.sin(n * 8.13) * 135;
+    const z = Math.cos(n * 7.37) * 135;
+    if (x > -51 && x < 43 && z > -30 && z < 42) continue;
     ripples.box(n % 3 ? '#467b89' : '#65929b', x, -.185, z, 1.1 + n % 5, .012, .07);
   }
   const rippleRoot = ripples.finish();

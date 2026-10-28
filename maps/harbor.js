@@ -11,7 +11,8 @@ const hiddenPoint = ([x, z]) => ({ x, z, jitter: .65 });
 export const harborMap = {
   id: 'harbor',
   name: 'West Harbor',
-  spawn: { x: -5, z: 7, heading: Math.PI },
+  environment: { background: new THREE.Color('#376b7c'), fog: null },
+  spawn: { x: -5, z: 7, heading: Math.PI / 2 },
   bounds: { minX: -27.8, maxX: 27.8, minZ: -27.8, maxZ: 27.8 },
   pickups: {
     medkit: [{ x: 3.5, z: 9.5 }, ...courtyards.slice(0, 4).map(hiddenPoint)],
@@ -275,8 +276,9 @@ function buildHarbor(scene) {
     part('cylinder', '#697c7d', n, 0.28, s * 28.2, 0.13, 0.56, 0.13);
     part('cylinder', '#697c7d', s * 28.2, 0.28, n, 0.13, 0.56, 0.13);
   }
-  // Granite seawall and mooring posts mark the northern edge of the city.
-  part('box', '#697e80', 0, -.1, -28.75, 76, .55, .5);
+  // The city stands on an island: a quay edge meets water on every side.
+  for (const z of [-29, 41]) part('box', '#697e80', -4, -.18, z, 92, .55, .35);
+  for (const x of [-50, 42]) part('box', '#697e80', x, -.18, 6, .35, .55, 70);
   for (let x = -26; x <= 26; x += 4) {
     part('cylinder', '#334b52', x, .15, -28.45, .24, .3, .24);
     part('box', '#334b52', x, .31, -28.45, .4, .08, .15);

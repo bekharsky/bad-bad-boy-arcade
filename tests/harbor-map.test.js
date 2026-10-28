@@ -157,3 +157,17 @@ test('reset restores faded buildings and their shadows for the next run', () => 
     assert.equal(mesh.castShadow, true);
   }
 });
+
+
+test('harbor starts in profile and Baltic water surrounds every side of the city', () => {
+  const { scene } = setup();
+  assert.equal(harborMap.spawn.heading, Math.PI / 2);
+  const water = scene.getObjectByName('Baltic harbor water');
+  scene.updateMatrixWorld(true);
+  const bounds = new THREE.Box3().setFromObject(water);
+  for (const [x, z] of [[-60, 6], [55, 6], [-4, -45], [-4, 55]]) {
+    assert.equal(bounds.containsPoint(new THREE.Vector3(x, -.2, z)), true, `Water reaches ${x}, ${z}`);
+  }
+  const ferry = scene.getObjectByName('Cruise ferry');
+  ferry.traverse(node => { if (node.isMesh) assert.equal(node.material.map, null, 'The ferry has no text sign'); });
+});

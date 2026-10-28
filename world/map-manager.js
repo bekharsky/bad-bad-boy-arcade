@@ -4,6 +4,7 @@ export function createMapManager(scene, definitions, playerRadius = .4) {
   const registry = new Map(definitions.map(definition => [definition.id, definition]));
   if (registry.size !== definitions.length) throw new Error('Map IDs must be unique');
   let active = null;
+  const defaultBackground = scene.background, defaultFog = scene.fog;
   const manager = {
     get id() { return active?.id; },
     get name() { return active?.name; },
@@ -25,10 +26,12 @@ export function createMapManager(scene, definitions, playerRadius = .4) {
       const previous = active;
       active = next;
       scene.add(next.root);
+      scene.background = definition.environment?.background ?? defaultBackground;
+      scene.fog = definition.environment?.fog === undefined ? defaultFog : definition.environment.fog;
       previous?.dispose();
       return true;
     },
-    dispose() { active?.dispose(); active = null; },
+    dispose() { active?.dispose(); active = null; scene.background = defaultBackground; scene.fog = defaultFog; },
   };
   for (const method of ['move', 'routeTo', 'chase', 'spawnPoint', 'pickupPoints', 'lineClear', 'lineClear3D', 'canStandAt', 'update', 'updateRunner', 'updateVisibility', 'reset']) {
     manager[method] = (...args) => active[method](...args);
