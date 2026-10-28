@@ -5,46 +5,48 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#12151f" />
     <title>Golden Blast Helsinki — Bad Bad Boy Arcade</title>
-    <link rel="stylesheet" href="./style.css?v=20261028-map-polish1" />
+    <link rel="stylesheet" href="./style.css?v=20261028-transitions1" />
     <script type="importmap">
       {
         "imports": {
           "three": "./vendor/three-0.180.0/build/three.module.min.js",
           "three/addons/": "./vendor/three-0.180.0/examples/jsm/",
-          "game": "./game.js?v=20261028-map-polish1",
+          "game": "./game.js?v=20261028-transitions1",
           "./gesture-guard.js": "./gesture-guard.js?v=20261027-mobile1",
           "./waves.js": "./waves.js?v=20261028-three-waves1",
-          "./batteries.js": "./batteries.js?v=20261028-map-polish1",
+          "./batteries.js": "./batteries.js?v=20261028-transitions1",
           "./maps/index.js": "./maps/index.js?v=20261028-campaign-order1",
-          "./maps/baana.js": "./maps/baana.js?v=20261028-map-polish1",
-          "./runner/baana-run.js": "./runner/baana-run.js?v=20261028-map-polish1",
-          "./runner/traffic-models.js": "./runner/traffic-models.js?v=20261028-map-polish1",
-          "./touch-controls.js": "./touch-controls.js?v=20261028-map-polish1",
-          "./runner/runner-input.js": "./runner/runner-input.js?v=20261028-map-polish1",
+          "./maps/baana.js": "./maps/baana.js?v=20261028-transitions1",
+          "./runner/baana-run.js": "./runner/baana-run.js?v=20261028-transitions1",
+          "./runner/traffic-models.js": "./runner/traffic-models.js?v=20261028-transitions1",
+          "./touch-controls.js": "./touch-controls.js?v=20261028-transitions1",
+          "./runner/runner-input.js": "./runner/runner-input.js?v=20261028-transitions1",
           "./maps/kamppi-square.js": "./maps/kamppi-square.js?v=20261028-kamppi4",
           "./maps/kamppi-landmarks.js": "./maps/kamppi-landmarks.js?v=20261028-kamppi4",
           "./maps/senate-square.js": "./maps/senate-square.js?v=20261027-shared-camera1",
           "./maps/senate-landmarks.js": "./maps/senate-landmarks.js?v=20261027-cupolas3",
           "./maps/scenery-model.js": "./maps/scenery-model.js?v=20261027-cathedral2",
           "./maps/tram.js": "./maps/tram.js?v=20261027-senate1",
-          "./maps/harbor.js": "./maps/harbor.js?v=20261028-map-polish1",
-          "./maps/harbor-scenery.js": "./maps/harbor-scenery.js?v=20261028-map-polish1",
-          "./world/navigation.js": "./world/navigation.js?v=20261028-map-polish1",
-          "./world/map.js": "./world/map.js?v=20261028-map-polish1",
+          "./maps/harbor.js": "./maps/harbor.js?v=20261028-transitions1",
+          "./maps/harbor-scenery.js": "./maps/harbor-scenery.js?v=20261028-transitions1",
+          "./world/navigation.js": "./world/navigation.js?v=20261028-transitions1",
+          "./world/map.js": "./world/map.js?v=20261028-transitions1",
+          "./world/map-transition.js": "./world/map-transition.js?v=20261028-transitions1",
+          "./world/transition-renderer.js": "./world/transition-renderer.js?v=20261028-transitions1",
           "./world/game-camera.js": "./world/game-camera.js?v=20261027-shared-camera1",
-          "./world/map-manager.js": "./world/map-manager.js?v=20261028-map-polish1",
-          "./world/dispose.js": "./world/dispose.js?v=20261028-map-polish1",
-          "./world/building-visibility.js": "./world/building-visibility.js?v=20261028-map-polish1",
+          "./world/map-manager.js": "./world/map-manager.js?v=20261028-transitions1",
+          "./world/dispose.js": "./world/dispose.js?v=20261028-transitions1",
+          "./world/building-visibility.js": "./world/building-visibility.js?v=20261028-transitions1",
           "./game-input.js": "./game-input.js?v=20261027-input3",
           "./enemy-pressure.js": "./enemy-pressure.js?v=20261026-harbor2",
           "./movement.js": "./movement.js?v=20261027-mobile1",
           "./mouse-aim.js": "./mouse-aim.js?v=20261027-ground-aim1",
           "./aim-assist.js": "./aim-assist.js?v=20261026-assist1",
           "./hero.js": "./hero.js?v=20261025-medkits1",
-          "./enemies.js": "./enemies.js?v=20261028-map-polish1",
+          "./enemies.js": "./enemies.js?v=20261028-transitions1",
           "./liquid.js": "./liquid.js?v=20261027-clarion1",
           "./bites.js": "./bites.js?v=20261025-medkits1",
-          "./medkits.js": "./medkits.js?v=20261028-map-polish1"
+          "./medkits.js": "./medkits.js?v=20261028-transitions1"
         }
       }
     </script>
@@ -126,6 +128,7 @@
           </svg>
         </button>
       </div>
+      <div id="map-transition" class="map-transition-label" role="status" aria-live="polite" hidden><strong></strong></div>
       <div id="toast" class="toast" aria-live="polite"></div>
       <div id="runner-progress" class="runner-progress" role="progressbar" aria-label="Baana progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden><span></span></div>
     </main>

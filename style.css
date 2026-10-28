@@ -204,3 +204,10 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 900 clamp(52px, 8vw, 78px
 }
 
 @media (pointer: coarse) { .runner-start-hint .runner-keyboard { display: none; } }
+
+/* The GPU transition owns the scene; the destination title stays crisp above it. */
+.map-transition-label { position: absolute; z-index: 7; inset: 0; display: grid; place-content: center; justify-items: center; padding: 32px; pointer-events: none; text-align: center; }
+.map-transition-label strong { max-width: 85vw; color: #f5f1e6; font: 900 clamp(34px, 6vw, 66px)/1.05 "Barlow Condensed", sans-serif; letter-spacing: .07em; text-transform: uppercase; text-shadow: 0 3px 20px #0005; }
+.map-transition-label::after { content: ''; width: 44px; height: 3px; margin-top: 18px; background: var(--gold); border-radius: 2px; }
+.map-changing .hud, .map-changing .hero-hud, .map-changing .mobile-controls, .map-changing .runner-progress, .map-changing .toast { opacity: 0; pointer-events: none; }
+.map-changing .mobile-controls { visibility: hidden; }

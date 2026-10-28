@@ -59,7 +59,7 @@ On devices with a coarse primary pointer, the stream keeps its glossy coating an
 
 ## City and enemies
 
-The campaign moves from **West Harbor** to **Baana Run** on wave 4, **Kamppi / Narinkkatori** on wave 7, and **Senate Square** on wave 10, returning to West Harbor on wave 13. Each arena district lasts three waves. Baana keeps its single 700-metre runner course in place of an arena wave block; finishing it and choosing **CONTINUE** enters Kamppi. The four districts then repeat. Every new district starts at full health and keeps the score; enemies, scenery and pickups reset for the new district while camera scale stays the same. Direct local starts are available for [Senate Square](http://localhost:8000/?map=senate-square), [Kamppi](http://localhost:8000/?map=kamppi), and [Baana](http://localhost:8000/?map=baana). An unknown `map` parameter uses the normal harbor start.
+The campaign moves from **West Harbor** to **Baana Run** on wave 4, **Kamppi / Narinkkatori** on wave 7, and **Senate Square** on wave 10, returning to West Harbor on wave 13. Each arena district lasts three waves. Baana keeps its single 700-metre runner course in place of an arena wave block; finishing it and choosing **CONTINUE** enters Kamppi. The four districts then repeat. Between districts, a 1.2-second pixelation and fade hides the scene swap beneath the destination name. Gameplay and input pause during the effect; Esc pauses the transition too. The reduced-motion preference uses a shorter fade without pixelation. Starting the first district and advancing waves within a district remain immediate. Every new district starts at full health and keeps the score; enemies, scenery and pickups reset for the new district while camera scale stays the same. Direct local starts are available for [Senate Square](http://localhost:8000/?map=senate-square), [Kamppi](http://localhost:8000/?map=kamppi), and [Baana](http://localhost:8000/?map=baana). An unknown `map` parameter uses the normal harbor start.
 
 For map testing, open [the map picker](http://localhost:8000/?debug=maps) with `?debug=maps`. It lists every registered map on the title screen, pause menu and game-over screen. Clicking a map immediately starts a fresh round there at wave 1, without reloading or waiting through earlier waves. New entries in `maps/index.js` appear automatically. The ordinary interface stays unchanged when this parameter is absent.
 
@@ -121,6 +121,7 @@ Four Battery energy drinks are hidden behind the outer houses instead of droppin
 - `world/map-manager.js`: active map replacement and the stable spatial query API used by gameplay.
 - `world/navigation.js`: collision, movement, line of sight, and shared enemy routing.
 - `world/building-visibility.js`: camera occlusion and building fading.
+- `world/map-transition.js` and `world/transition-renderer.js`: simulation-time scene changes and the temporary GPU pixelation/fade pass.
 - `world/game-camera.js`: shared camera scale, viewport lens and follow behavior for every district.
 - `world/dispose.js`: disposal of map-owned GPU resources.
 - `waves.js`: campaign planning, difficulty, clear delay, and wave/reinforcement scheduling.

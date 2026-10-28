@@ -4,6 +4,8 @@ import { createHero, animateHero, HERO_BASE_HEIGHT } from './hero.js';
 import { maps, mapOrder } from './maps/index.js';
 import { createMapManager } from './world/map-manager.js';
 import { createGameCamera } from './world/game-camera.js';
+import { createMapTransition } from './world/map-transition.js';
+import { createTransitionRenderer } from './world/transition-renderer.js';
 import { createCampaign, createWaveDirector } from './waves.js';
 import { createBatteries } from './batteries.js';
 import { loadEnemyModels, createEnemy, animateEnemy, disposeEnemy } from './enemies.js';
@@ -59,6 +61,8 @@ const settingsDone = document.querySelector('#settings-done');
 const soundSetting = document.querySelector('#sound-setting');
 const waveStatLabel = document.querySelector('#wave-stat-label');
 const runnerProgress = document.querySelector('#runner-progress');
+const transitionLabel = document.querySelector('#map-transition');
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const query = new URLSearchParams(window.location.search);
 const debugMaps = query.get('debug') === 'maps';
 const mouseSupported = typeof canvas.requestPointerLock === 'function' && window.matchMedia('(any-pointer: fine)').matches;
@@ -73,7 +77,7 @@ const mouseAim = createMouseAim({
   getInitialPosition: aimCursorPosition,
   onUnlock() {
     lastMouseUnlock = performance.now();
-    if (playing) openSettings();
+    if (playing && !mapTransition.active) openSettings();
   },
   onError() { mouseCaptureFailed = true; }
 });
@@ -210,12 +214,22 @@ let runnerComplete = false, runnerBaseScore = 0;
 const isRunner = () => world.mode === 'runner';
 const runnerInput = bindRunnerInput({
   canvas,
-  canInteract: () => playing && isRunner() && !controlsDialog.open,
+  canInteract: () => playing && isRunner() && !controlsDialog.open && !mapTransition.active,
   dodge: direction => baanaRun.dodge(direction),
   setFiring: firing => firing ? keys.add('Fire') : keys.delete('Fire'), beginSpray,
 });
 
 const laneSteering = createLaneSteering(direction => baanaRun.dodge(direction));
+const transitionRenderer = createTransitionRenderer(renderer);
+const mapTransition = createMapTransition({ onSwap: applyWave, onFinish: finishMapTransition });
+
+function finishMapTransition() {
+  document.querySelector('.game-shell').classList.remove('map-changing');
+  transitionLabel.hidden = true;
+  resetInput();
+  touchControls.setEnabled(playing);
+  syncMouseAim();
+}
 
 function syncLevelUI() {
   const runner = isRunner();
@@ -344,6 +358,20 @@ function spawnEnemies(count, level) {
 }
 
 function spawnWave(plan) {
+  if (playing && world.id !== plan.mapId) {
+    if (!mapTransition.start(plan, reducedMotion.matches ? .5 : 1.2)) return;
+    resetInput();
+    syncMouseAim();
+    touchControls.setEnabled(false);
+    document.querySelector('.game-shell').classList.add('map-changing');
+    transitionLabel.querySelector('strong').textContent = maps.find(map => map.id === plan.mapId).name;
+    transitionLabel.style.opacity = '0'; transitionLabel.hidden = false;
+    return;
+  }
+  applyWave(plan);
+}
+
+function applyWave(plan) {
   const changedMap = world.activate(plan.mapId);
   if (changedMap || plan.number === 1) {
     // Keep score, but begin every district at full health with no old attacks.
@@ -474,7 +502,7 @@ function mouseHeading() {
 }
 
 function syncMouseAim() {
-  mouseAim.setEnabled(mouseSupported && mouseAimEnabled && !usingTouchControls && playing && !controlsDialog.open && !isRunner());
+  mouseAim.setEnabled(mouseSupported && mouseAimEnabled && !usingTouchControls && playing && !controlsDialog.open && !isRunner() && !mapTransition.active);
 }
 
 function requestMouseAim() {
@@ -494,6 +522,7 @@ function resetAimAssist() {
 
 function update(dt) {
   if (controlsDialog.open) return;
+  if (mapTransition.active) { mapTransition.update(dt); return; }
   gameTime += dt;
   // Finish the final bite's splash even after the round ends.
   biteEffects.update(dt);
@@ -730,6 +759,7 @@ function placePlayerAtSpawn() {
 
 function startGame() {
   if (!player.model) return;
+  mapTransition.cancel(); finishMapTransition();
   mouseCaptureFailed = false;
   score = 0;
   player.hp = player.maxHp;
@@ -800,11 +830,15 @@ function animate(now) {
   frameTime = now;
   update(dt);
   if (player.model) world.updateVisibility(camera, player.root, HERO_HEIGHT, dt);
-  renderer.render(scene, camera);
+  if (mapTransition.active) {
+    const frame = transitionRenderer.render(scene, camera, mapTransition.progress, reducedMotion.matches);
+    transitionLabel.style.opacity = String(frame.title);
+  } else renderer.render(scene, camera);
   updateHeroHp();
 }
 
 function beginSpray() {
+  if (mapTransition.active) return;
   player.tapTimer = 0.075;
   stream.resetPressure();
 }
@@ -900,6 +934,10 @@ window.addEventListener('keydown', (event) => {
     return;
   }
   if (controlsDialog.open) return;
+  if (mapTransition.active) {
+    if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code)) event.preventDefault();
+    return;
+  }
   if (playing && isRunner() && ['ArrowLeft', 'ArrowRight', 'KeyA', 'KeyD'].includes(event.code)) {
     event.preventDefault();
     if (!event.repeat) baanaRun.dodge(event.code === 'ArrowLeft' || event.code === 'KeyA' ? -1 : 1);
@@ -917,16 +955,16 @@ window.addEventListener('keydown', (event) => {
   if (event.code === 'Enter' && !playing && !startScreen.classList.contains('hidden') && player.model) { startGame(); requestMouseAim(); }
 });
 window.addEventListener('keyup', (event) => keys.delete(event.code));
-window.addEventListener('blur', () => { resetInput(); if (playing && (mouseAim.locked || isRunner())) openSettings(); });
+window.addEventListener('blur', () => { resetInput(); if (playing && (mouseAim.locked || isRunner() || mapTransition.active)) openSettings(); });
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) { resetInput(); if (playing && (mouseAim.locked || isRunner())) openSettings(); }
+  if (document.hidden) { resetInput(); if (playing && (mouseAim.locked || isRunner() || mapTransition.active)) openSettings(); }
 });
 window.addEventListener('resize', resize);
 bindGameInput({
   canvas,
   movementZone: document.querySelector('#joystick-zone'),
   movementHandle: document.querySelector('.joystick-hint'),
-  canInteract: () => playing && !controlsDialog.open && !isRunner(),
+  canInteract: () => playing && !controlsDialog.open && !isRunner() && !mapTransition.active,
   setFiring: firing => firing ? keys.add('Fire') : keys.delete('Fire'),
   beginSpray,
   requestMouseAim,
