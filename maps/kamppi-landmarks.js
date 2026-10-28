@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createSceneryModel } from './scenery-model.js';
 
 // Original procedural scenery, guided by the Narinkkatori photo references in README.
@@ -98,7 +99,7 @@ export function createKamppiChapel() {
   model.box('#e0cfac', 5.2, 1.1, 2.05, .035, .7, .03);
   model.box('#e0cfac', 5.2, 1.2, 2.05, .22, .035, .03);
   const group = model.finish({ vertexColors: true });
-  group.position.set(-22, 0, -6.5);
+  group.position.set(-28, 0, 7.5);
   return group;
 }
 
@@ -238,7 +239,7 @@ export function createLasipalatsiClockTower() {
     return new THREE.Vector3(Math.cos(angle) * .28, 15 + i / 64 * 1.15, Math.sin(angle) * .28);
   });
   model.geometry('#a46c59', new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), 64, .025, 5, false));
-  const group = model.finish({ vertexColors: true }); group.position.set(8, 0, 38);
+  const group = model.finish({ vertexColors: true }); group.position.set(-17, 0, 35);
   return group;
 }
 
@@ -277,5 +278,54 @@ export function createAmosRexMound(x, z, radius, height) {
   model.geometry('#e7e8d6', new THREE.TorusGeometry(topRadius, .14, 8, 48).rotateX(-Math.PI / 2 - tilt).translate(0, height, 0));
   model.geometry('#739e9b', new THREE.CircleGeometry(topRadius - .08, 48).rotateX(-Math.PI / 2 - tilt).translate(0, height + .015, 0));
   const group = model.finish({ vertexColors: true }); group.position.set(x, 0, z);
+  return group;
+}
+
+export function createKamppiCityBlock({ name, x, z, width, depth, height, color, turn = 0, glass = false }) {
+  const model = createSceneryModel(name), { box } = model;
+  box(color, 0, height / 2, 0, width, height, depth);
+  box('#858d84', 0, .24, 0, width + .12, .48, depth + .12);
+  box('#d2d1bb', 0, height - .15, 0, width + .25, .2, depth + .25);
+  box('#63736e', 0, height + .1, 0, width + .35, .3, depth + .35);
+  const glazing = ['#68888f', '#7d9a9e', '#597b82', '#94acaa'];
+  function facade(length, front, rotation) {
+    const wall = createSceneryModel('City facade');
+    const columns = Math.floor((length - 1) / 1.7);
+    for (let row = 0; row < Math.floor((height - .8) / 1.55); row++) {
+      const y = 1.25 + row * 1.55;
+      for (let column = 0; column < columns; column++) {
+        const px = (column - (columns - 1) / 2) * 1.7;
+        if (!glass) wall.box('#d7d1b8', px, y, front + .04, 1.17, 1.22, .1);
+        wall.box(glazing[(row + column * 3) % glazing.length], px, y, front + .11, glass ? 1.6 : .94, glass ? 1.36 : .98, .05);
+        wall.box(glass ? '#abbab4' : '#cbc8af', px, y, front + .15, .04, glass ? 1.4 : 1, .025);
+      }
+      if (glass) wall.box('#485e61', 0, y + .73, front + .15, length, .09, .1);
+    }
+    for (const mesh of wall.finish({ vertexColors: true }).children) {
+      // Keep the window colours while batching all four elevations into one mesh.
+      const geometry = mesh.geometry.clone().rotateY(rotation);
+      model.group.add(new THREE.Mesh(geometry, mesh.material.clone()));
+      mesh.geometry.dispose(); mesh.material.dispose();
+    }
+  }
+  facade(width, depth / 2, 0); facade(width, depth / 2, Math.PI);
+  facade(depth, width / 2, Math.PI / 2); facade(depth, width / 2, -Math.PI / 2);
+  for (let px = -width * .33; px <= width * .33; px += 6) {
+    box('#839087', px, height + .55, -depth * .15, 1.4, .75, 1.3);
+    box('#5b6b65', px, height + .96, -depth * .15, 1.55, .09, 1.45);
+  }
+  if (glass) {
+    // Horizontal fins evoke Simonkenttä's layered green-glass frontage.
+    for (let y = 2; y < height; y += 1.55) box('#9aaea1', 0, y, depth / 2 + .4, width + .25, .09, .65);
+  } else {
+    for (const px of [-width / 2 + .35, width / 2 - .35]) box('#c5c2a8', px, height / 2, depth / 2 + .16, .17, height - .7, .18);
+  }
+  const group = model.finish({ vertexColors: true });
+  const combined = mergeGeometries(group.children.map(mesh => mesh.geometry));
+  for (const mesh of group.children) { mesh.geometry.dispose(); mesh.material.dispose(); }
+  group.clear();
+  const mesh = new THREE.Mesh(combined, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .75 }));
+  mesh.castShadow = mesh.receiveShadow = true; group.add(mesh);
+  group.position.set(x, 0, z); group.rotation.y = turn;
   return group;
 }

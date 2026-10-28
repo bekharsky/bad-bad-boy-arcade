@@ -31,13 +31,13 @@ test('Narinkkatori has open combat lanes, solid landmarks and visible perimeter 
   for (const [x, z] of [[0, -14], [0, -6], [8, 0], [12, -5], [-32, 19], [33, 19], [0, 26], [0, 35], [35, 52], [0, 61.5], [0, -39]]) {
     assert.equal(map.canStandAt(x, z, .736), true, `Open lane at ${x}, ${z}`);
   }
-  for (const [x, z] of [[0, -29], [-22, -6.5], [-16.8, -7.4], [5, 19], [14, -8], [30, 9], [0, 52], [-27, 42], [27, 42], [8, 38], [-10, 31.5]]) {
+  for (const [x, z] of [[0, -29], [-28, 7.5], [-22.8, 6.6], [5, 19], [14, -8], [30, 9], [0, 52], [-27, 42], [27, 42], [-17, 35], [-10, 31.5]]) {
     assert.equal(map.canStandAt(x, z, .736), false, `Solid scenery at ${x}, ${z}`);
   }
-  assert.equal(map.lineClear3D({ x: -27, y: 1, z: -6.5 }, { x: -15, y: 1, z: -6.5 }), false, 'The chapel blocks liquid');
+  assert.equal(map.lineClear3D({ x: -34, y: 1, z: 7.5 }, { x: -20, y: 1, z: 7.5 }), false, 'The chapel blocks liquid');
   assert.equal(map.lineClear3D({ x: -10, y: 1, z: -19 }, { x: -7, y: 1, z: -19 }), true, 'Actors can pass under the mall canopy');
-  assert.equal(map.lineClear3D({ x: -31, y: .4, z: 4 }, { x: -31, y: .4, z: 6 }), false);
-  assert.equal(map.lineClear3D({ x: -31, y: 1.5, z: 4 }, { x: -31, y: 1.5, z: 6 }), true, 'Liquid clears the low bench');
+  assert.equal(map.lineClear3D({ x: -35, y: .4, z: -5 }, { x: -35, y: .4, z: -3 }), false);
+  assert.equal(map.lineClear3D({ x: -35, y: 1.5, z: -5 }, { x: -35, y: 1.5, z: -3 }), true, 'Liquid clears the low bench');
   assert.ok(map.root.getObjectByName('Kamppi Square boundary'));
   for (const [x, z] of [[43, 0], [-43, 0], [0, -43], [0, 68.5]]) assert.equal(map.canStandAt(x, z, .736), false);
   map.dispose();
@@ -49,6 +49,10 @@ test('the chapel is left of the mall and Kasarmi, Lasipalatsi and tram form succ
   const chapel = centre('Kamppi Chapel of Silence'), mall = centre('Kamppi shopping centre');
   const kasarmi = centre('Kulttuurikasarmi'), lasipalatsi = centre('Lasipalatsi'), clock = centre('Lasipalatsi clock tower');
   assert.ok(chapel.x < mall.x - 10, 'The chapel belongs on the left when facing the mall');
+  assert.ok(Math.abs(chapel.z - map.spawn.z) < 3, 'The chapel is at the near end of Narinkkatori');
+  assert.ok(clock.x < 0, 'The clock moves toward the chapel side of the courtyard');
+  assert.equal(map.canStandAt(-22, -6.5, .736), true, 'The old chapel footprint no longer blocks walking');
+  assert.equal(map.canStandAt(8, 38, .736), true, 'The old clock footprint no longer blocks walking');
   assert.ok(kasarmi.z > map.spawn.z && kasarmi.z - map.spawn.z < 15, 'The barracks sit close to the player');
   assert.ok(kasarmi.z < clock.z && clock.z < lasipalatsi.z, 'The clock courtyard sits behind Kasarmi');
   assert.ok(lasipalatsi.z < map.root.getObjectByName('Helsinki tram').position.z);
@@ -57,6 +61,25 @@ test('the chapel is left of the mall and Kasarmi, Lasipalatsi and tram form succ
   assert.ok(bounds.maxZ - map.root.getObjectByName('Helsinki tram').position.z < 10, 'The map ends just behind the tram corridor');
   const mallBounds = new THREE.Box3().setFromObject(map.root.getObjectByName('Kamppi shopping centre'));
   assert.ok(mallBounds.max.x - mallBounds.min.x > 54, 'The mall itself is larger too');
+  map.dispose();
+});
+
+test('surrounding city stays outside combat bounds, keeps tram portals clear and fades around the camera', () => {
+  const map = kamppiSquareMap.create(), city = map.root.getObjectByName('Kamppi surrounding city');
+  assert.ok(city.children.length >= 10, 'Street walls surround the district');
+  const bounds = kamppiSquareMap.bounds;
+  for (const block of city.children) {
+    const box = new THREE.Box3().setFromObject(block);
+    assert.ok(box.max.x < bounds.minX || box.min.x > bounds.maxX || box.max.z < bounds.minZ || box.min.z > bounds.maxZ, `${block.name} stays outside the playable map`);
+    assert.ok(box.max.z < 60.5 || box.min.z > 62.5, `${block.name} leaves the tram entry and exit clear`);
+  }
+  const camera = new THREE.PerspectiveCamera(56, 1, .1, 150), hero = new THREE.Group();
+  hero.position.set(0, 0, 67); camera.position.set(0, 12, 82); camera.lookAt(0, 2, 67);
+  map.updateVisibility(camera, hero, 3.45, 1);
+  const sokos = city.getObjectByName('Sokos Helsinki backdrop');
+  assert.ok(sokos.children.every(mesh => mesh.material.opacity < .2), 'The outside building cannot hide the player near the far edge');
+  map.reset();
+  assert.ok(sokos.children.every(mesh => mesh.material.opacity === 1));
   map.dispose();
 });
 

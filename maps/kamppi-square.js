@@ -3,7 +3,7 @@ import { createMap } from '../world/map.js';
 import { overlaps } from '../world/navigation.js';
 import { createSceneryModel } from './scenery-model.js';
 import { createTram } from './tram.js';
-import { createKamppiCentre, createKamppiChapel, createEntrepreneursMonument, createKasarmi, createLasipalatsi, createLasipalatsiClockTower, createAmosRexMound } from './kamppi-landmarks.js';
+import { createKamppiCentre, createKamppiChapel, createEntrepreneursMonument, createKasarmi, createLasipalatsi, createLasipalatsiClockTower, createAmosRexMound, createKamppiCityBlock } from './kamppi-landmarks.js';
 
 const TRAM_Z = 61.5;
 const hidden = (x, z) => ({ x, z, jitter: .25 });
@@ -14,8 +14,8 @@ export const kamppiSquareMap = {
   spawn: { x: -5.5, z: 7.5, heading: Math.PI },
   bounds: { minX: -43, maxX: 43, minZ: -43, maxZ: 68.5 },
   pickups: {
-    medkit: [{ x: -2, z: 6 }, hidden(-12, -39), hidden(-37, -17), hidden(25, 27), hidden(-5, 57.5)],
-    battery: [hidden(12, -39), hidden(-35, -16), hidden(-15, 26), hidden(18, 57.5)],
+    medkit: [{ x: -2, z: 6 }, hidden(-12, -39), hidden(-38, 8), hidden(25, 27), hidden(-5, 57.5)],
+    battery: [hidden(12, -39), hidden(-38, 4.5), hidden(-15, 26), hidden(18, 57.5)],
   },
   create() { return createMap(kamppiSquareMap, buildKamppi); },
 };
@@ -49,8 +49,8 @@ function buildKamppi(root) {
   }
   const paving = new THREE.CanvasTexture(canvas);
   paving.colorSpace = THREE.SRGBColorSpace; paving.wrapS = paving.wrapT = THREE.RepeatWrapping;
-  paving.repeat.set(19, 23); paving.anisotropy = 4;
-  surface('Kamppi district paving', 130, 155, 0, 12, '#b6b5a9', -.045, paving);
+  paving.repeat.set(26, 28); paving.anisotropy = 4;
+  surface('Kamppi district paving', 180, 190, 0, 12, '#b6b5a9', -.045, paving);
   const squarePaving = paving.clone(); squarePaving.repeat.set(12, 8);
   surface('Narinkkatori granite square', 58, 39, 0, -4, '#d7d4c6', -.012, squarePaving);
   // Dark granite grid bands are a defining feature of the real pedestrian square.
@@ -73,12 +73,13 @@ function buildKamppi(root) {
   addBuilding(createKamppiCentre());
   obstacle(0, -29, 55.3, 12.8, 17.9);
   for (let x = -26.25; x <= 26.25; x += 3.75) obstacle(x, -19.91, .16, .16, 3.75);
-  addBuilding(createKamppiChapel());
+  const chapel = createKamppiChapel(); addBuilding(chapel);
+  const { x: chapelX, z: chapelZ } = chapel.position;
   for (let dz = -3.75; dz < 3.75; dz += .5) {
     const halfWidth = 4.95 * Math.sqrt(Math.max(0, 1 - (dz + .25) ** 2 / 3.85 ** 2));
-    obstacle(-22, -6.5 + dz + .25, (halfWidth + .2) * 2, .5, 8.2);
+    obstacle(chapelX, chapelZ + dz + .25, (halfWidth + .2) * 2, .5, 8.2);
   }
-  obstacle(-16.8, -7.4, 4.7, 5.8, 2.8);
+  obstacle(chapelX + 5.2, chapelZ - .9, 4.7, 5.8, 2.8);
   addBuilding(createEntrepreneursMonument()); obstacle(14, -8, 3.5, 3.5, 4.7);
 
   // Kasarmi is the near edge of the first square, not a distant side backdrop.
@@ -90,7 +91,8 @@ function buildKamppi(root) {
   for (const wing of createLasipalatsi()) addBuilding(wing);
   obstacle(0, 52, 60.3, 7.3, 4.3);
   obstacle(-27, 41.5, 6.3, 20.3, 5.4); obstacle(27, 41.5, 6.3, 20.3, 4.3);
-  addBuilding(createLasipalatsiClockTower()); obstacle(8, 38, 2.3, 2.3, 16.3);
+  const clock = createLasipalatsiClockTower(); addBuilding(clock);
+  obstacle(clock.position.x, clock.position.z, 2.3, 2.3, 16.3);
   for (const [x, z, radius, height] of [[-10, 31.5, 4.1, 2], [8, 29.5, 3.4, 1.7], [16, 40, 4.3, 2.5], [-12, 42, 3.4, 2], [0, 45, 2.8, 1.6]]) {
     addBuilding(createAmosRexMound(x, z, radius, height));
     // Flat-ground gameplay routes around the real skylight hills.
@@ -100,20 +102,31 @@ function buildKamppi(root) {
     }
   }
 
-  // Buildings beyond the combat perimeter continue the city skyline.
-  function backdrop(name, x, z, width, depth, height, color) {
-    const model = createSceneryModel(name);
-    model.box(color, x, height / 2, z, width, height, depth);
-    model.box('#727f79', x, height + .12, z, width + .3, .24, depth + .3);
-    for (let dx = -width / 2 + 1; dx < width / 2; dx += 1.7) for (let y = 1.5; y < height - .5; y += 1.5) {
-      model.box('#d0cbb4', x + dx, y, z + depth / 2 + .06, 1.12, 1.15, .12);
-      model.box('#506e76', x + dx, y, z + depth / 2 + .14, .85, .93, .05);
-    }
-    root.add(model.finish({ vertexColors: true }));
+  // Keep the play perimeter, but surround it with the dense street walls visible
+  // on the satellite reference. Both tram portals remain clear of buildings.
+  for (const x of [-45, 45]) surface('Street outside Kamppi', 4, 130, x, 12, '#646f72', -.025);
+  surface('Street behind Kamppi', 130, 4, 0, -45, '#646f72', -.025);
+  const city = new THREE.Group(); city.name = 'Kamppi surrounding city'; root.add(city);
+  const blocks = [
+    { name: 'Scandic Simonkentta backdrop', x: -51, z: 8, width: 36, depth: 12, height: 13, color: '#6e8986', turn: Math.PI / 2, glass: true },
+    { name: 'Simonkatu corner backdrop', x: -52, z: -28, width: 28, depth: 14, height: 10, color: '#c1aa92', turn: Math.PI / 2 },
+    { name: 'Forum side backdrop', x: -52, z: 44, width: 28, depth: 14, height: 11, color: '#bfaa95', turn: Math.PI / 2 },
+    { name: 'Hotel Presidentti backdrop', x: 51, z: -16, width: 40, depth: 12, height: 15, color: '#949c91', turn: -Math.PI / 2 },
+    { name: 'Salomonkatu offices backdrop', x: 51, z: 22, width: 28, depth: 12, height: 12, color: '#777f78', turn: -Math.PI / 2, glass: true },
+    { name: 'Arkadiankatu corner backdrop', x: 51, z: 48, width: 16, depth: 12, height: 10, color: '#d1bca2', turn: -Math.PI / 2 },
+    { name: 'Kamppi rear block west', x: -36, z: -53, width: 22, depth: 14, height: 11, color: '#cab79b' },
+    { name: 'Kamppi rear block centre', x: -7, z: -53, width: 30, depth: 14, height: 13, color: '#a9b4aa', glass: true },
+    { name: 'Kamppi rear block east', x: 22, z: -53, width: 22, depth: 14, height: 10, color: '#c3a188' },
+    { name: 'Kamppi rear corner', x: 48, z: -53, width: 20, depth: 14, height: 12, color: '#c1b7a1' },
+    { name: 'Mannerheimintie west backdrop', x: -31, z: 82, width: 28, depth: 13, height: 12, color: '#bb9581', turn: Math.PI },
+    { name: 'Sokos Helsinki backdrop', x: 0, z: 82, width: 30, depth: 13, height: 15, color: '#b9b5a2', turn: Math.PI },
+    { name: 'Mannerheimintie east backdrop', x: 31, z: 82, width: 28, depth: 13, height: 12, color: '#b3b9aa', turn: Math.PI },
+  ];
+  for (const block of blocks) {
+    const group = createKamppiCityBlock(block);
+    // Even outside scenery must fade if the following camera enters a building.
+    addBuilding(group); city.add(group);
   }
-  backdrop('Hotel Presidentti backdrop', 33, -52, 15, 10, 13, '#949c91');
-  backdrop('Tennispalatsi backdrop', -50, -24, 12, 22, 6.5, '#d0c7a3');
-  backdrop('Simonkatu city backdrop', 49, 6, 9, 14, 10, '#b7a592');
 
   function bench(x, z, length = 3) {
     street.box('#8d6748', x, .47, z, length, .14, .7);
@@ -137,7 +150,7 @@ function buildKamppi(root) {
     planter(30, z, 1.5, 2.5, true);
     if (z !== -2) bench(26, z, 3.6);
   }
-  planter(-35, 5, 2.2, 2.2, true); bench(-31, 5, 3.3);
+  planter(-38, 0, 2.2, 2.2, true); bench(-35, -4, 3.3);
   for (const x of [-35, 35]) { planter(x, 28, 2, 2, true); bench(x, 33, 3); }
   const terrace = createSceneryModel('Narinkkatori cafe terrace');
   for (const x of [17, 22, 27]) {
