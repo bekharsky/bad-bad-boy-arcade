@@ -1,5 +1,6 @@
 export const BAANA_LENGTH = 1300;
 export const RIDER_BONUS = 150;
+export const RIDER_HEALTH = .4;
 export const RUN_LANES = Object.freeze([-3, 0, 3]);
 export const TRAFFIC_COLORS = Object.freeze(['green', 'blue', 'red']);
 export const TRAFFIC_CAPACITY = 24;
@@ -63,7 +64,7 @@ export function createBaanaRun({ length = BAANA_LENGTH, random = Math.random } =
     for (const lane of [0, 1, 2]) {
       const kind = roadworks ? ROADWORK_TYPES[choose(ROADWORK_TYPES.length)] : (choose(2) ? 'scooter' : 'bike');
       const profile = trafficProfile(kind), progress = state.distance + arrival * (state.speed + speed);
-      const agent = { id: nextId, lane, safeLane, row: state.elapsed, progress, speed, kind, color: TRAFFIC_COLORS[choose(3)], hp: 1.5, x: RUN_LANES[lane], z: state.distance - progress, size: profile.size, hitHeight: profile.hitHeight, alive: true, hit: false, passed: false, hitUntil: 0 };
+      const agent = { id: nextId, lane, safeLane, row: state.elapsed, progress, speed, kind, color: TRAFFIC_COLORS[choose(3)], hp: roadworks ? 1.5 : RIDER_HEALTH, x: RUN_LANES[lane], z: state.distance - progress, size: profile.size, hitHeight: profile.hitHeight, alive: true, hit: false, passed: false, hitUntil: 0 };
       if (state.traffic.some(existing => trafficRoutesConflict(agent, existing))) continue;
       candidates.push(agent);
     }

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createBaanaRun, trafficContact, TRAFFIC_CAPACITY, RUN_LANES, trafficProfile, trafficRoutesConflict } from '../runner/baana-run.js';
+import { createBaanaRun, trafficContact, TRAFFIC_CAPACITY, RUN_LANES, trafficProfile, trafficRoutesConflict, RIDER_HEALTH } from '../runner/baana-run.js';
 
 const seeded = seed => () => ((seed = seed * 16807 % 2147483647) - 1) / 2147483646;
 
@@ -68,7 +68,7 @@ test('spraying clears riders, charged hits are stronger and clearing prevents da
   run.update(.01);
   for (const kind of ['bike', 'scooter']) {
     const agent = run.state.traffic[0];
-    Object.assign(agent, { kind, hp: 1.5, alive: true, cleared: false, lane: 1, progress: run.state.distance + 3 });
+    Object.assign(agent, { kind, hp: RIDER_HEALTH, alive: true, cleared: false, lane: 1, progress: run.state.distance + 3 });
     assert.equal(run.sprayHit(agent.id, { charge: 0, damage: .5 }), false);
     assert.ok(agent.hitUntil > run.state.elapsed);
     const before = run.state.bonus;
@@ -122,5 +122,18 @@ test('dense generated traffic never intersects or overtakes on its visible route
         else order.set(key, Math.sign(gap));
       }
     }
+  }
+});
+
+
+test('both generated rider types clear on one uncharged hit and award the bonus once', () => {
+  for (const [kind, value] of [['bike', .3], ['scooter', .6]]) {
+    const run = createBaanaRun({ random: () => value }); run.update(.01);
+    const agent = run.state.traffic[0];
+    assert.equal(agent.kind, kind);
+    assert.equal(run.sprayHit(agent.id, { damage: 1, charge: 0 }), true);
+    assert.equal(agent.alive, false); assert.equal(run.state.bonus, 150);
+    assert.equal(run.sprayHit(agent.id, { damage: 1, charge: 0 }), false);
+    assert.equal(run.state.bonus, 150);
   }
 });

@@ -179,11 +179,11 @@ test('disabling refraction preserves gloss, pressure, range, and collision damag
 });
 
 test('runner liquid clears approaching riders while roadwork obstacles survive and still collide', async () => {
-  const { createBaanaRun, trafficProfile } = await import('../runner/baana-run.js');
+  const { createBaanaRun, trafficProfile, RIDER_HEALTH } = await import('../runner/baana-run.js');
   for (const kind of ['bike', 'scooter', 'cone', 'tractor', 'barrier', 'trench']) {
     const run = createBaanaRun();
     const agent = { id: -1, kind, lane: 1, speed: kind === 'bike' || kind === 'scooter' ? 5.2 : 0,
-      progress: 38, hp: 1.5,
+      progress: 38, hp: kind === 'bike' || kind === 'scooter' ? RIDER_HEALTH : 1.5,
       hitHeight: trafficProfile(kind).hitHeight, size: trafficProfile(kind).size,
       x: 0, z: -38, alive: true, hit: false, passed: false };
     run.state.traffic.push(agent);
@@ -199,5 +199,26 @@ test('runner liquid clears approaching riders while roadwork obstacles survive a
     assert.equal(agent.hit, !rider, rider ? `${kind} clears before colliding` : `${kind} still collides`);
     assert.equal(run.state.cleared, rider ? 1 : 0);
     if (!rider) assert.equal(agent.hp, 1.5);
+  }
+});
+
+
+test('a brief uncharged runner spray defeats either approaching rider before collision', async () => {
+  const { createBaanaRun, trafficProfile, RIDER_HEALTH } = await import('../runner/baana-run.js');
+  for (const kind of ['bike', 'scooter']) {
+    const run = createBaanaRun(), profile = trafficProfile(kind);
+    const agent = { id: -1, kind, lane: 1, speed: 5.2, progress: 7.5, hp: RIDER_HEALTH,
+      hitHeight: profile.hitHeight, size: profile.size, x: 0, z: -7.5, alive: true, hit: false, passed: false };
+    run.state.traffic.push(agent);
+    const scene = new THREE.Scene(), emitter = new THREE.Object3D();
+    emitter.position.set(.083, 1.228, -.356);
+    const stream = createLiquidStream(scene, { lineClear3D: () => true }, (target, direction, impact) => run.sprayHit(target.id, impact), { refraction: false, scale: 3.45 / 2.25 });
+    for (let frame = 0; frame < 60 && agent.alive; frame++) {
+      run.update(1 / 60);
+      stream.update(1 / 60, frame < 5, emitter, { dx: 0, dz: -1 }, [agent]);
+    }
+    assert.equal(agent.alive, false, `${kind} falls to a short tap`);
+    assert.equal(agent.hit, false, `${kind} is defeated before touching the hero`);
+    assert.equal(run.state.bonus, 150);
   }
 });
