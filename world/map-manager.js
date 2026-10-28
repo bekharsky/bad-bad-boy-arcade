@@ -7,6 +7,7 @@ export function createMapManager(scene, definitions, playerRadius = .4) {
   const manager = {
     get id() { return active?.id; },
     get name() { return active?.name; },
+    get mode() { return active?.mode ?? 'arena'; },
     get spawn() { return active.spawn; },
     pickupCapacity(kind) {
       return Math.max(0, ...definitions.map(definition => definition.pickups?.[kind]?.length ?? 0));
@@ -29,7 +30,7 @@ export function createMapManager(scene, definitions, playerRadius = .4) {
     },
     dispose() { active?.dispose(); active = null; },
   };
-  for (const method of ['move', 'routeTo', 'chase', 'spawnPoint', 'pickupPoints', 'lineClear', 'lineClear3D', 'canStandAt', 'update', 'updateVisibility', 'reset']) {
+  for (const method of ['move', 'routeTo', 'chase', 'spawnPoint', 'pickupPoints', 'lineClear', 'lineClear3D', 'canStandAt', 'update', 'updateRunner', 'updateVisibility', 'reset']) {
     manager[method] = (...args) => active[method](...args);
   }
   return manager;

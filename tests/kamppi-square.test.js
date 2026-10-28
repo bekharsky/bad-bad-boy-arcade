@@ -19,8 +19,9 @@ const { createMapManager } = await import('../world/map-manager.js');
 test('Kamppi follows Senate Square, supports direct/debug starts and retains normal difficulty', () => {
   const campaign = createCampaign(maps.map(map => map.id));
   assert.equal(campaign.plan(11).mapId, 'kamppi');
-  assert.equal(campaign.plan(16).mapId, 'harbor');
-  assert.deepEqual(mapOrder('kamppi').map(map => map.id), ['kamppi', 'harbor', 'senate-square']);
+  assert.equal(campaign.plan(16).mapId, 'baana');
+  assert.equal(campaign.plan(21).mapId, 'harbor');
+  assert.deepEqual(mapOrder('kamppi').map(map => map.id), ['kamppi', 'baana', 'harbor', 'senate-square']);
   campaign.setStartingMap('kamppi');
   assert.deepEqual(campaign.plan(1), { number: 1, enemyCount: 8, healthBonus: 0, mapId: 'kamppi' });
 });
