@@ -16,7 +16,7 @@ import { createAimAssist } from './aim-assist.js';
 import { createMouseAim } from './mouse-aim.js';
 import { bindGameInput } from './game-input.js';
 import { preventGameZoom } from './gesture-guard.js';
-import { createBaanaRun, RUN_LANES } from './runner/baana-run.js';
+import { createBaanaRun, RUN_LANES, RIDER_BONUS } from './runner/baana-run.js';
 import { bindRunnerInput, createLaneSteering } from './runner/runner-input.js';
 
 const MODEL_URL = './assets/bad-bad-boy.glb?v=20261025-opt1';
@@ -156,6 +156,7 @@ scene.add(player.root);
 function hitEnemy(enemy, direction, impact) {
   if (isRunner()) {
     if (baanaRun.sprayHit(enemy.id, impact)) {
+      showToast(`+${RIDER_BONUS}`);
       burst(enemy.x, enemy.hitHeight, enemy.z, 0xffd34e, 20, null, 3);
       blip(440 + Math.random() * 280, .045);
     }

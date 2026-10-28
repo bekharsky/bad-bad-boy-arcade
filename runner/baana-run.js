@@ -1,4 +1,5 @@
 export const BAANA_LENGTH = 1300;
+export const RIDER_BONUS = 150;
 export const RUN_LANES = Object.freeze([-3, 0, 3]);
 export const TRAFFIC_COLORS = Object.freeze(['green', 'blue', 'red']);
 export const TRAFFIC_CAPACITY = 24;
@@ -54,7 +55,7 @@ export function createBaanaRun({ length = BAANA_LENGTH, random = Math.random } =
       agent.hitUntil = state.elapsed + .18;
       if (agent.hp > 0) return false;
       agent.alive = false; agent.cleared = true; agent.clearedAt = state.elapsed;
-      state.cleared++; state.bonus += 50;
+      state.cleared++; state.bonus += RIDER_BONUS;
       return true;
     },
     dodge(direction) {

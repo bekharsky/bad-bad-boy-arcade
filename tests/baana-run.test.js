@@ -73,9 +73,9 @@ test('spraying clears riders, charged hits are stronger and clearing prevents da
     assert.ok(agent.hitUntil > run.state.elapsed);
     const before = run.state.bonus;
     while (agent.alive) run.sprayHit(agent.id, { charge: 1 });
-    assert.equal(run.state.bonus - before, 50);
+    assert.equal(run.state.bonus - before, 150);
     assert.equal(run.sprayHit(agent.id, { charge: 1 }), false);
-    assert.equal(run.state.bonus - before, 50);
+    assert.equal(run.state.bonus - before, 150);
     assert.equal(run.update(.3).hits, 0);
   }
   run.reset(); assert.equal(run.state.bonus, 0); assert.equal(run.state.cleared, 0);
