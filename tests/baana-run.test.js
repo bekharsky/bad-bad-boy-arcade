@@ -63,20 +63,33 @@ test('generated traffic always permits a complete run at multiple refresh rates 
 });
 
 
-test('spraying clears every type, charged hits are stronger and clearing prevents damage and duplicate rewards', () => {
+test('spraying clears riders, charged hits are stronger and clearing prevents damage and duplicate rewards', () => {
   const run = createBaanaRun({ random: seeded(42) });
   run.update(.01);
-  for (const kind of ['bike', 'scooter', 'cone', 'tractor']) {
+  for (const kind of ['bike', 'scooter']) {
     const agent = run.state.traffic[0];
-    Object.assign(agent, { kind, hp: kind === 'tractor' ? 4 : 1.5, alive: true, cleared: false, lane: 1, progress: run.state.distance + 3 });
+    Object.assign(agent, { kind, hp: 1.5, alive: true, cleared: false, lane: 1, progress: run.state.distance + 3 });
     assert.equal(run.sprayHit(agent.id, { charge: 0, damage: .5 }), false);
-    assert.ok(agent.wetUntil > run.state.elapsed);
+    assert.ok(agent.hitUntil > run.state.elapsed);
     const before = run.state.bonus;
     while (agent.alive) run.sprayHit(agent.id, { charge: 1 });
-    assert.equal(run.state.bonus - before, kind === 'tractor' ? 150 : 50);
+    assert.equal(run.state.bonus - before, 50);
     assert.equal(run.sprayHit(agent.id, { charge: 1 }), false);
-    assert.equal(run.state.bonus - before, kind === 'tractor' ? 150 : 50);
+    assert.equal(run.state.bonus - before, 50);
     assert.equal(run.update(.3).hits, 0);
   }
   run.reset(); assert.equal(run.state.bonus, 0); assert.equal(run.state.cleared, 0);
+});
+
+
+test('cones and tractors are solid obstacles immune to repeated fully charged spray', () => {
+  for (const kind of ['cone', 'tractor']) {
+    const run = createBaanaRun({ random: seeded(42) }); run.update(.01);
+    const agent = run.state.traffic[0];
+    Object.assign(agent, { kind, hp: 4, alive: true, lane: 1, progress: run.state.distance + 3 });
+    for (let hit = 0; hit < 100; hit++) assert.equal(run.sprayHit(agent.id, { damage: 10, charge: 1 }), false);
+    assert.equal(agent.hp, 4); assert.equal(agent.alive, true); assert.equal(agent.hitUntil, 0);
+    assert.equal(run.state.bonus, 0); assert.equal(run.state.cleared, 0);
+    assert.equal(run.update(.3).hits, 1, `${kind} still collides`);
+  }
 });

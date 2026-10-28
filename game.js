@@ -17,7 +17,7 @@ import { createMouseAim } from './mouse-aim.js';
 import { bindGameInput } from './game-input.js';
 import { preventGameZoom } from './gesture-guard.js';
 import { createBaanaRun, RUN_LANES } from './runner/baana-run.js';
-import { bindRunnerInput } from './runner/runner-input.js';
+import { bindRunnerInput, createLaneSteering } from './runner/runner-input.js';
 
 const MODEL_URL = './assets/bad-bad-boy.glb?v=20261025-opt1';
 // World metres; the hero keeps the same physical size across every map.
@@ -58,7 +58,6 @@ const settingsButton = document.querySelector('#open-settings');
 const settingsDone = document.querySelector('#settings-done');
 const soundSetting = document.querySelector('#sound-setting');
 const rangeHud = document.querySelector('.range-hud');
-const runnerControls = document.querySelector('#runner-controls');
 const waveStatLabel = document.querySelector('#wave-stat-label');
 const runnerProgress = document.querySelector('#runner-progress');
 const query = new URLSearchParams(window.location.search);
@@ -87,6 +86,7 @@ const touchControls = createTouchControls({
   fireButton: document.querySelector('#mobile-fire'),
   onFireStart: beginSpray,
   onInput() {
+    canvas.focus({ preventScroll: true });
     if (!usingTouchControls) { usingTouchControls = true; syncControlMode(); }
   }
 });
@@ -154,7 +154,13 @@ player.root.position.set(player.x, 0, player.z);
 scene.add(player.root);
 
 function hitEnemy(enemy, direction, impact) {
-  if (isRunner()) { baanaRun.sprayHit(enemy.id, impact); return; }
+  if (isRunner()) {
+    if (baanaRun.sprayHit(enemy.id, impact)) {
+      burst(enemy.x, enemy.hitHeight, enemy.z, 0xffd34e, 20, null, 3);
+      blip(440 + Math.random() * 280, .045);
+    }
+    return;
+  }
   enemy.hp -= impact.damage;
   enemy.hit = 0.18;
   world.move(enemy, direction.x * impact.knockback, direction.z * impact.knockback, enemy.size);
@@ -203,18 +209,20 @@ const baanaRun = createBaanaRun();
 let runnerComplete = false, runnerBaseScore = 0;
 const isRunner = () => world.mode === 'runner';
 const runnerInput = bindRunnerInput({
-  canvas, left: document.querySelector('#runner-left'), right: document.querySelector('#runner-right'),
+  canvas,
   canInteract: () => playing && isRunner() && !controlsDialog.open,
   dodge: direction => baanaRun.dodge(direction),
-  fire: document.querySelector('#runner-fire'),
   setFiring: firing => firing ? keys.add('Fire') : keys.delete('Fire'), beginSpray,
 });
+
+const laneSteering = createLaneSteering(direction => baanaRun.dodge(direction));
 
 function syncLevelUI() {
   const runner = isRunner();
   document.querySelector('.game-shell').classList.toggle('runner-mode', runner);
   waveStatLabel.textContent = runner ? 'BAANA' : 'WAVE';
-  runnerControls.hidden = !runner || !playing;
+  touchControls.setHorizontalOnly(runner);
+  document.querySelector('#joystick-zone').setAttribute('aria-label', runner ? 'Drag left or right to dodge' : 'Drag to move and aim');
   runnerProgress.hidden = !runner || !playing;
   rangeHud.hidden = !playing;
 }
@@ -372,9 +380,9 @@ function removeEnemy(enemy, pop = false) {
   }
 }
 
-function burst(x, y, z, color, count = 8, forward = null) {
+function burst(x, y, z, color, count = 8, forward = null, scale = 1) {
   for (let i = 0; i < count; i++) {
-    const radius = 0.025 + Math.random() * 0.045;
+    const radius = (0.025 + Math.random() * 0.045) * scale;
     const object = new THREE.Mesh(
       new THREE.SphereGeometry(radius, 7, 6),
       new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95 })
@@ -382,7 +390,7 @@ function burst(x, y, z, color, count = 8, forward = null) {
     object.position.set(x, y, z);
     scene.add(object);
     const spread = forward ? new THREE.Vector3(forward.x * (1.8 + Math.random() * 2) + (Math.random() - 0.5) * 1.5, Math.random() * 1.2, forward.z * (1.8 + Math.random() * 2) + (Math.random() - 0.5) * 1.5) : new THREE.Vector3((Math.random() - 0.5) * 2, Math.random() * 1.8, (Math.random() - 0.5) * 2);
-    effects.push({ object, velocity: spread, life: 0.32 + Math.random() * 0.28, maxLife: 0.6, gravity: 2.5 });
+    effects.push({ object, velocity: spread.multiplyScalar(scale), life: 0.32 + Math.random() * 0.28, maxLife: 0.6, gravity: 2.5 });
   }
 }
 
@@ -485,6 +493,7 @@ function update(dt) {
   gameTime += dt;
   // Finish the final bite's splash even after the round ends.
   biteEffects.update(dt);
+  updateEffects(dt, playing && isRunner() ? baanaRun.state.speed : 0);
   if (!playing) return;
   if (isRunner()) { updateRunner(dt); return; }
   const announcement = world.update(dt, [player, ...enemies]);
@@ -565,21 +574,6 @@ function update(dt) {
   player.model.material.opacity = player.invulnerable > 0 && Math.floor(gameTime * 18) % 2 === 0 ? 0.45 : 1;
   player.model.material.transparent = player.invulnerable > 0;
 
-  for (let i = effects.length - 1; i >= 0; i--) {
-    const effect = effects[i];
-    effect.life -= dt;
-    effect.object.position.addScaledVector(effect.velocity, dt);
-    effect.velocity.y -= (effect.gravity || 0) * dt;
-    effect.object.material.opacity = Math.max(0, effect.life / effect.maxLife);
-    effect.object.scale.setScalar(Math.max(0.01, effect.life / effect.maxLife));
-    if (effect.life <= 0) {
-      scene.remove(effect.object);
-      effect.object.geometry.dispose();
-      effect.object.material.dispose();
-      effects.splice(i, 1);
-    }
-  }
-
   for (let i = enemies.length - 1; i >= 0; i--) {
     if (!enemies[i].alive) enemies.splice(i, 1);
   }
@@ -595,7 +589,26 @@ function update(dt) {
   cameraRig.frame(player.x, player.z, dt);
 }
 
+function updateEffects(dt, scroll = 0) {
+  for (let i = effects.length - 1; i >= 0; i--) {
+    const effect = effects[i];
+    effect.life -= dt;
+    effect.object.position.z += scroll * dt;
+    effect.object.position.addScaledVector(effect.velocity, dt);
+    effect.velocity.y -= (effect.gravity || 0) * dt;
+    effect.object.material.opacity = Math.max(0, effect.life / effect.maxLife);
+    effect.object.scale.setScalar(Math.max(0.01, effect.life / effect.maxLife));
+    if (effect.life <= 0) {
+      scene.remove(effect.object);
+      effect.object.geometry.dispose();
+      effect.object.material.dispose();
+      effects.splice(i, 1);
+    }
+  }
+}
+
 function updateRunner(dt) {
+  laneSteering.update(touchControls.input.x, dt);
   const result = baanaRun.update(dt), state = baanaRun.state;
   player.x = state.x; player.z = 0;
   player.heading = Math.PI; player.dx = 0; player.dz = -1;
@@ -607,7 +620,7 @@ function updateRunner(dt) {
   player.body.rotation.z = THREE.MathUtils.damp(player.body.rotation.z, (RUN_LANES[state.lane] - state.x) * -.055, 12, dt);
   animateHero(player.rig, player.runTime, 1);
   player.root.updateMatrixWorld(true);
-  const firing = keys.has('Space') || keys.has('Fire') || player.tapTimer > 0;
+  const firing = keys.has('Space') || keys.has('Fire') || touchControls.input.firing || player.tapTimer > 0;
   player.tapTimer = Math.max(0, player.tapTimer - dt);
   const spray = stream.update(dt, firing, player.rig.emitter, player, state.traffic);
   pressureFill.style.transform = `scaleX(${spray.charge})`;
@@ -755,7 +768,7 @@ function endGame() {
   syncMouseAim();
   resetAimAssist();
   rangeHud.hidden = true;
-  runnerControls.hidden = runnerProgress.hidden = true;
+  runnerProgress.hidden = true;
   touchControls.setEnabled(false);
   stream.clear();
   player.tapTimer = 0;
@@ -794,6 +807,7 @@ function beginSpray() {
 
 function resetInput() {
   runnerInput.reset();
+  laneSteering.reset();
   resetAimAssist();
   mouseAim.resetAim();
   keys.clear();

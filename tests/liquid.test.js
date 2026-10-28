@@ -178,7 +178,7 @@ test('disabling refraction preserves gloss, pressure, range, and collision damag
   assert.deepEqual(mobile.hits, desktop.hits);
 });
 
-test('runner liquid can clear approaching riders, cones and tractors before contact', async () => {
+test('runner liquid clears approaching riders while roadwork obstacles survive and still collide', async () => {
   const { createBaanaRun } = await import('../runner/baana-run.js');
   for (const kind of ['bike', 'scooter', 'cone', 'tractor']) {
     const run = createBaanaRun();
@@ -194,8 +194,10 @@ test('runner liquid can clear approaching riders, cones and tractors before cont
       run.update(1 / 60);
       stream.update(1 / 60, true, emitter, { dx: 0, dz: -1 }, [agent]);
     }
-    assert.equal(agent.alive, false, kind);
-    assert.equal(agent.hit, false, `${kind} clears before colliding`);
-    assert.equal(run.state.cleared, 1);
+    const rider = kind === 'bike' || kind === 'scooter';
+    assert.equal(agent.alive, !rider, kind);
+    assert.equal(agent.hit, !rider, rider ? `${kind} clears before colliding` : `${kind} still collides`);
+    assert.equal(run.state.cleared, rider ? 1 : 0);
+    if (!rider) assert.equal(agent.hp, kind === 'tractor' ? 4 : 1);
   }
 });

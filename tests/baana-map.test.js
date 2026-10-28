@@ -47,3 +47,23 @@ test('switching between runner and arena disposes shared traffic resources once 
   world.activate('baana'); assert.equal(world.mode, 'runner'); assert.equal(scene.children.length, 1);
   world.dispose();
 });
+
+
+test('rider hit flash is isolated to its slot and cleared models disappear at full scale', () => {
+  const map = baanaMap.create();
+  const agents = [0, 1].map(id => ({ id, lane: id, kind: 'bike', color: 'red', progress: 20, speed: 5.2, hitUntil: id === 0 ? 1 : 0 }));
+  const state = { elapsed: .1, distance: 0, traffic: agents };
+  map.updateRunner(state);
+  const pool = map.root.children.filter(node => node.name === 'Baana traffic');
+  const material = node => node.children.find(child => child.name === 'red bike').children.find(child => child.isMesh).material;
+  assert.equal(material(pool[0]).emissiveIntensity, .7);
+  assert.equal(material(pool[1]).emissiveIntensity, 0);
+  assert.notEqual(material(pool[0]), material(pool[1]));
+  state.elapsed = 2; map.updateRunner(state);
+  assert.equal(material(pool[0]).emissiveIntensity, 0);
+  agents[0].cleared = true; map.updateRunner(state);
+  assert.equal(pool[0].visible, false);
+  assert.deepEqual(pool[0].scale.toArray(), [1, 1, 1]);
+  assert.equal(pool[1].visible, true);
+  map.dispose();
+});

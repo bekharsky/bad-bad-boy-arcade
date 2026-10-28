@@ -12,7 +12,7 @@ export const baanaMap = {
 };
 
 function buildBaana(root) {
-  const sections = [], buildings = [], trafficPool = [];
+  const sections = [], buildings = [], trafficPool = [], trafficMaterials = [];
   let seed = 326;
   const random = () => ((seed = seed * 16807 % 2147483647) - 1) / 2147483646;
   for (let section = 0; section < 5; section++) {
@@ -73,10 +73,21 @@ function buildBaana(root) {
   for (const kind of ['cone', 'tractor']) templates.push(createTrafficModel(kind, 'roadwork'));
   for (let i = 0; i < TRAFFIC_CAPACITY; i++) {
     const object = new THREE.Group(); object.name = 'Baana traffic'; object.visible = false;
-    for (const template of templates) { const variant = template.clone(true); variant.visible = false; object.add(variant); }
+    // One material per traffic slot keeps hit flashes local, while all colour
+    // variants and wheels within that slot share the vertex-coloured material.
+    const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .65 });
+    trafficMaterials.push(material);
+    for (const template of templates) {
+      const variant = template.clone(true); variant.visible = false;
+      variant.traverse(node => { if (node.isMesh) node.material = material; });
+      object.add(variant);
+    }
     root.add(object); trafficPool.push(object);
   }
-  // All cloned geometries/materials are now owned by this map's subtree.
+  const templateMaterials = new Set();
+  for (const template of templates) template.traverse(node => { if (node.material) templateMaterials.add(node.material); });
+  for (const material of templateMaterials) material.dispose();
+  // Shared geometries and per-slot materials are now owned by this map's subtree.
   const finish = createSceneryModel('Baana finish');
   for (let row = 0; row < 2; row++) for (let col = 0; col < 12; col++) finish.box((row + col) % 2 ? '#e1ddc2' : '#354d50', (col - 5.5) * .8, .055, row * .8, .8, .02, .8);
   const finishLine = finish.finish({ vertexColors: true }); finishLine.visible = false; root.add(finishLine);
@@ -85,12 +96,12 @@ function buildBaana(root) {
     for (const section of sections) section.updateMatrixWorld(true);
     for (const bridge of buildings) bridge.bounds.setFromObject(bridge.group);
     for (let i = 0; i < trafficPool.length; i++) {
-      const object = trafficPool[i], agent = state.traffic[i]; object.visible = !!agent;
+      const object = trafficPool[i], agent = state.traffic[i], material = trafficMaterials[i];
+      object.visible = !!agent && !agent.cleared;
+      material.emissive.set(agent?.hitUntil > state.elapsed ? '#ffe58c' : '#000000');
+      material.emissiveIntensity = agent?.hitUntil > state.elapsed ? .7 : 0;
       if (!agent) continue;
-      const cleared = agent.cleared ? Math.min(1, (state.elapsed - agent.clearedAt) / .6) : 0;
-      object.position.set(RUN_LANES[agent.lane] + cleared * (agent.lane === 0 ? -2 : 2), 0, state.distance - agent.progress);
-      object.scale.setScalar(1 - cleared);
-      object.rotation.z = cleared * -.8 + (agent.wetUntil > state.elapsed ? Math.sin(state.elapsed * 60) * .08 : 0);
+      object.position.set(RUN_LANES[agent.lane], 0, state.distance - agent.progress);
       for (const variant of object.children) {
         variant.visible = variant.name === `${agent.kind === 'cone' || agent.kind === 'tractor' ? 'roadwork' : agent.color} ${agent.kind}`;
         if (variant.visible) animateTraffic(variant, state.elapsed + agent.id, agent.speed + state.speed);

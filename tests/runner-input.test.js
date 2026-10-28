@@ -1,24 +1,18 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { bindRunnerInput } from '../runner/runner-input.js';
+import { bindRunnerInput, createLaneSteering } from '../runner/runner-input.js';
 
 function setup() {
   globalThis.window = new EventTarget(); globalThis.document = new EventTarget();
-  const canvas = new EventTarget(), left = new EventTarget(), right = new EventTarget(), fire = new EventTarget(), steps = [], firing = [];
+  const canvas = new EventTarget(), steps = [], firing = [];
   let enabled = true, focused = 0;
   canvas.focus = () => focused++; canvas.setPointerCapture = () => { throw new Error('No capture'); };
-  const input = bindRunnerInput({ canvas, left, right, fire, setFiring: value => firing.push(value), canInteract: () => enabled, dodge: value => steps.push(value) });
+  const input = bindRunnerInput({ canvas, setFiring: value => firing.push(value), canInteract: () => enabled, dodge: value => steps.push(value) });
   function pointer(type, x = 100, y = 100, id = 1) {
     const event = new Event(type); Object.assign(event, { pointerId: id, button: 0, clientX: x, clientY: y }); canvas.dispatchEvent(event);
   }
-  return { canvas, left, right, fire, firing, input, steps, pointer, focused: () => focused, enable: value => { enabled = value; } };
+  return { canvas, firing, input, steps, pointer, focused: () => focused, enable: value => { enabled = value; } };
 }
-
-test('left/right buttons dodge once and restore game focus; paused controls do nothing', () => {
-  const game = setup(); game.left.dispatchEvent(new Event('click')); game.right.dispatchEvent(new Event('click'));
-  assert.deepEqual(game.steps, [-1, 1]); assert.equal(game.focused(), 2);
-  game.enable(false); game.left.dispatchEvent(new Event('click')); assert.equal(game.steps.length, 2);
-});
 
 test('horizontal swipes work without pointer capture and cannot repeat within a gesture', () => {
   const game = setup(); game.pointer('pointerdown'); game.pointer('pointermove', 135); game.pointer('pointermove', 200);
@@ -41,24 +35,31 @@ test('cancel, pause/reset and backgrounding discard an unfinished swipe', () => 
 });
 
 
-test('spray holds independently of a touch dodge and stops on release, capture loss or pause', () => {
+test('mouse spray stops on release/capture loss and paused canvas cannot fire', () => {
   for (const stop of ['pointerup', 'pointercancel', 'lostpointercapture', 'reset', 'blur']) {
     const game = setup();
-    const down = new Event('pointerdown'); Object.assign(down, { button: 0, pointerId: 8 });
-    game.fire.dispatchEvent(down); assert.equal(game.firing.at(-1), true);
-    game.pointer('pointerdown'); game.pointer('pointermove', 150);
-    const otherUp = new Event('pointerup'); Object.assign(otherUp, { pointerId: 1 });
-    window.dispatchEvent(otherUp); game.pointer('pointerup');
-    assert.equal(game.firing.at(-1), true, 'Lifting the dodging finger keeps spray held');
+    const down = new Event('pointerdown'); Object.assign(down, { button: 0, pointerId: 8, pointerType: 'mouse', clientX: 100, clientY: 100 });
+    game.canvas.dispatchEvent(down); assert.equal(game.firing.at(-1), true);
     if (stop === 'reset') game.input.reset();
     else if (stop === 'blur') window.dispatchEvent(new Event('blur'));
     else {
       const event = new Event(stop); Object.assign(event, { pointerId: 8 });
-      (stop === 'lostpointercapture' ? game.fire : window).dispatchEvent(event);
+      (stop === 'lostpointercapture' ? game.canvas : window).dispatchEvent(event);
     }
     assert.equal(game.firing.at(-1), false, stop);
   }
-  const game = setup(); game.enable(false);
-  const event = new Event('pointerdown'); Object.assign(event, { button: 0, pointerId: 8 });
-  game.fire.dispatchEvent(event); assert.deepEqual(game.firing, []);
+  const game = setup(); game.enable(false); game.pointer('pointerdown');
+  assert.deepEqual(game.firing, []);
+});
+
+test('horizontal joystick steps promptly, repeats while held and resets on neutral, reversal and pause', () => {
+  const steps = [], steering = createLaneSteering(value => steps.push(value));
+  steering.update(.1, 1); assert.deepEqual(steps, []);
+  steering.update(1, .01); assert.deepEqual(steps, [1]);
+  steering.update(1, .1); assert.deepEqual(steps, [1]);
+  steering.update(1, .19); assert.deepEqual(steps, [1, 1]);
+  steering.update(-1, .01); assert.deepEqual(steps, [1, 1, -1]);
+  steering.update(0, .01); steering.update(-1, .01); assert.equal(steps.length, 4);
+  steering.reset(); steering.update(0, 20); assert.equal(steps.length, 4);
+  steering.update(1, .01); assert.equal(steps.at(-1), 1);
 });

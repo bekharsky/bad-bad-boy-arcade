@@ -41,7 +41,7 @@ export function createBaanaRun({ length = BAANA_LENGTH, random = Math.random } =
     for (const lane of [0, 1, 2].filter(lane => lane !== safeLane)) {
       const kind = roadworks ? (choose(3) === 0 ? 'tractor' : 'cone') : (choose(2) ? 'scooter' : 'bike');
       const hp = kind === 'tractor' ? 4 : kind === 'cone' ? 1 : 1.5;
-      state.traffic.push({ id: nextId++, lane, safeLane, row: state.elapsed, progress: state.distance + arrival * (state.speed + speed), speed, kind, color: TRAFFIC_COLORS[choose(3)], hp, x: RUN_LANES[lane], z: -arrival * (state.speed + speed), size: kind === 'tractor' ? 1.1 : kind === 'cone' ? .55 : .7, hitHeight: kind === 'cone' ? .55 : 1.2, alive: true, hit: false, passed: false, wetUntil: 0 });
+      state.traffic.push({ id: nextId++, lane, safeLane, row: state.elapsed, progress: state.distance + arrival * (state.speed + speed), speed, kind, color: TRAFFIC_COLORS[choose(3)], hp, x: RUN_LANES[lane], z: -arrival * (state.speed + speed), size: kind === 'tractor' ? 1.1 : kind === 'cone' ? .55 : .7, hitHeight: kind === 'cone' ? .55 : 1.2, alive: true, hit: false, passed: false, hitUntil: 0 });
     }
   }
 
@@ -49,12 +49,12 @@ export function createBaanaRun({ length = BAANA_LENGTH, random = Math.random } =
     state, length, reset,
     sprayHit(id, { damage = 1, charge = 0 } = {}) {
       const agent = state.traffic.find(agent => agent.id === id);
-      if (!agent || !agent.alive || state.finished) return false;
+      if (!agent || !agent.alive || !['bike', 'scooter'].includes(agent.kind) || state.finished) return false;
       agent.hp -= damage * (.75 + Math.max(0, Math.min(1, charge)) * 1.75);
-      agent.wetUntil = state.elapsed + .25;
+      agent.hitUntil = state.elapsed + .18;
       if (agent.hp > 0) return false;
       agent.alive = false; agent.cleared = true; agent.clearedAt = state.elapsed;
-      state.cleared++; state.bonus += agent.kind === 'tractor' ? 150 : 50;
+      state.cleared++; state.bonus += 50;
       return true;
     },
     dodge(direction) {
