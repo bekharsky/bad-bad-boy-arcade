@@ -4,6 +4,28 @@ export const RUN_LANES = Object.freeze([-3, 0, 3]);
 export const TRAFFIC_COLORS = Object.freeze(['green', 'blue', 'red']);
 export const TRAFFIC_CAPACITY = 24;
 
+export const ROADWORK_TYPES = Object.freeze(['cone', 'tractor', 'barrier', 'trench']);
+const PROFILES = {
+  bike: { halfLength: 1.2, width: 1.05, depth: 1.65, size: .7, hitHeight: 1.2 },
+  scooter: { halfLength: .95, width: 1.05, depth: 1.65, size: .7, hitHeight: 1.2 },
+  cone: { halfLength: .6, width: 1.05, depth: 1.65, size: .55, hitHeight: .55 },
+  tractor: { halfLength: 1.9, width: 1.65, depth: 2.4, size: 1.1, hitHeight: 1.2 },
+  barrier: { halfLength: .6, width: 1.65, depth: 1.4, size: 1.1, hitHeight: .7 },
+  trench: { halfLength: 2.8, width: 1.65, depth: 3.4, size: 1.2, hitHeight: .3 },
+};
+export const trafficProfile = kind => PROFILES[kind] ?? PROFILES.bike;
+
+// Progress runs forward along Baana; riders travel toward decreasing progress.
+// Reject not just overlaps at spawn, but any route that would catch a parked
+// obstacle (or a slower rider) later in the visible section.
+export function trafficRoutesConflict(a, b) {
+  if (a.lane !== b.lane || a.cleared || b.cleared) return false;
+  const clearance = trafficProfile(a.kind).halfLength + trafficProfile(b.kind).halfLength + 1.5;
+  const gap = a.progress - b.progress;
+  if (a.speed === b.speed) return Math.abs(gap) < clearance;
+  return a.speed > b.speed ? gap > -clearance : gap < clearance;
+}
+
 // Swept collision in the runner's moving frame: quick lane changes and a long
 // frame cannot jump through a cyclist between two rendered positions.
 export function trafficContact(x0, gap0, x1, gap1, laneX, width = 1.05, depth = 1.65) {
@@ -31,19 +53,31 @@ export function createBaanaRun({ length = BAANA_LENGTH, random = Math.random } =
   }
   function row() {
     const choices = [safeLane - 1, safeLane, safeLane + 1].filter(lane => lane >= 0 && lane < RUN_LANES.length);
-    const nextSafeLane = choices[choose(choices.length)];
     const roadworks = choose(4) === 0, speed = roadworks ? 0 : 5.2;
     // Reserve arrival times, not world-space spacing: parked roadworks and
     // oncoming riders must not converge into an unavoidable three-lane wall.
     let arrival = 3.2;
     for (const agent of state.traffic) if (!agent.cleared) arrival = Math.max(arrival, (agent.progress - state.distance) / (state.speed + agent.speed) + .85);
     if (arrival > 5 || state.traffic.length + 2 > TRAFFIC_CAPACITY) return;
-    safeLane = nextSafeLane;
-    for (const lane of [0, 1, 2].filter(lane => lane !== safeLane)) {
-      const kind = roadworks ? (choose(3) === 0 ? 'tractor' : 'cone') : (choose(2) ? 'scooter' : 'bike');
-      const hp = kind === 'tractor' ? 4 : kind === 'cone' ? 1 : 1.5;
-      state.traffic.push({ id: nextId++, lane, safeLane, row: state.elapsed, progress: state.distance + arrival * (state.speed + speed), speed, kind, color: TRAFFIC_COLORS[choose(3)], hp, x: RUN_LANES[lane], z: -arrival * (state.speed + speed), size: kind === 'tractor' ? 1.1 : kind === 'cone' ? .55 : .7, hitHeight: kind === 'cone' ? .55 : 1.2, alive: true, hit: false, passed: false, hitUntil: 0 });
+    const candidates = [];
+    for (const lane of [0, 1, 2]) {
+      const kind = roadworks ? ROADWORK_TYPES[choose(ROADWORK_TYPES.length)] : (choose(2) ? 'scooter' : 'bike');
+      const profile = trafficProfile(kind), progress = state.distance + arrival * (state.speed + speed);
+      const agent = { id: nextId, lane, safeLane, row: state.elapsed, progress, speed, kind, color: TRAFFIC_COLORS[choose(3)], hp: 1.5, x: RUN_LANES[lane], z: state.distance - progress, size: profile.size, hitHeight: profile.hitHeight, alive: true, hit: false, passed: false, hitUntil: 0 };
+      if (state.traffic.some(existing => trafficRoutesConflict(agent, existing))) continue;
+      candidates.push(agent);
     }
+    // Prefer a full group, but use a single free lane beside roadworks rather
+    // than spawning through a blocked lane or making the whole route empty.
+    const count = lane => candidates.filter(agent => agent.lane !== lane).length;
+    const most = Math.max(...choices.map(count));
+    if (!most) return false;
+    const safeChoices = choices.filter(lane => count(lane) === most);
+    safeLane = safeChoices[choose(safeChoices.length)];
+    for (const agent of candidates.filter(agent => agent.lane !== safeLane)) {
+      agent.id = nextId++; agent.safeLane = safeLane; state.traffic.push(agent);
+    }
+    return true;
   }
 
   return {
@@ -75,18 +109,19 @@ export function createBaanaRun({ length = BAANA_LENGTH, random = Math.random } =
         const target = RUN_LANES[state.lane], change = target - state.x;
         state.x += Math.sign(change) * Math.min(Math.abs(change), 13 * step);
         if (state.elapsed >= nextSpawn && state.distance < length - 65) {
-          row(); nextSpawn = state.elapsed + Math.max(.85, 1.05 - state.distance / 6000);
+          const spawned = row();
+          nextSpawn = state.elapsed + (spawned ? Math.max(.85, 1.05 - state.distance / 6000) : .15);
         }
         for (const traffic of state.traffic) {
           const oldGap = traffic.progress - oldDistance;
           traffic.progress -= traffic.speed * step;
           const gap = traffic.progress - state.distance;
           traffic.x = RUN_LANES[traffic.lane]; traffic.z = -gap;
-          if (!traffic.cleared && !traffic.hit && trafficContact(oldX, oldGap, state.x, gap, RUN_LANES[traffic.lane], traffic.kind === 'tractor' ? 1.65 : 1.05, traffic.kind === 'tractor' ? 2.4 : 1.65)) {
+          if (!traffic.cleared && !traffic.hit && trafficContact(oldX, oldGap, state.x, gap, RUN_LANES[traffic.lane], trafficProfile(traffic.kind).width, trafficProfile(traffic.kind).depth)) {
             traffic.hit = true;
             if (state.invulnerable <= 0) { hits++; state.invulnerable = 1.2; }
           }
-          if (!traffic.passed && gap < (traffic.kind === 'tractor' ? -3 : -2.2)) {
+          if (!traffic.passed && gap < -trafficProfile(traffic.kind).depth - .6) {
             traffic.passed = true;
             if (!traffic.hit && !traffic.cleared) { passed++; state.passed++; }
           }

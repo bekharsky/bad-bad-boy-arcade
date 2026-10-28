@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { createMap } from '../world/map.js';
 import { createSceneryModel } from './scenery-model.js';
 import { createTrafficModel, animateTraffic } from '../runner/traffic-models.js';
-import { RUN_LANES, TRAFFIC_COLORS, TRAFFIC_CAPACITY, BAANA_LENGTH } from '../runner/baana-run.js';
+import { RUN_LANES, TRAFFIC_COLORS, TRAFFIC_CAPACITY, BAANA_LENGTH, ROADWORK_TYPES } from '../runner/baana-run.js';
 
 export const baanaMap = {
   id: 'baana', name: 'Baana Run', mode: 'runner',
@@ -70,7 +70,7 @@ function buildBaana(root) {
   }
   const templates = [];
   for (const kind of ['bike', 'scooter']) for (const color of TRAFFIC_COLORS) templates.push(createTrafficModel(kind, color));
-  for (const kind of ['cone', 'tractor']) templates.push(createTrafficModel(kind, 'roadwork'));
+  for (const kind of ROADWORK_TYPES) templates.push(createTrafficModel(kind, 'roadwork'));
   for (let i = 0; i < TRAFFIC_CAPACITY; i++) {
     const object = new THREE.Group(); object.name = 'Baana traffic'; object.visible = false;
     // One material per traffic slot keeps hit flashes local, while all colour
@@ -103,7 +103,7 @@ function buildBaana(root) {
       if (!agent) continue;
       object.position.set(RUN_LANES[agent.lane], 0, state.distance - agent.progress);
       for (const variant of object.children) {
-        variant.visible = variant.name === `${agent.kind === 'cone' || agent.kind === 'tractor' ? 'roadwork' : agent.color} ${agent.kind}`;
+        variant.visible = variant.name === `${ROADWORK_TYPES.includes(agent.kind) ? 'roadwork' : agent.color} ${agent.kind}`;
         if (variant.visible) animateTraffic(variant, state.elapsed + agent.id, agent.speed + state.speed);
       }
     }

@@ -19,6 +19,32 @@ export function createTrafficModel(kind, color) {
     }
     return model.finish({ vertexColors: true });
   }
+  if (kind === 'barrier') {
+    // Concrete feet and a broad red/white construction fence across one lane.
+    for (const x of [-.9, .9]) {
+      box('#65716d', x, .12, 0, .65, .24, 1.05);
+      box('#d8d6bc', x, .75, 0, .1, 1.3, .1);
+      model.geometry('#f6ad35', new THREE.SphereGeometry(.14, 10, 6).translate(x, 1.48, 0));
+    }
+    for (const y of [.65, 1.12]) {
+      box('#eee9d4', 0, y, 0, 2.5, .28, .15);
+      for (const x of [-.9, -.3, .3, .9]) box('#c85c43', x, y, .085, .27, .28, .025);
+    }
+    return model.finish({ vertexColors: true });
+  }
+  if (kind === 'trench') {
+    // A dark excavated bed masks the asphalt, with exposed pipe and spoil piles.
+    box('#826947', 0, .065, 0, 2.7, .08, 5.4);
+    box('#302f29', 0, .12, 0, 2.3, .08, 4.8);
+    for (const x of [-1.1, 1.1]) box('#b2976b', x, .22, 0, .15, .25, 4.8);
+    model.geometry('#626d68', new THREE.CylinderGeometry(.16, .16, 4.3, 10).rotateX(Math.PI / 2).translate(.3, .3, 0));
+    for (const z of [-2.25, 2.25]) box('#9e8261', 0, .22, z, 2.3, .25, .16);
+    for (let i = 0; i < 9; i++) {
+      const side = i % 2 ? -1 : 1, z = -2.3 + (i % 5) * 1.1;
+      model.geometry(i % 3 ? '#98754b' : '#6e6953', new THREE.DodecahedronGeometry(.3, 0).scale(.65, .7 + i % 3 * .2, 1.25).translate(side * 1.25, .3, z));
+    }
+    return model.finish({ vertexColors: true });
+  }
   if (kind === 'tractor') {
     for (const x of [-.87, .87]) for (const z of [-.85, .9]) {
       const radius = z < 0 ? .68 : .48;

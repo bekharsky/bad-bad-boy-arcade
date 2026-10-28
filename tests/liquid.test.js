@@ -179,12 +179,12 @@ test('disabling refraction preserves gloss, pressure, range, and collision damag
 });
 
 test('runner liquid clears approaching riders while roadwork obstacles survive and still collide', async () => {
-  const { createBaanaRun } = await import('../runner/baana-run.js');
-  for (const kind of ['bike', 'scooter', 'cone', 'tractor']) {
+  const { createBaanaRun, trafficProfile } = await import('../runner/baana-run.js');
+  for (const kind of ['bike', 'scooter', 'cone', 'tractor', 'barrier', 'trench']) {
     const run = createBaanaRun();
-    const agent = { id: -1, kind, lane: 1, speed: kind === 'cone' || kind === 'tractor' ? 0 : 5.2,
-      progress: 38, hp: kind === 'tractor' ? 4 : kind === 'cone' ? 1 : 1.5,
-      hitHeight: kind === 'cone' ? .55 : 1.2, size: kind === 'tractor' ? 1.1 : kind === 'cone' ? .55 : .7,
+    const agent = { id: -1, kind, lane: 1, speed: kind === 'bike' || kind === 'scooter' ? 5.2 : 0,
+      progress: 38, hp: 1.5,
+      hitHeight: trafficProfile(kind).hitHeight, size: trafficProfile(kind).size,
       x: 0, z: -38, alive: true, hit: false, passed: false };
     run.state.traffic.push(agent);
     const scene = new THREE.Scene(), emitter = new THREE.Object3D();
@@ -198,6 +198,6 @@ test('runner liquid clears approaching riders while roadwork obstacles survive a
     assert.equal(agent.alive, !rider, kind);
     assert.equal(agent.hit, !rider, rider ? `${kind} clears before colliding` : `${kind} still collides`);
     assert.equal(run.state.cleared, rider ? 1 : 0);
-    if (!rider) assert.equal(agent.hp, kind === 'tractor' ? 4 : 1);
+    if (!rider) assert.equal(agent.hp, 1.5);
   }
 });

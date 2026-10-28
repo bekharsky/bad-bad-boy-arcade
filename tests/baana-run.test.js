@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createBaanaRun, trafficContact, TRAFFIC_CAPACITY, RUN_LANES } from '../runner/baana-run.js';
+import { createBaanaRun, trafficContact, TRAFFIC_CAPACITY, RUN_LANES, trafficProfile, trafficRoutesConflict } from '../runner/baana-run.js';
 
 const seeded = seed => () => ((seed = seed * 16807 % 2147483647) - 1) / 2147483646;
 
@@ -46,7 +46,7 @@ test('generated traffic always permits a complete run at multiple refresh rates 
     const run = createBaanaRun({ random: seeded(seed) });
     let hits = 0, peakTraffic = 0; const colors = new Set(), kinds = new Set();
     for (let frame = 0; frame < fps * 160 && !run.state.finished; frame++) {
-      const upcoming = run.state.traffic.filter(agent => agent.progress - run.state.distance > -3).sort((a, b) => a.progress - b.progress)[0];
+      const upcoming = run.state.traffic.filter(agent => agent.progress - run.state.distance > -trafficProfile(agent.kind).depth - .6).sort((a, b) => a.progress - b.progress)[0];
       if (upcoming) run.dodge(upcoming.safeLane - run.state.lane);
       hits += run.update(1 / fps).hits;
       peakTraffic = Math.max(peakTraffic, run.state.traffic.length);
@@ -56,7 +56,7 @@ test('generated traffic always permits a complete run at multiple refresh rates 
     assert.equal(run.state.finished, true); assert.equal(run.state.distance, 1300);
     assert.ok(run.state.passed > 150); assert.ok(peakTraffic <= TRAFFIC_CAPACITY);
     assert.deepEqual([...colors].sort(), ['blue', 'green', 'red']);
-    assert.deepEqual([...kinds].sort(), ['bike', 'cone', 'scooter', 'tractor']);
+    assert.deepEqual([...kinds].sort(), ['barrier', 'bike', 'cone', 'scooter', 'tractor', 'trench']);
     assert.ok(RUN_LANES.includes(run.state.x));
     const distance = run.state.distance; run.update(10); assert.equal(run.state.distance, distance);
   }
@@ -82,8 +82,8 @@ test('spraying clears riders, charged hits are stronger and clearing prevents da
 });
 
 
-test('cones and tractors are solid obstacles immune to repeated fully charged spray', () => {
-  for (const kind of ['cone', 'tractor']) {
+test('all roadworks are solid obstacles immune to repeated fully charged spray', () => {
+  for (const kind of ['cone', 'tractor', 'barrier', 'trench']) {
     const run = createBaanaRun({ random: seeded(42) }); run.update(.01);
     const agent = run.state.traffic[0];
     Object.assign(agent, { kind, hp: 4, alive: true, lane: 1, progress: run.state.distance + 3 });
@@ -91,5 +91,36 @@ test('cones and tractors are solid obstacles immune to repeated fully charged sp
     assert.equal(agent.hp, 4); assert.equal(agent.alive, true); assert.equal(agent.hitUntil, 0);
     assert.equal(run.state.bonus, 0); assert.equal(run.state.cleared, 0);
     assert.equal(run.update(.3).hits, 1, `${kind} still collides`);
+  }
+});
+
+test('route reservations reject future overtaking and spawning inside every stationary roadwork', () => {
+  for (const kind of ['cone', 'tractor', 'barrier', 'trench']) {
+    const obstacle = { kind, lane: 1, progress: 50, speed: 0 };
+    assert.equal(trafficRoutesConflict({ kind: 'bike', lane: 1, progress: 70, speed: 5.2 }, obstacle), true);
+    assert.equal(trafficRoutesConflict(obstacle, { kind: 'scooter', lane: 1, progress: 70, speed: 5.2 }), true);
+    assert.equal(trafficRoutesConflict({ kind: 'bike', lane: 1, progress: 50, speed: 5.2 }, obstacle), true);
+    assert.equal(trafficRoutesConflict({ kind: 'bike', lane: 1, progress: 40, speed: 5.2 }, obstacle), false);
+    assert.equal(trafficRoutesConflict({ kind: 'bike', lane: 0, progress: 70, speed: 5.2 }, obstacle), false);
+  }
+});
+
+test('dense generated traffic never intersects or overtakes on its visible route, including at spawn', () => {
+  for (const seed of [1, 42, 371, 819, 17, 67, 113, 201, 566, 978]) {
+    const run = createBaanaRun({ random: seeded(seed) }), order = new Map();
+    while (!run.state.finished) {
+      run.update(1 / 30);
+      const traffic = run.state.traffic;
+      for (let i = 0; i < traffic.length; i++) for (let j = i + 1; j < traffic.length; j++) {
+        const a = traffic[i], b = traffic[j];
+        if (a.lane !== b.lane) continue;
+        const gap = a.progress - b.progress;
+        const clearance = trafficProfile(a.kind).halfLength + trafficProfile(b.kind).halfLength;
+        assert.ok(Math.abs(gap) >= clearance + 1.49, `${a.kind} overlaps ${b.kind}, seed ${seed}`);
+        const key = `${a.id}/${b.id}`;
+        if (order.has(key)) assert.equal(Math.sign(gap), order.get(key), 'Riders cannot drive through other traffic');
+        else order.set(key, Math.sign(gap));
+      }
+    }
   }
 });
