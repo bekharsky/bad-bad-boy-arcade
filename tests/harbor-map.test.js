@@ -128,9 +128,17 @@ test('the boulevard stays asphalt on both sides of the tracks past the plaza', (
   assert.ok(bounds.max.y > 12, 'The towers and rooftop pool rise above the neighbourhood');
 });
 
-test('building facades and roofs have no sign textures', () => {
+test('only Verkkopaukka restores its building signs', () => {
   const { scene } = setup();
-  const names = ['Residential building', 'Verkkopaukka', 'West brick warehouse', 'East brick warehouse', 'West harbor terminal', 'Clarion Hotel Helsinki'];
+  const shop = scene.getObjectByName('Verkkopaukka');
+  const roof = shop.getObjectByName('Verkkopaukka rooftop V');
+  const square = shop.getObjectByName('Verkkopaukka square V');
+  assert.ok(roof.material.map.isCanvasTexture);
+  assert.equal(square.material.map, roof.material.map);
+  assert.ok(roof.position.y > 6.8, 'The original V rises above the roof');
+  assert.ok(square.position.x > 3.6, 'The second logo faces the hero’s starting square');
+  assert.equal(square.rotation.y, Math.PI / 2);
+  const names = ['Residential building', 'West brick warehouse', 'East brick warehouse', 'West harbor terminal', 'Clarion Hotel Helsinki'];
   const buildings = [];
   scene.traverse(node => { if (names.includes(node.name)) buildings.push(node); });
   assert.ok(buildings.length >= 10);

@@ -107,9 +107,32 @@ function buildHarbor(scene) {
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, 256, 50);
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, width * 96 / 512), new THREE.MeshStandardMaterial({ map: t, roughness: 0.8 }));
-    mesh.position.set(x, y, z);
-    scene.add(mesh);
+    mesh.position.set(x - (activeBuilding?.x ?? 0), y, z - (activeBuilding?.z ?? 0));
+    (activeBuilding?.group ?? scene).add(mesh);
+    if (activeBuilding) { activeBuilding.materials.push(mesh.material); activeBuilding.meshes.push(mesh); }
     return mesh;
+  }
+  function shopLogo(w, d, h) {
+    const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 256;
+    const context = canvas.getContext('2d');
+    context.fillStyle = '#e4002b'; context.fillRect(0, 0, 1024, 256);
+    context.fillStyle = '#ffffff'; context.textBaseline = 'middle';
+    context.font = 'bold 230px sans-serif'; context.textAlign = 'center'; context.fillText('V', 150, 136);
+    context.font = 'bold 100px sans-serif'; context.textAlign = 'left'; context.fillText('verkkopaukka', 290, 136);
+    const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace;
+    // The original rooftop V, repeated on the facade facing the starting square.
+    for (const [name, width, x, y, z, turn] of [
+      ['Verkkopaukka rooftop V', 5.4, 0, h + 1.025, d / 2 - .35, 0],
+      ['Verkkopaukka square V', d * .88, w / 2 + .12, h - .9, 0, Math.PI / 2],
+    ]) {
+      const material = new THREE.MeshStandardMaterial({ map: texture, roughness: .6 });
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, width / 4), material);
+      mesh.name = name; mesh.position.set(x, y, z); mesh.rotation.y = turn;
+      if (!turn) mesh.rotation.z = .12;
+      mesh.castShadow = mesh.receiveShadow = true;
+      activeBuilding.group.add(mesh);
+      activeBuilding.materials.push(material); activeBuilding.meshes.push(mesh);
+    }
   }
   const colors = ['#cd9a7f', '#d5c590', '#8fa9a4', '#ceb7a4', '#b38b84', '#a6b2be'];
   let buildingIndex = 0;
@@ -182,6 +205,8 @@ function buildHarbor(scene) {
       }
       part('box', '#bb2635', x - w * .38, h * .54, front + .16, .65, h * .94, .3);
       part('box', '#405058', x, h + .4, z, w * .7, .45, d * .7);
+      shopLogo(w, d, h);
+      sign('VERKKOPAUKKA', x, 2.1, front + .13, w * .86, '#bd2838');
     } else {
       part('box', '#6e7370', x + w * .23, h + .6, z + d * .2, .45, .8, .5);
       const floors = Math.floor(h / 1.18), columns = Math.floor(w / 1.2);
