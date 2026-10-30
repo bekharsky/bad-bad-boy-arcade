@@ -55,7 +55,9 @@ const scoreLabel = document.querySelector('#score');
 const waveLabel = document.querySelector('#wave');
 const toast = document.querySelector('#toast');
 const sprayButton = document.querySelector('#mobile-fire');
-const sprayGauge = document.querySelector('#spray-gauge-fill');
+const sprayGauges = document.querySelectorAll('[data-spray-gauge-fill]');
+const desktopSpray = document.querySelector('#desktop-spray');
+const sprayRange = document.querySelector('#spray-range');
 const controlsDialog = document.querySelector('#controls-dialog');
 const settingsButton = document.querySelector('#open-settings');
 const settingsDone = document.querySelector('#settings-done');
@@ -227,6 +229,7 @@ function finishMapTransition() {
 
 function syncLevelUI() {
   const runner = isRunner();
+  desktopSpray.hidden = !playing;
   document.querySelector('.game-shell').classList.toggle('runner-mode', runner);
   waveStatLabel.parentElement.hidden = runner;
   touchControls.setHorizontalOnly(runner);
@@ -641,9 +644,17 @@ function updateRunner(dt) {
 }
 
 function updateSprayGauge(spray) {
-  sprayGauge.style.strokeDashoffset = String(100 * (1 - spray.charge));
+  const offset = String(100 * (1 - spray.charge));
+  for (const gauge of sprayGauges) gauge.style.strokeDashoffset = offset;
+  const range = spray.range.toFixed(1);
+  if (sprayRange.textContent !== range) sprayRange.textContent = range;
+  const pressure = String(Math.round(spray.charge * 100));
+  if (desktopSpray.getAttribute('aria-valuenow') !== pressure) desktopSpray.setAttribute('aria-valuenow', pressure);
+  const description = `Range ${range} metres${spray.blocked ? ', blocked' : ''}`;
+  if (desktopSpray.getAttribute('aria-valuetext') !== description) desktopSpray.setAttribute('aria-valuetext', description);
+  desktopSpray.dataset.blocked = String(spray.blocked);
   sprayButton.dataset.blocked = String(spray.blocked);
-  sprayButton.setAttribute('aria-label', spray.blocked ? 'Fire spray, blocked' : `Fire spray, range ${spray.range.toFixed(1)} metres`);
+  sprayButton.setAttribute('aria-label', spray.blocked ? 'Fire spray, blocked' : `Fire spray, range ${range} metres`);
 }
 
 function updateHealth() {
@@ -745,6 +756,7 @@ function clearArena() {
 
 function endGame() {
   playing = false;
+  desktopSpray.hidden = true;
   syncMouseAim();
   resetAimAssist();
   runnerProgress.hidden = true;

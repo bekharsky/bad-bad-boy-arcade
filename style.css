@@ -58,6 +58,15 @@ button { font: inherit; }
 .stat { display: grid; gap: 3px; text-align: center; min-width: 50px; }
 .stat-label { color: #aaa7b3; font: 700 10px/1 "Barlow Condensed", sans-serif; letter-spacing: .16em; }
 .stat strong { color: var(--ink); font: 800 21px/1 "Barlow Condensed", sans-serif; }
+.desktop-spray { position: relative; display: grid; place-items: center; flex: 0 0 52px; width: 52px; height: 52px; color: var(--ink); }
+.desktop-spray .spray-gauge { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.desktop-spray .spray-gauge-track { stroke: #f5f3ed40; }
+.spray-range { display: grid; justify-items: center; gap: 1px; font-variant-numeric: tabular-nums; }
+.spray-range strong { font: 800 20px/1 "Barlow Condensed", sans-serif; }
+.spray-range > span { color: #f5f3edaa; font: 700 9px/1 "Barlow Condensed", sans-serif; }
+.desktop-spray[data-blocked="true"] { color: #ff7952; }
+.desktop-spray[data-blocked="true"] .spray-gauge-track { stroke: #ff795250; }
+.desktop-spray[data-blocked="true"] .spray-gauge-fill { stroke: #ff7952; }
 
 /* One primary action; preferences stay behind a secondary, labelled gear. */
 .settings-button { position: absolute; top: 16px; right: 16px; display: grid; place-items: center; width: 44px; height: 44px; padding: 10px; border: 1px solid #ffffff25; border-radius: 50%; color: #b9b6c1; background: #ffffff06; cursor: pointer; }
@@ -155,7 +164,7 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 900 clamp(52px, 8vw, 78px
 }
 
 .mobile-controls { --stick-size: clamp(104px, 28vw, 112px); --fire-size: clamp(88px, 24vw, 96px); --control-side: clamp(16px, 5vw, 24px); }
-.mobile-controls.enabled { position: absolute; z-index: 3; inset: 0; display: block; pointer-events: none; }
+.mobile-controls.enabled { position: absolute; z-index: 3; inset: 0; pointer-events: none; }
 .joystick-zone { display: none; position: absolute; top: max(120px, env(safe-area-inset-top)); bottom: 0; left: 0; width: 55%; pointer-events: auto; touch-action: none; }
 .joystick-hint, .joystick { position: absolute; width: var(--stick-size); height: var(--stick-size); border: 1px solid #f3e8bc55; border-radius: 50%; background: radial-gradient(circle, #1b2028aa 40%, #141821cf); box-shadow: inset 0 0 0 6px #ffffff05, 0 6px 22px #0004; pointer-events: none; }
 .joystick-hint::before, .joystick::before { content: ''; position: absolute; inset: 14px; border: 1px dashed #ffffff24; border-radius: 50%; }
@@ -168,7 +177,6 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 900 clamp(52px, 8vw, 78px
 .fire-button .spray-icon { width: 46px; height: 46px; pointer-events: none; }
 .fire-button.pressed { background: #fff0ab; box-shadow: 0 0 28px #ffd34e66, inset 0 2px 8px #a5762455; transform: scale(.94); }
 
-.runner-mode .joystick-zone { display: block; }
 .fire-button .spray-gauge { position: absolute; inset: -11px; width: calc(100% + 22px); height: calc(100% + 22px); overflow: visible; transform: rotate(-90deg); pointer-events: none; }
 .spray-gauge circle { fill: none; stroke-width: 5; }
 .spray-gauge-track { stroke: #15202a99; }
@@ -178,6 +186,11 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 900 clamp(52px, 8vw, 78px
 
 @media (any-pointer: coarse), (max-width: 680px) {
   .joystick-zone { display: block; }
+}
+
+@media (any-pointer: coarse) {
+  .mobile-controls.enabled { display: block; }
+  .desktop-spray { display: none; }
 }
 
 @media (pointer: coarse) {
