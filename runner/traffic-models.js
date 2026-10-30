@@ -6,6 +6,37 @@ export const TRAFFIC_PALETTE = { green: '#64c94c', blue: '#51bde0', red: '#e45c5
 export function createTrafficModel(kind, color) {
   const model = createSceneryModel(`${color} ${kind}`), { box } = model;
   const paint = TRAFFIC_PALETTE[color];
+  if (kind === 'tram') {
+    const green = '#347758', cream = '#e2d09a', glass = '#294a52';
+    for (const z of [-3.85, 3.85]) {
+      box(green, 0, 1.05, z, 2.45, 1.45, 7.2);
+      box(cream, 0, 2.35, z, 2.48, 1.15, 7.2);
+      box('#d2d6bd', 0, 3.04, z, 2.5, .22, 7.25);
+      box('#e4b94e', 0, 1.73, z, 2.49, .17, 7.22);
+      for (const side of [-1, 1]) {
+        for (let n = -2; n <= 2; n++) box(glass, side * 1.252, 2.38, z + n * 1.28, .03, .85, 1.06);
+        for (const offset of [-2.6, 2.6]) {
+          box('#3e4e43', side * 1.26, 1.3, z + offset, .035, 2.15, .065);
+          box('#c5c9ad', side * 1.28, .42, z + offset, .12, .14, 1.05);
+        }
+        for (const offset of [-1.9, 1.9]) box('#253338', side * .96, .38, z + offset, .3, .65, .8);
+      }
+    }
+    box('#515d53', 0, 1.72, 0, 2.2, 2.25, .6);
+    for (const z of [-.22, 0, .22]) box('#293a35', 0, 1.72, z, 2.29, 2.28, .055);
+    for (const end of [-1, 1]) {
+      box(glass, 0, 2.36, end * 7.48, 2.03, .9, .04);
+      box('#223e35', 0, 3, end * 7.51, 1.65, .3, .04);
+      for (const x of [-.75, .75]) box('#f4e6a9', x, 1, end * 7.52, .27, .22, .04);
+      box('#d7b65f', 0, .66, end * 7.5, 2.4, .15, .07);
+    }
+    for (const side of [-1, 1]) {
+      box('#344e46', side * .38, 3.63, -2, .07, 1.2, .08, side * -.7);
+      box('#344e46', side * .38, 4.47, -2, .07, 1.2, .08, side * .7);
+    }
+    box('#344e46', 0, 4.96, -2, 1.65, .08, .12);
+    return model.finish({ vertexColors: true });
+  }
   function rod(shade, a, b, radius = .055) {
     const start = new THREE.Vector3(...a), end = new THREE.Vector3(...b), delta = end.sub(start);
     const geometry = new THREE.CylinderGeometry(radius, radius, delta.length(), 7);

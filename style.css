@@ -131,6 +131,7 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 900 clamp(52px, 8vw, 78px
 .controls-card::backdrop { background: #11131bd9; }
 .end-card { margin-right: 0; margin-left: 0; text-align: center; }
 .end-card h2 { margin: 0 0 28px; font-size: 58px; }
+.runner-mode .end-card h2 { font-size: clamp(28px, 4.5vw, 48px); line-height: 1; }
 .toast { position: absolute; z-index: 3; top: 82px; left: 50%; transform: translate(-50%, -10px); padding: 9px 15px; border: 1px solid #ffffff20; border-radius: 999px; color: var(--gold); background: #181925df; font: 700 12px/1 "Barlow Condensed", sans-serif; letter-spacing: .12em; opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; }
 .toast.visible { transform: translate(-50%, 0); opacity: 1; }
 .mobile-controls { display: none; }

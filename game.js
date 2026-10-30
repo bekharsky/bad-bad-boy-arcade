@@ -19,7 +19,7 @@ import { createAimAssist } from './aim-assist.js';
 import { createMouseAim } from './mouse-aim.js';
 import { bindGameInput } from './game-input.js';
 import { preventGameZoom } from './gesture-guard.js';
-import { createRunnerRun, RUN_LANES, RIDER_BONUS } from './runner/course.js';
+import { createRunnerRun, RIDER_BONUS } from './runner/course.js';
 import { bindRunnerInput, createLaneSteering } from './runner/runner-input.js';
 
 const MODEL_URL = './assets/bad-bad-boy.glb?v=20261025-opt1';
@@ -617,9 +617,10 @@ function updateRunner(dt) {
   player.runBlend = 1; player.moveSpeed = state.speed;
   player.body.position.y = Math.abs(Math.sin(player.runTime)) * .035 * HERO_SCALE;
   player.body.rotation.x = -.05;
-  player.body.rotation.z = THREE.MathUtils.damp(player.body.rotation.z, (RUN_LANES[state.lane] - state.x) * -.055, 12, dt);
+  player.body.rotation.z = THREE.MathUtils.damp(player.body.rotation.z, (runnerRun.lanes[state.lane] - state.x) * -.055, 12, dt);
   animateHero(player.rig, player.runTime, 1);
   player.root.updateMatrixWorld(true);
+  if (result.warning) showToast(result.warning);
   const firing = keys.has('Space') || keys.has('Fire') || touchControls.input.firing || player.tapTimer > 0;
   player.tapTimer = Math.max(0, player.tapTimer - dt);
   const spray = stream.update(dt, firing, player.rig.emitter, player, state.traffic);
@@ -713,7 +714,7 @@ function placePlayerAtSpawn() {
   player.root.position.set(player.x, 0, player.z);
   player.body.position.set(0, 0, 0);
   player.body.rotation.set(0, 0, 0);
-  cameraRig.frame(player.x, player.z, 0, true);
+  cameraRig.frame(isRunner() ? 0 : player.x, player.z, 0, true);
   animateHero(player.rig, 0, 0);
 }
 
