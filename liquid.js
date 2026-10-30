@@ -291,6 +291,12 @@ export function createLiquidStream(scene, city, onHit, { scale = 1, refraction =
     for (const drop of splashes) drawDrop(drop.position, drop.velocity, drop.radius * (1 - drop.age / drop.life * 0.5), dropCount++);
     geometry.setDrawRange(0, indexCount);
     if (indexCount > 0) {
+      geometry.attributes.position.clearUpdateRanges();
+      geometry.attributes.position.addUpdateRange(0, ring * SIDES * 3);
+      geometry.attributes.normal.clearUpdateRanges();
+      geometry.attributes.normal.addUpdateRange(0, ring * SIDES * 3);
+      geometry.index.clearUpdateRanges();
+      geometry.index.addUpdateRange(0, indexCount);
       geometry.attributes.position.needsUpdate = true;
       geometry.attributes.normal.needsUpdate = true;
       geometry.index.needsUpdate = true;
@@ -298,7 +304,11 @@ export function createLiquidStream(scene, city, onHit, { scale = 1, refraction =
     surface.visible = indexCount > 0;
     droplets.count = dropCount;
     droplets.visible = dropCount > 0;
-    if (dropCount > 0) droplets.instanceMatrix.needsUpdate = true;
+    if (dropCount > 0) {
+      droplets.instanceMatrix.clearUpdateRanges();
+      droplets.instanceMatrix.addUpdateRange(0, dropCount * 16);
+      droplets.instanceMatrix.needsUpdate = true;
+    }
     for (const ripple of ripples) {
       const progress = ripple.age / 0.55;
       ripple.mesh.visible = progress < 1;

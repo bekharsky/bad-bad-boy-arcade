@@ -2,29 +2,56 @@ const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
 export const overlaps = (c, x, z, r, y = null) => x + r > c.minX && x - r < c.maxX && z + r > c.minZ && z - r < c.maxZ && (y === null || (y + r > 0 && y - r < c.height));
 
+// Intersect the whole segment with the expanded collider, rather than sampling
+// points along it. Open slabs preserve overlaps(): touching a face is allowed.
+function crosses(c, x, y, z, tx, ty, tz, r) {
+  let enter = 0, leave = 1;
+  for (let axis = 0; axis < (y === null ? 2 : 3); axis++) {
+    const from = axis === 0 ? x : axis === 1 ? z : y;
+    const to = axis === 0 ? tx : axis === 1 ? tz : ty;
+    const min = (axis === 0 ? c.minX : axis === 1 ? c.minZ : 0) - r;
+    const max = (axis === 0 ? c.maxX : axis === 1 ? c.maxZ : c.height) + r;
+    const change = to - from;
+    if (change === 0) {
+      if (from <= min || from >= max) return false;
+    } else {
+      const a = (min - from) / change, b = (max - from) / change;
+      enter = Math.max(enter, Math.min(a, b));
+      leave = Math.min(leave, Math.max(a, b));
+      if (enter >= leave) return false;
+    }
+  }
+  return true;
+}
+
 // Gameplay queries use simple collision data, independently of rendered meshes.
 export function createNavigation({ bounds, colliders = [], dynamicColliders = () => [] }) {
+  function outside(x, z, r) {
+    return x - r < bounds.minX || x + r > bounds.maxX || z - r < bounds.minZ || z + r > bounds.maxZ;
+  }
   function blocked(x, z, r = .4, y = null) {
-    return x - r < bounds.minX || x + r > bounds.maxX || z - r < bounds.minZ || z + r > bounds.maxZ
+    return outside(x, z, r)
       || colliders.some(c => overlaps(c, x, z, r, y)) || dynamicColliders().some(c => overlaps(c, x, z, r, y));
   }
   function move(entity, dx, dz, r) {
     const x = clamp(entity.x + dx, bounds.minX + r, bounds.maxX - r);
-    if (!blocked(x, entity.z, r)) entity.x = x;
+    // Permit escape if moving scenery has already overlapped an actor.
+    const embedded = blocked(entity.x, entity.z, r);
+    if (dx && (embedded ? !blocked(x, entity.z, r) : lineClear(entity.x, entity.z, x, entity.z, r))) entity.x = x;
     const z = clamp(entity.z + dz, bounds.minZ + r, bounds.maxZ - r);
-    if (!blocked(entity.x, z, r)) entity.z = z;
+    if (dz && (embedded ? !blocked(entity.x, z, r) : lineClear(entity.x, entity.z, entity.x, z, r))) entity.z = z;
   }
   function lineClear(x, z, tx, tz, r = .5) {
-    const steps = Math.ceil(Math.hypot(tx - x, tz - z) / .25);
-    for (let i = 1; i <= steps; i++) if (blocked(x + (tx - x) * i / steps, z + (tz - z) * i / steps, r)) return false;
-    return true;
+    return segmentClear(x, null, z, tx, null, tz, r);
   }
   function lineClear3D(from, to, radius = 0) {
-    const steps = Math.max(1, Math.ceil(Math.hypot(to.x - from.x, to.y - from.y, to.z - from.z) / .1));
-    for (let i = 0; i <= steps; i++) {
-      const t = i / steps;
-      if (blocked(from.x + (to.x - from.x) * t, from.z + (to.z - from.z) * t, radius, from.y + (to.y - from.y) * t)) return false;
-    }
+    return segmentClear(from.x, from.y, from.z, to.x, to.y, to.z, radius);
+  }
+  function segmentClear(x, y, z, tx, ty, tz, r) {
+    // The bounds are convex, so checking both ends covers the whole segment.
+    if (outside(x, z, r) || outside(tx, tz, r)) return false;
+    for (const c of colliders) if (crosses(c, x, y, z, tx, ty, tz, r)) return false;
+    for (const c of dynamicColliders()) if (crosses(c, x, y, z, tx, ty, tz, r)) return false;
     return true;
   }
 
@@ -60,7 +87,14 @@ export function createNavigation({ bounds, colliders = [], dynamicColliders = ()
     queue[0] = target; distances[target] = 0;
     while (head < tail) {
       const i = queue[head++];
-      for (const n of neighbours(i)) if (open[n] && distances[n] < 0) { distances[n] = distances[i] + 1; queue[tail++] = n; }
+      // No temporary neighbour arrays per visited cell in the flood field.
+      for (let side = 0; side < 4; side++) {
+        const n = side === 0 ? (i % width > 0 ? i - 1 : -1)
+          : side === 1 ? (i % width < width - 1 ? i + 1 : -1)
+          : side === 2 ? (i >= width ? i - width : -1)
+          : (i < cells - width ? i + width : -1);
+        if (n >= 0 && open[n] && distances[n] < 0) { distances[n] = distances[i] + 1; queue[tail++] = n; }
+      }
     }
   }
   function chase(x, z, tx, tz) {

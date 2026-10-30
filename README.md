@@ -128,6 +128,9 @@ Four Battery energy drinks are hidden behind the outer houses instead of droppin
 - `batteries.js`: reusable Battery pickup rendering and collection.
 - `enemy-pressure.js`: kill-sensitive reinforcement timing and crowd limits.
 - `liquid.js`: ballistic liquid simulation, fluid surface, droplets, splashes, and hit detection.
+- `spray-system.js`: owns the centre and Battery side jets, shared power colour, pressure reset and round cleanup.
+- `burst-effects.js`: bounded, reusable instanced particles for enemy defeats.
+- `docs/project-review.md`: architecture review, verification and priorities for performance and gameplay pacing.
 - `enemies.js`: loading and animating the snail and slug models.
 - `hero.js`: character rig, animation, and stream emitter.
 - `bites.js`: red droplets marking damaging snail and slug bites.

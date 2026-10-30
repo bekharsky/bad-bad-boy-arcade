@@ -9,8 +9,9 @@ import { createTransitionRenderer } from './world/transition-renderer.js';
 import { createCampaign, createWaveDirector } from './waves.js';
 import { createBatteries } from './batteries.js';
 import { loadEnemyModels, createEnemy, animateEnemy, disposeEnemy } from './enemies.js';
-import { createLiquidStream } from './liquid.js';
+import { createSpraySystem } from './spray-system.js';
 import { createBiteEffects } from './bites.js';
+import { createBurstEffects } from './burst-effects.js';
 import { createMedkits } from './medkits.js';
 import { createTouchControls } from './touch-controls.js';
 import { movePlayer } from './movement.js';
@@ -172,9 +173,7 @@ function hitEnemy(enemy, direction, impact) {
   if (enemy.hp <= 0) removeEnemy(enemy, true);
 }
 const streamOptions = { scale: HERO_HEIGHT / 2.25, refraction: !window.matchMedia('(pointer: coarse)').matches, getHitTime: () => gameTime };
-const stream = createLiquidStream(scene, world, hitEnemy, streamOptions);
-// Battery power adds two side streams that fan out from the centre stream.
-const sideStreams = [createLiquidStream(scene, world, hitEnemy, streamOptions), createLiquidStream(scene, world, hitEnemy, streamOptions)];
+const stream = createSpraySystem(scene, world, hitEnemy, streamOptions);
 
 const enemies = [];
 const waves = createWaveDirector({
@@ -193,17 +192,12 @@ const assistMarker = new THREE.Mesh(
 assistMarker.rotation.x = -Math.PI / 2;
 assistMarker.visible = false;
 scene.add(assistMarker);
-const effects = [];
+const effects = createBurstEffects(scene);
 const biteEffects = createBiteEffects(scene);
 const medkits = createMedkits(scene, world);
 const batteries = createBatteries(scene, world);
 // Battery cans are hidden in back courtyards. Exploration powers up the spray.
 const POWER_TIME = 8;
-const SPREAD_ANGLE = 0.22;
-const STREAM_COLOR = '#ffd34c';
-const POWER_COLOR = '#39ff14';
-const spreadFacing = { dx: 0, dz: 0 };
-let spreadOn = false;
 let playing = false;
 let gameTime = 0;
 let score = 0;
@@ -413,17 +407,7 @@ function removeEnemy(enemy, pop = false) {
 }
 
 function burst(x, y, z, color, count = 8, forward = null, scale = 1) {
-  for (let i = 0; i < count; i++) {
-    const radius = (0.025 + Math.random() * 0.045) * scale;
-    const object = new THREE.Mesh(
-      new THREE.SphereGeometry(radius, 7, 6),
-      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95 })
-    );
-    object.position.set(x, y, z);
-    scene.add(object);
-    const spread = forward ? new THREE.Vector3(forward.x * (1.8 + Math.random() * 2) + (Math.random() - 0.5) * 1.5, Math.random() * 1.2, forward.z * (1.8 + Math.random() * 2) + (Math.random() - 0.5) * 1.5) : new THREE.Vector3((Math.random() - 0.5) * 2, Math.random() * 1.8, (Math.random() - 0.5) * 2);
-    effects.push({ object, velocity: spread.multiplyScalar(scale), life: 0.32 + Math.random() * 0.28, maxLife: 0.6, gravity: 2.5 });
-  }
+  effects.burst(x, y, z, color, count, forward, scale);
 }
 
 function showBite(enemy) {
@@ -526,7 +510,7 @@ function update(dt) {
   gameTime += dt;
   // Finish the final bite's splash even after the round ends.
   biteEffects.update(dt);
-  updateEffects(dt, playing && isRunner() ? baanaRun.state.speed : 0);
+  effects.update(dt, playing && isRunner() ? baanaRun.state.speed : 0);
   if (!playing) return;
   if (isRunner()) { updateRunner(dt); return; }
   const announcement = world.update(dt, [player, ...enemies]);
@@ -550,9 +534,8 @@ function update(dt) {
 
   player.tapTimer = Math.max(0, player.tapTimer - dt);
   // Each parcel starts at the hands, then follows its own ballistic trajectory.
-  const spray = stream.update(dt, firing, player.rig.emitter, player, enemies);
+  const spray = stream.update(dt, firing, player.rig.emitter, player, enemies, player.powerTimer > 0);
   player.powerTimer = Math.max(0, player.powerTimer - dt);
-  updateSpread(dt, firing);
   updateSprayGauge(spray);
   player.fireTimer -= dt;
   if (firing && player.fireTimer <= 0) {
@@ -596,7 +579,7 @@ function update(dt) {
       updateHealth();
       showBite(enemy);
       blip(115, 0.12);
-      if (player.hp <= 0) endGame();
+      if (player.hp <= 0) { endGame(); return; }
     }
     animateEnemy(enemy, dt, gameTime, attacking);
   }
@@ -618,24 +601,6 @@ function update(dt) {
   }
   // Pan with a fixed viewing angle so movement does not swing the aiming view.
   cameraRig.frame(player.x, player.z, dt);
-}
-
-function updateEffects(dt, scroll = 0) {
-  for (let i = effects.length - 1; i >= 0; i--) {
-    const effect = effects[i];
-    effect.life -= dt;
-    effect.object.position.z += scroll * dt;
-    effect.object.position.addScaledVector(effect.velocity, dt);
-    effect.velocity.y -= (effect.gravity || 0) * dt;
-    effect.object.material.opacity = Math.max(0, effect.life / effect.maxLife);
-    effect.object.scale.setScalar(Math.max(0.01, effect.life / effect.maxLife));
-    if (effect.life <= 0) {
-      scene.remove(effect.object);
-      effect.object.geometry.dispose();
-      effect.object.material.dispose();
-      effects.splice(i, 1);
-    }
-  }
 }
 
 function updateRunner(dt) {
@@ -711,23 +676,6 @@ function collectBattery() {
   blip(880, .15);
 }
 
-function updateSpread(dt, firing) {
-  const powered = player.powerTimer > 0;
-  if (powered !== spreadOn) {
-    spreadOn = powered;
-    for (const s of [stream, ...sideStreams]) s.setTint(powered ? POWER_COLOR : STREAM_COLOR, powered ? POWER_COLOR : undefined);
-    if (!powered) for (const side of sideStreams) side.clear();
-  }
-  if (!powered) return;
-  sideStreams.forEach((side, i) => {
-    const angle = (i ? 1 : -1) * SPREAD_ANGLE;
-    const c = Math.cos(angle), s = Math.sin(angle);
-    spreadFacing.dx = player.dx * c - player.dz * s;
-    spreadFacing.dz = player.dx * s + player.dz * c;
-    side.update(dt, firing, player.rig.emitter, spreadFacing, enemies);
-  });
-}
-
 function collectMedkit(amount) {
   player.hp = Math.min(player.maxHp, player.hp + amount);
   updateHealth();
@@ -759,6 +707,7 @@ function placePlayerAtSpawn() {
 
 function startGame() {
   if (!player.model) return;
+  playing = false;
   mapTransition.cancel(); finishMapTransition();
   mouseCaptureFailed = false;
   score = 0;
@@ -781,21 +730,17 @@ function startGame() {
 
 function clearArena() {
   resetInput();
+  clearTimeout(showToast.timer);
+  toast.classList.remove('visible');
   stream.clear();
   biteEffects.clear();
   medkits.clear();
   player.tapTimer = 0;
   player.powerTimer = 0;
-  for (const side of sideStreams) side.clear();
   batteries.clear();
   for (const enemy of enemies) disposeEnemy(enemy);
-  for (const effect of effects) {
-    scene.remove(effect.object);
-    effect.object.geometry.dispose();
-    effect.object.material.dispose();
-  }
+  effects.clear();
   enemies.length = 0;
-  effects.length = 0;
 }
 
 function endGame() {
@@ -826,6 +771,7 @@ function resize() {
 
 function animate(now) {
   requestAnimationFrame(animate);
+  if (document.hidden) { frameTime = 0; return; }
   const dt = Math.min(0.05, frameTime ? (now - frameTime) / 1000 : 0);
   frameTime = now;
   update(dt);
@@ -909,6 +855,7 @@ function openSettings() {
 }
 settingsButton.addEventListener('click', openSettings);
 controlsDialog.addEventListener('close', () => {
+  frameTime = 0;
   resetInput();
   (playing ? canvas : settingsButton).focus({ preventScroll: true });
   syncMouseAim();
@@ -955,9 +902,9 @@ window.addEventListener('keydown', (event) => {
   if (event.code === 'Enter' && !playing && !startScreen.classList.contains('hidden') && player.model) { startGame(); requestMouseAim(); }
 });
 window.addEventListener('keyup', (event) => keys.delete(event.code));
-window.addEventListener('blur', () => { resetInput(); if (playing && (mouseAim.locked || isRunner() || mapTransition.active)) openSettings(); });
+window.addEventListener('blur', () => { resetInput(); if (playing) openSettings(); });
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) { resetInput(); if (playing && (mouseAim.locked || isRunner() || mapTransition.active)) openSettings(); }
+  if (document.hidden) { resetInput(); if (playing) openSettings(); }
 });
 window.addEventListener('resize', resize);
 bindGameInput({
@@ -973,7 +920,7 @@ startButton.addEventListener('click', () => { startGame(); requestMouseAim(); })
 restartButton.addEventListener('click', () => {
   if (runnerComplete) {
     playing = true; waves.completeMap(); endScreen.classList.add('hidden');
-    touchControls.setEnabled(true); syncLevelUI(); canvas.focus({ preventScroll: true }); requestMouseAim();
+    touchControls.setEnabled(!mapTransition.active); syncLevelUI(); canvas.focus({ preventScroll: true }); requestMouseAim();
   } else { startGame(); requestMouseAim(); }
 });
 soundSetting.checked = soundEnabled;
