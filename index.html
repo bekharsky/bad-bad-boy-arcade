@@ -11,15 +11,20 @@
         "imports": {
           "three": "./vendor/three-0.180.0/build/three.module.min.js",
           "three/addons/": "./vendor/three-0.180.0/examples/jsm/",
-          "game": "./game.js?v=20261030-spray-hud1",
+          "game": "./game.js?v=20261030-esplanadi1",
           "./spray-system.js": "./spray-system.js?v=20261029-cleanup1",
           "./burst-effects.js": "./burst-effects.js?v=20261029-cleanup1",
           "./gesture-guard.js": "./gesture-guard.js?v=20261027-mobile1",
           "./waves.js": "./waves.js?v=20261028-three-waves1",
           "./batteries.js": "./batteries.js?v=20261028-transitions1",
-          "./maps/index.js": "./maps/index.js?v=20261028-campaign-order1",
-          "./maps/baana.js": "./maps/baana.js?v=20261028-transitions1",
-          "./runner/baana-run.js": "./runner/baana-run.js?v=20261028-transitions1",
+          "./maps/index.js": "./maps/index.js?v=20261030-esplanadi1",
+          "./maps/esplanadi.js": "./maps/esplanadi.js?v=20261030-esplanadi1",
+          "./maps/esplanadi-landmarks.js": "./maps/esplanadi-landmarks.js?v=20261030-esplanadi1",
+          "./maps/ferry.js": "./maps/ferry.js?v=20261030-esplanadi1",
+          "./runner/course.js": "./runner/course.js?v=20261030-esplanadi1",
+          "./runner/track-renderer.js": "./runner/track-renderer.js?v=20261030-esplanadi1",
+          "./maps/baana.js": "./maps/baana.js?v=20261030-esplanadi1",
+          "./runner/baana-run.js": "./runner/baana-run.js?v=20261030-esplanadi1",
           "./runner/traffic-models.js": "./runner/traffic-models.js?v=20261028-transitions1",
           "./touch-controls.js": "./touch-controls.js?v=20261028-transitions1",
           "./runner/runner-input.js": "./runner/runner-input.js?v=20261028-transitions1",
@@ -30,13 +35,13 @@
           "./maps/scenery-model.js": "./maps/scenery-model.js?v=20261027-cathedral2",
           "./maps/tram.js": "./maps/tram.js?v=20261027-senate1",
           "./maps/harbor.js": "./maps/harbor.js?v=20261028-transitions1",
-          "./maps/harbor-scenery.js": "./maps/harbor-scenery.js?v=20261028-transitions1",
+          "./maps/harbor-scenery.js": "./maps/harbor-scenery.js?v=20261030-esplanadi1",
           "./world/navigation.js": "./world/navigation.js?v=20261029-cleanup1",
-          "./world/map.js": "./world/map.js?v=20261028-transitions1",
+          "./world/map.js": "./world/map.js?v=20261030-esplanadi1",
           "./world/map-transition.js": "./world/map-transition.js?v=20261028-transitions1",
           "./world/transition-renderer.js": "./world/transition-renderer.js?v=20261028-transitions1",
           "./world/game-camera.js": "./world/game-camera.js?v=20261027-shared-camera1",
-          "./world/map-manager.js": "./world/map-manager.js?v=20261028-transitions1",
+          "./world/map-manager.js": "./world/map-manager.js?v=20261030-esplanadi1",
           "./world/dispose.js": "./world/dispose.js?v=20261028-transitions1",
           "./world/building-visibility.js": "./world/building-visibility.js?v=20261028-transitions1",
           "./game-input.js": "./game-input.js?v=20261027-input3",
@@ -139,7 +144,7 @@
       </div>
       <div id="map-transition" class="map-transition-label" role="status" aria-live="polite" hidden><strong></strong></div>
       <div id="toast" class="toast" aria-live="polite"></div>
-      <div id="runner-progress" class="runner-progress" role="progressbar" aria-label="Baana progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden><span></span></div>
+      <div id="runner-progress" class="runner-progress" role="progressbar" aria-label="Runner progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden><span></span></div>
     </main>
   </body>
 </html>

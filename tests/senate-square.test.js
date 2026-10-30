@@ -32,7 +32,7 @@ test('switching between actual districts preserves hero size, screen position an
     const scene = new THREE.Scene(), world = createMapManager(scene, maps, .736), rig = createGameCamera();
     rig.resize(width, height, touch);
     let previous;
-    for (const id of ['harbor', 'baana', 'kamppi', 'senate-square', 'harbor']) {
+    for (const id of ['harbor', 'baana', 'kamppi', 'esplanadi', 'senate-square', 'harbor']) {
       world.activate(id);
       rig.frame(world.spawn.x, world.spawn.z, 0, true);
       const next = heroProjection(rig.camera, world.spawn);
@@ -63,14 +63,14 @@ test('the common scale falls between the previous close harbor and distant squar
   }
 });
 
-test('Senate Square is the fourth district and direct links preserve the new campaign order', () => {
+test('Senate Square is the fifth district and direct links preserve the new campaign order', () => {
   const campaign = createCampaign(maps.map(map => map.id));
   assert.equal(campaign.plan(1).mapId, 'harbor');
   assert.equal(campaign.plan(4).mapId, 'baana');
   assert.equal(campaign.plan(7).mapId, 'kamppi');
-  assert.equal(campaign.plan(10).mapId, 'senate-square');
-  assert.equal(campaign.plan(13).mapId, 'harbor');
-  assert.deepEqual(mapOrder('senate-square').map(map => map.id), ['senate-square', 'harbor', 'baana', 'kamppi']);
+  assert.equal(campaign.plan(10).mapId, 'esplanadi');
+  assert.equal(campaign.plan(13).mapId, 'senate-square');
+  assert.deepEqual(mapOrder('senate-square').map(map => map.id), ['senate-square', 'harbor', 'baana', 'kamppi', 'esplanadi']);
   assert.deepEqual(mapOrder('unknown'), maps);
   assert.equal(maps[0].id, 'harbor', 'Previewing never mutates the campaign registry');
 });
@@ -165,7 +165,7 @@ test('the cathedral fits the shared camera and real map switches dispose their o
 });
 
 
-test('only harbor replaces the fog with open water, and all other districts restore the original environment', () => {
+test('harbor and Esplanadi use their own environments and other districts restore the original', () => {
   const scene = new THREE.Scene();
   const background = scene.background = new THREE.Color('#7c929f');
   const fog = scene.fog = new THREE.Fog('#7c929f', 40, 100);
@@ -175,6 +175,11 @@ test('only harbor replaces the fog with open water, and all other districts rest
     world.activate(id); assert.equal(scene.fog, fog); assert.equal(scene.background, background);
     assert.equal(scene.fog.near, 40); assert.equal(scene.fog.far, 100);
   }
+  world.activate('esplanadi');
+  assert.equal(scene.background.getHexString(), '9bbbc6');
+  assert.equal(scene.fog.near, 60); assert.equal(scene.fog.far, 160);
+  world.activate('senate-square');
+  assert.equal(scene.fog, fog); assert.equal(scene.background, background);
   world.activate('harbor'); world.dispose();
   assert.equal(scene.fog, fog); assert.equal(scene.background, background);
 });

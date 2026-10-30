@@ -1,18 +1,19 @@
 import * as THREE from 'three';
 import { createMap } from '../world/map.js';
 import { createSceneryModel } from './scenery-model.js';
-import { createTrafficModel, animateTraffic } from '../runner/traffic-models.js';
-import { RUN_LANES, TRAFFIC_COLORS, TRAFFIC_CAPACITY, BAANA_LENGTH, ROADWORK_TYPES } from '../runner/baana-run.js';
+import { createRunnerTraffic, createRunnerFinish } from '../runner/track-renderer.js';
+import { BAANA_LENGTH } from '../runner/course.js';
 
 export const baanaMap = {
   id: 'baana', name: 'Baana Run', mode: 'runner',
+  runner: { length: BAANA_LENGTH },
   spawn: { x: 0, z: 0, heading: Math.PI },
   bounds: { minX: -5.5, maxX: 5.5, minZ: -130, maxZ: 30 },
   create() { return createMap(baanaMap, buildBaana); },
 };
 
 function buildBaana(root) {
-  const sections = [], buildings = [], trafficPool = [], trafficMaterials = [];
+  const sections = [], buildings = [];
   let seed = 326;
   const random = () => ((seed = seed * 16807 % 2147483647) - 1) / 2147483646;
   for (let section = 0; section < 5; section++) {
@@ -68,47 +69,14 @@ function buildBaana(root) {
       buildings.push({ group: object, meshes: [...object.children], materials: object.children.map(mesh => mesh.material), bounds: new THREE.Box3(), opacity: 1, hiddenUntil: 0 });
     }
   }
-  const templates = [];
-  for (const kind of ['bike', 'scooter']) for (const color of TRAFFIC_COLORS) templates.push(createTrafficModel(kind, color));
-  for (const kind of ROADWORK_TYPES) templates.push(createTrafficModel(kind, 'roadwork'));
-  for (let i = 0; i < TRAFFIC_CAPACITY; i++) {
-    const object = new THREE.Group(); object.name = 'Baana traffic'; object.visible = false;
-    // One material per traffic slot keeps hit flashes local, while all colour
-    // variants and wheels within that slot share the vertex-coloured material.
-    const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .65 });
-    trafficMaterials.push(material);
-    for (const template of templates) {
-      const variant = template.clone(true); variant.visible = false;
-      variant.traverse(node => { if (node.isMesh) node.material = material; });
-      object.add(variant);
-    }
-    root.add(object); trafficPool.push(object);
-  }
-  const templateMaterials = new Set();
-  for (const template of templates) template.traverse(node => { if (node.material) templateMaterials.add(node.material); });
-  for (const material of templateMaterials) material.dispose();
-  // Shared geometries and per-slot materials are now owned by this map's subtree.
-  const finish = createSceneryModel('Baana finish');
-  for (let row = 0; row < 2; row++) for (let col = 0; col < 12; col++) finish.box((row + col) % 2 ? '#e1ddc2' : '#354d50', (col - 5.5) * .8, .055, row * .8, .8, .02, .8);
-  const finishLine = finish.finish({ vertexColors: true }); finishLine.visible = false; root.add(finishLine);
+  const traffic = createRunnerTraffic(root, 'Baana');
+  const finish = createRunnerFinish(root, 'Baana', BAANA_LENGTH);
   function updateRunner(state) {
     for (let i = 0; i < sections.length; i++) sections[i].position.z = ((i * 32 + state.distance + 128) % 160) - 128;
     for (const section of sections) section.updateMatrixWorld(true);
     for (const bridge of buildings) bridge.bounds.setFromObject(bridge.group);
-    for (let i = 0; i < trafficPool.length; i++) {
-      const object = trafficPool[i], agent = state.traffic[i], material = trafficMaterials[i];
-      object.visible = !!agent && !agent.cleared;
-      material.emissive.set(agent?.hitUntil > state.elapsed ? '#ffe58c' : '#000000');
-      material.emissiveIntensity = agent?.hitUntil > state.elapsed ? .7 : 0;
-      if (!agent) continue;
-      object.position.set(RUN_LANES[agent.lane], 0, state.distance - agent.progress);
-      for (const variant of object.children) {
-        variant.visible = variant.name === `${ROADWORK_TYPES.includes(agent.kind) ? 'roadwork' : agent.color} ${agent.kind}`;
-        if (variant.visible) animateTraffic(variant, state.elapsed + agent.id, agent.speed + state.speed);
-      }
-    }
-    finishLine.visible = BAANA_LENGTH - state.distance < 80;
-    finishLine.position.z = state.distance - BAANA_LENGTH;
+    traffic.update(state);
+    finish.update(state);
   }
   return { colliders: [], buildings, updateRunner, reset() { updateRunner({ distance: 0, elapsed: 0, traffic: [] }); } };
 }

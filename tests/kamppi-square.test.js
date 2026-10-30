@@ -19,9 +19,9 @@ const { createMapManager } = await import('../world/map-manager.js');
 test('Kamppi follows Baana, supports direct/debug starts and retains normal difficulty', () => {
   const campaign = createCampaign(maps.map(map => map.id));
   assert.equal(campaign.plan(7).mapId, 'kamppi');
-  assert.equal(campaign.plan(10).mapId, 'senate-square');
-  assert.equal(campaign.plan(13).mapId, 'harbor');
-  assert.deepEqual(mapOrder('kamppi').map(map => map.id), ['kamppi', 'senate-square', 'harbor', 'baana']);
+  assert.equal(campaign.plan(10).mapId, 'esplanadi');
+  assert.equal(campaign.plan(13).mapId, 'senate-square');
+  assert.deepEqual(mapOrder('kamppi').map(map => map.id), ['kamppi', 'esplanadi', 'senate-square', 'harbor', 'baana']);
   campaign.setStartingMap('kamppi');
   assert.deepEqual(campaign.plan(1), { number: 1, enemyCount: 8, healthBonus: 0, mapId: 'kamppi' });
 });
@@ -168,7 +168,7 @@ test('switching away from Kamppi releases landmark geometry and paving textures 
 });
 
 
-test('the real campaign goes harbor → Baana → Kamppi → Senate Square and loops after runner completion', () => {
+test('the real campaign goes harbor → Baana → Kamppi → Esplanadi → Senate Square and loops after runner completion', () => {
   const campaign = createCampaign(maps.map(map => map.id)), entered = [];
   const director = createWaveDirector({ campaign, onWave: plan => entered.push([plan.number, plan.mapId]), onReinforcements() {} });
   director.start();
@@ -176,7 +176,10 @@ test('the real campaign goes harbor → Baana → Kamppi → Senate Square and l
   assert.deepEqual(entered.at(-1), [4, 'baana']);
   director.completeMap();
   assert.deepEqual(entered.at(-1), [7, 'kamppi']);
-  for (let wave = 8; wave <= 13; wave++) director.update(1.4, 0);
-  assert.deepEqual(entered.filter(([wave]) => [1, 4, 7, 10, 13].includes(wave)), [[1, 'harbor'], [4, 'baana'], [7, 'kamppi'], [10, 'senate-square'], [13, 'harbor']]);
-  assert.deepEqual(mapOrder('baana').map(map => map.id), ['baana', 'kamppi', 'senate-square', 'harbor']);
+  for (let wave = 8; wave <= 10; wave++) director.update(1.4, 0);
+  assert.deepEqual(entered.at(-1), [10, 'esplanadi']);
+  director.completeMap();
+  for (let wave = 14; wave <= 16; wave++) director.update(1.4, 0);
+  assert.deepEqual(entered.filter(([wave]) => [1, 4, 7, 10, 13, 16].includes(wave)), [[1, 'harbor'], [4, 'baana'], [7, 'kamppi'], [10, 'esplanadi'], [13, 'senate-square'], [16, 'harbor']]);
+  assert.deepEqual(mapOrder('baana').map(map => map.id), ['baana', 'kamppi', 'esplanadi', 'senate-square', 'harbor']);
 });

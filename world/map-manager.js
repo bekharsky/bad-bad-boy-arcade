@@ -9,6 +9,7 @@ export function createMapManager(scene, definitions, playerRadius = .4) {
     get id() { return active?.id; },
     get name() { return active?.name; },
     get mode() { return active?.mode ?? 'arena'; },
+    get runner() { return active?.runner; },
     get spawn() { return active.spawn; },
     pickupCapacity(kind) {
       return Math.max(0, ...definitions.map(definition => definition.pickups?.[kind]?.length ?? 0));

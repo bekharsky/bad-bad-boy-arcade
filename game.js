@@ -19,7 +19,7 @@ import { createAimAssist } from './aim-assist.js';
 import { createMouseAim } from './mouse-aim.js';
 import { bindGameInput } from './game-input.js';
 import { preventGameZoom } from './gesture-guard.js';
-import { createBaanaRun, RUN_LANES, RIDER_BONUS } from './runner/baana-run.js';
+import { createRunnerRun, RUN_LANES, RIDER_BONUS } from './runner/course.js';
 import { bindRunnerInput, createLaneSteering } from './runner/runner-input.js';
 
 const MODEL_URL = './assets/bad-bad-boy.glb?v=20261025-opt1';
@@ -161,7 +161,7 @@ scene.add(player.root);
 
 function hitEnemy(enemy, direction, impact) {
   if (isRunner()) {
-    if (baanaRun.sprayHit(enemy.id, impact)) {
+    if (runnerRun.sprayHit(enemy.id, impact)) {
       showToast(`+${RIDER_BONUS}`);
       burst(enemy.x, enemy.hitHeight, enemy.z, 0xffd34e, 20, null, 3);
       blip(440 + Math.random() * 280, .045);
@@ -205,17 +205,17 @@ let gameTime = 0;
 let score = 0;
 let audioContext = null;
 let frameTime = 0;
-const baanaRun = createBaanaRun();
+let runnerRun = createRunnerRun();
 let runnerComplete = false, runnerBaseScore = 0;
 const isRunner = () => world.mode === 'runner';
 const runnerInput = bindRunnerInput({
   canvas,
   canInteract: () => playing && isRunner() && !controlsDialog.open && !mapTransition.active,
-  dodge: direction => baanaRun.dodge(direction),
+  dodge: direction => runnerRun.dodge(direction),
   setFiring: firing => firing ? keys.add('Fire') : keys.delete('Fire'), beginSpray,
 });
 
-const laneSteering = createLaneSteering(direction => baanaRun.dodge(direction));
+const laneSteering = createLaneSteering(direction => runnerRun.dodge(direction));
 const transitionRenderer = createTransitionRenderer(renderer);
 const mapTransition = createMapTransition({ onSwap: applyWave, onFinish: finishMapTransition });
 
@@ -235,6 +235,7 @@ function syncLevelUI() {
   touchControls.setHorizontalOnly(runner);
   document.querySelector('#joystick-zone').setAttribute('aria-label', runner ? 'Drag left or right to dodge' : 'Drag to move and aim');
   runnerProgress.hidden = !runner || !playing;
+  runnerProgress.setAttribute('aria-label', `${world.name} progress`);
 }
 
 if (debugMaps) {
@@ -384,11 +385,11 @@ function applyWave(plan) {
   runnerComplete = false;
   syncLevelUI();
   if (isRunner()) {
-    baanaRun.reset(); runnerBaseScore = score; player.invulnerable = 0;
+    runnerRun = createRunnerRun(world.runner); runnerBaseScore = score; player.invulnerable = 0;
     runnerProgress.firstElementChild.style.transform = 'scaleX(0)';
     runnerProgress.setAttribute('aria-valuenow', '0');
-    world.updateRunner(baanaRun.state);
-    showToast('BAANA · ← →');
+    world.updateRunner(runnerRun.state);
+    showToast(`${world.name.toUpperCase()} · ← →`);
     return;
   }
   waveLabel.textContent = String(plan.number).padStart(2, '0');
@@ -513,7 +514,7 @@ function update(dt) {
   gameTime += dt;
   // Finish the final bite's splash even after the round ends.
   biteEffects.update(dt);
-  effects.update(dt, playing && isRunner() ? baanaRun.state.speed : 0);
+  effects.update(dt, playing && isRunner() ? runnerRun.state.speed : 0);
   if (!playing) return;
   if (isRunner()) { updateRunner(dt); return; }
   const announcement = world.update(dt, [player, ...enemies]);
@@ -608,7 +609,7 @@ function update(dt) {
 
 function updateRunner(dt) {
   laneSteering.update(touchControls.input.x, dt);
-  const result = baanaRun.update(dt), state = baanaRun.state;
+  const result = runnerRun.update(dt), state = runnerRun.state;
   player.x = state.x; player.z = 0;
   player.heading = Math.PI; player.dx = 0; player.dz = -1;
   player.root.position.set(player.x, 0, 0); player.root.rotation.y = Math.PI;
@@ -626,8 +627,8 @@ function updateRunner(dt) {
   world.updateRunner(state);
   score = runnerBaseScore + Math.floor(state.distance) * 2 + state.passed * 25 + state.bonus;
   scoreLabel.textContent = String(score).padStart(4, '0');
-  runnerProgress.firstElementChild.style.transform = `scaleX(${state.distance / baanaRun.length})`;
-  runnerProgress.setAttribute('aria-valuenow', String(Math.round(state.distance / baanaRun.length * 100)));
+  runnerProgress.firstElementChild.style.transform = `scaleX(${state.distance / runnerRun.length})`;
+  runnerProgress.setAttribute('aria-valuenow', String(Math.round(state.distance / runnerRun.length * 100)));
   if (result.hits) {
     player.hp = Math.max(0, player.hp - result.hits); updateHealth(); blip(110, .12);
     if (player.hp === 0) { endGame(); return; }
@@ -766,7 +767,7 @@ function endGame() {
   player.moveSpeed = 0;
   player.turnSpeed = 0;
   endScreen.classList.remove('hidden');
-  document.querySelector('#end-title').textContent = runnerComplete ? 'BAANA CLEAR' : 'WASTED';
+  document.querySelector('#end-title').textContent = runnerComplete ? `${world.name.replace(/ Run$/, '').toUpperCase()} CLEAR` : 'WASTED';
   restartButton.textContent = runnerComplete ? 'CONTINUE' : 'PLAY AGAIN';
   player.model.material.opacity = 1;
   player.model.material.transparent = false;
@@ -899,7 +900,7 @@ window.addEventListener('keydown', (event) => {
   }
   if (playing && isRunner() && ['ArrowLeft', 'ArrowRight', 'KeyA', 'KeyD'].includes(event.code)) {
     event.preventDefault();
-    if (!event.repeat) baanaRun.dodge(event.code === 'ArrowLeft' || event.code === 'KeyA' ? -1 : 1);
+    if (!event.repeat) runnerRun.dodge(event.code === 'ArrowLeft' || event.code === 'KeyA' ? -1 : 1);
     return;
   }
   if (!mouseAim.locked && event.target instanceof Element && event.target.closest('select, input')) return;
