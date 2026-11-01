@@ -9,8 +9,8 @@ registerHooks({ resolve(specifier, context, next) {
 } });
 globalThis.document = { createElement: () => ({ getContext: () => ({ fillRect() {}, fillText() {} }) }) };
 const THREE = await import('three');
-const { aleksanterinkatuMap, ALEKSI_LENGTH, ALEKSI_CROSSINGS } = await import('../maps/aleksanterinkatu.js');
-const { ALEKSI_LANDMARKS, SENATE_OPENING, remainingFacadeSpans } = await import('../maps/aleksi-landmarks.js');
+const { aleksanterinkatuMap, ALEKSI_LENGTH, ALEKSI_CROSSINGS, aleksiRoadSpans } = await import('../maps/aleksanterinkatu.js');
+const { ALEKSI_LANDMARKS, WATERFRONT_OPENING, QUAY_OPENING, remainingFacadeSpans } = await import('../maps/aleksi-landmarks.js');
 const { baanaMap } = await import('../maps/baana.js');
 const { senateSquareMap } = await import('../maps/senate-square.js');
 const { maps, mapOrder } = await import('../maps/index.js');
@@ -83,6 +83,19 @@ test('two-lane tram and cross-scooter traffic leaves a complete safe route acros
   }
 });
 
+test('both runners leave a safe path while braking, boosting and changing speed during approaches', () => {
+  for (const definition of [baanaMap, aleksanterinkatuMap]) for (const fps of [15, 60]) for (const seed of [1, 42, 17, 113]) for (const mode of [-1, 1, 'vary']) {
+    const run = createRunnerRun({ ...definition.runner, random: seeded(seed) });
+    let hits = 0;
+    while (!run.state.finished) {
+      run.setThrottle(mode === 'vary' ? Math.sin(run.state.elapsed * 1.7) : mode);
+      steer(run); hits += run.update(1 / fps).hits;
+    }
+    assert.equal(hits, 0, `${definition.id}, ${fps} FPS, seed ${seed}, throttle ${mode}`);
+    assert.equal(run.state.distance, definition.runner.length);
+  }
+});
+
 test('trams collide along their full length and cannot be destroyed by spray', () => {
   const run = createRunnerRun({ ...aleksanterinkatuMap.runner, tramChance: 1, crossingPoints: [], random: () => .2 });
   run.update(.01);
@@ -112,7 +125,7 @@ test('facades frame real cross-street openings; traffic geometry and material co
   const city = map.root.getObjectByName('Aleksanterinkatu street');
   const facades = city.children.filter(node => node.name === 'Aleksi ornate facade');
   assert.ok(facades.length > 20);
-  for (const facade of facades) for (const reserved of [...ALEKSI_LANDMARKS, SENATE_OPENING]) {
+  for (const facade of facades) for (const reserved of [...ALEKSI_LANDMARKS, WATERFRONT_OPENING, QUAY_OPENING]) {
     const { side, routeFrom, routeTo } = facade.userData;
     assert.ok(side !== reserved.side || routeTo <= reserved.from + 1e-8 || routeFrom >= reserved.to - 1e-8, 'Generic fronts never cover a landmark or the open square');
   }
@@ -175,9 +188,15 @@ test('real frontages keep their street sides, opposite neighbours and a lower Se
   assert.equal(pohjola.userData.side, 1); assert.equal(lundqvist.userData.side, -1);
   const height = node => new THREE.Box3().setFromObject(node).getSize(new THREE.Vector3()).y;
   assert.ok(height(sederholm) < height(stockmann) * .6);
-  assert.ok(map.root.getObjectByName('Helsinki Cathedral'));
-  const square = new THREE.Box3().setFromObject(map.root.getObjectByName('Senate Square opening'));
-  assert.ok(square.max.x < -5.3);
+  assert.equal(map.root.getObjectByName('Helsinki Cathedral'), undefined);
+  const ferry = map.root.getObjectByName('Aleksi finishing ferry');
+  assert.ok(ferry);
+  const ferryBounds = new THREE.Box3().setFromObject(ferry);
+  assert.ok(ferryBounds.max.z < -664, 'The ferry sits beyond the quay in the water');
+  const water = new THREE.Box3().setFromObject(map.root.getObjectByName('Aleksi Baltic water'));
+  assert.ok(Math.abs(water.max.z + 664) < .001);
+  map.updateRunner({ distance: ALEKSI_LENGTH, elapsed: 50, traffic: [], crossings: [] });
+  assert.ok(ferry.getWorldPosition(new THREE.Vector3()).z < -50, 'The finish still looks across a quay and sea');
   const geometries = new Set(); map.root.traverse(node => { if (node.geometry) geometries.add(node.geometry); });
   assert.ok([...geometries].reduce((sum, geometry) => sum + geometry.attributes.position.count, 0) <= 563701, 'Landmark detail stays within the previous street geometry budget');
   map.dispose();
@@ -186,10 +205,28 @@ test('real frontages keep their street sides, opposite neighbours and a lower Se
 test('facade reservations split blocks without closing cross streets or the Senate Square opening', () => {
   assert.deepEqual(remainingFacadeSpans(1, -40, 120), [[-40, -20]]);
   assert.deepEqual(remainingFacadeSpans(-1, 300, 400), [[352, 400]]);
-  assert.deepEqual(remainingFacadeSpans(1, 580, 680), [[580, 600], [640, 680]]);
+  assert.deepEqual(remainingFacadeSpans(1, 580, 680), [[580, 600]]);
   assert.deepEqual(remainingFacadeSpans(-1, 580, 680), []);
   for (const definition of ALEKSI_LANDMARKS) {
     // Only the reserved frontage may replace a facade; none spans a junction.
     assert.ok(ALEKSI_CROSSINGS.every(progress => definition.to <= progress - 20 || definition.from >= progress + 20));
   }
+});
+
+test('cross streets own one road surface and their warning arrows pulse without blinking out', () => {
+  const map = aleksanterinkatuMap.create(); map.root.updateMatrixWorld(true);
+  for (const progress of ALEKSI_CROSSINGS) {
+    const ray = new THREE.Raycaster(new THREE.Vector3(1.8, 1, -progress - .8), new THREE.Vector3(0, -1, 0));
+    const surfaces = ray.intersectObject(map.root, true).filter(hit => Math.abs(hit.point.y - .04) < .001);
+    assert.equal(surfaces.length, 1, 'There is no second coplanar road at the junction');
+    assert.ok(aleksiRoadSpans(-60, 642).every(([a, b]) => b <= progress - 6 || a >= progress + 6));
+  }
+  for (const elapsed of [0, .14, .28, .42, .56, .7]) {
+    map.updateRunner({ distance: 120, elapsed, traffic: [], crossings: [{ phase: 'warning', side: -1 }] });
+    const square = map.root.getObjectByName('Aleksi crossing square');
+    const arrows = square.children.filter(node => node.name === 'Side-street scooter warning');
+    assert.equal(arrows[0].visible, true); assert.equal(arrows[1].visible, false);
+    assert.ok(arrows[0].children[0].material.opacity >= .5);
+  }
+  map.dispose();
 });

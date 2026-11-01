@@ -135,8 +135,9 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 900 clamp(52px, 8vw, 78px
 .toast { position: absolute; z-index: 3; top: 82px; left: 50%; transform: translate(-50%, -10px); padding: 9px 15px; border: 1px solid #ffffff20; border-radius: 999px; color: var(--gold); background: #181925df; font: 700 12px/1 "Barlow Condensed", sans-serif; letter-spacing: .12em; opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; }
 .toast.visible { transform: translate(-50%, 0); opacity: 1; }
 .mobile-controls { display: none; }
-.runner-start-hint { display: none; }
-.runner-mode .runner-start-hint { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 20px; color: var(--muted); font-size: 12px; letter-spacing: .1em; }
+.runner-start-hint, .runner-score-hint { display: none; }
+.runner-mode .runner-start-hint { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; margin-top: 20px; color: var(--muted); font-size: 12px; letter-spacing: .1em; }
+.runner-mode .runner-score-hint { display: block; margin-top: 14px; color: var(--gold); text-align: center; font-size: 11px; letter-spacing: .1em; }
 .runner-start-hint kbd { padding: 4px 8px; border: 1px solid #ffffff40; border-radius: 5px; font: 700 20px/1 sans-serif; }
 .runner-mode .start-controls, .runner-mode .control-setting, .runner-mode .assist-setting:has([data-aim-assist]), .runner-mode .assist-setting:has([data-mouse-aim]) { display: none !important; }
 .runner-mode #start-screen.map-debug .runner-start-hint { display: none; }

@@ -3,10 +3,24 @@ import { createMap } from '../world/map.js';
 import { createSceneryModel as model } from './scenery-model.js';
 import { createRunnerTraffic, createRunnerFinish } from '../runner/track-renderer.js';
 import { TRAM_LANES, TRAFFIC_CAPACITY } from '../runner/course.js';
-import { createAleksiLandmarks, createSenateApproach, remainingFacadeSpans } from './aleksi-landmarks.js';
+import { createAleksiLandmarks, remainingFacadeSpans } from './aleksi-landmarks.js';
+import { createAleksiWaterfront, ALEKSI_SHORE } from './aleksi-waterfront.js';
 
 export const ALEKSI_LENGTH = 640;
 export const ALEKSI_CROSSINGS = Object.freeze([140, 280, 420, 560]);
+// The cross streets own the road surface within these spans. Splitting the
+// longitudinal road and pavements prevents coplanar surfaces from flickering.
+export function aleksiRoadSpans(from, to) {
+  let start = from; const spans = [];
+  for (const crossing of ALEKSI_CROSSINGS) {
+    const a = Math.max(from, crossing - 6), b = Math.min(to, crossing + 6);
+    if (a >= b) continue;
+    if (start < a) spans.push([start, a]);
+    start = b;
+  }
+  if (start < to) spans.push([start, to]);
+  return spans;
+}
 export const aleksanterinkatuMap = {
   id: 'aleksanterinkatu', name: 'Aleksanterinkatu', mode: 'runner',
   runner: { length: ALEKSI_LENGTH, lanes: TRAM_LANES, tramChance: .42, roadworkKinds: [], crossingPoints: ALEKSI_CROSSINGS, startSpeed: 10.5, speedLimit: 18, acceleration: .12 },
@@ -119,7 +133,9 @@ function junction(progress, index) {
       rod(arrow, '#ffd35e', [x + side * .35, .1, -.35], [x - side * .35, .1, 0], .065);
       rod(arrow, '#ffd35e', [x + side * .35, .1, .35], [x - side * .35, .1, 0], .065);
     }
-    const object = arrow.finish({ vertexColors: true }); root.add(object); object.visible = false; arrows.push(object);
+    const object = arrow.finish({ vertexColors: true });
+    object.children[0].material.transparent = true; object.children[0].material.depthWrite = false;
+    root.add(object); object.visible = false; arrows.push(object);
   }
   return { root, arrows };
 }
@@ -132,19 +148,26 @@ function buildAleksi(root) {
   lampModel.geometry('#e1d9af', new THREE.CylinderGeometry(.4, .4, .06, 12).translate(0, 6.43, 0));
   const lampTemplate = lampModel.finish({ vertexColors: true }).children[0];
   const ground = model('Aleksi cobbles rails and overhead wires');
-  ground.box('#b4aa94', 0, -.17, -310, 110, .2, 740);
-  ground.box('#948f7e', 0, -.025, -310, 12, .13, 740);
-  for (const x of [-7.2, 7.2]) ground.box('#c8bfa9', x, .02, -310, 2.4, .2, 740);
-  for (let z = 35; z > -670; z -= 2.1) {
+  ground.box('#b4aa94', 0, -.17, -(ALEKSI_SHORE - 60) / 2, 110, .2, ALEKSI_SHORE + 60);
+  for (const [from, to] of aleksiRoadSpans(-60, 642)) {
+    ground.box('#948f7e', 0, -.025, -(from + to) / 2, 12, .13, to - from);
+    for (const x of [-7.2, 7.2]) ground.box('#c8bfa9', x, .02, -(from + to) / 2, 2.4, .2, to - from);
+  }
+  for (let z = 35; z > -642; z -= 2.1) {
+    if (ALEKSI_CROSSINGS.some(crossing => Math.abs(-z - crossing) < 7)) continue;
     ground.box('#a49d8b', 0, .043, z, 12, .012, .04);
     for (const x of [-3.5, -.7, 2.1, 4.9]) ground.box('#a09a88', x, .044, z - .9, .035, .013, 1.7);
   }
   for (const lane of TRAM_LANES) for (const offset of [-.76, .76]) {
-    ground.box('#47524f', lane + offset, .055, -310, .18, .025, 740);
-    ground.box('#b0bab5', lane + offset, .073, -310, .065, .025, 740);
-    rod(ground, '#4c6159', [lane, 5.12, 40], [lane, 5.12, -670], .018);
+    ground.box('#47524f', lane + offset, .055, -307, .18, .025, 694);
+    ground.box('#b0bab5', lane + offset, .073, -307, .065, .025, 694);
+    rod(ground, '#4c6159', [lane, 5.12, 40], [lane, 5.12, -654], .018);
   }
-  for (let z = 12; z > -660; z -= 24) {
+  for (let z = 12; z > -642; z -= 24) {
+    // At the open waterfront, poles take over from the facade wire anchors.
+    if (z < -580) for (const x of [-9, 9]) {
+      rod(ground, '#596c62', [x, 0, z], [x, 10.6, z], .07);
+    }
     rod(ground, '#596c62', [-9, 10.5, z], [0, 7.7, z], .023);
     rod(ground, '#596c62', [9, 10.5, z], [0, 7.7, z], .023);
     rod(ground, '#596c62', [-9, 8.8, z - 4], [9, 8.8, z + 4], .017);
@@ -172,7 +195,8 @@ function buildAleksi(root) {
       }
     }
   }
-  city.add(...createAleksiLandmarks(), createSenateApproach());
+  const waterfront = createAleksiWaterfront();
+  city.add(...createAleksiLandmarks(), waterfront.root);
   const traffic = createRunnerTraffic(root, 'Aleksanterinkatu', aleksanterinkatuMap.runner);
   const finish = createRunnerFinish(root, 'Aleksanterinkatu', ALEKSI_LENGTH);
   let currentState = { distance: 0, elapsed: 0, traffic: [], crossings: [] }, colliderTime = -1;
@@ -193,6 +217,7 @@ function buildAleksi(root) {
     if (state !== currentState) colliderTime = -1;
     currentState = state;
     city.position.z = state.distance;
+    waterfront.update(state.elapsed);
     // Fade nearby hanging lamps before they can conceal a rider or the hero
     // under the following camera. Geometry stays shared across all fixtures.
     for (const lamp of lamps) {
@@ -201,7 +226,11 @@ function buildAleksi(root) {
     }
     for (let i = 0; i < squares.length; i++) {
       const event = state.crossings?.[i];
-      for (let side = 0; side < 2; side++) squares[i].arrows[side].visible = !!event && (event.phase === 'warning' || event.phase === 'crossing') && (event.side < 0 ? side === 0 : side === 1) && Math.floor(state.elapsed * 7) % 2 === 0;
+      for (let side = 0; side < 2; side++) {
+        const arrow = squares[i].arrows[side];
+        arrow.visible = !!event && (event.phase === 'warning' || event.phase === 'crossing') && (event.side < 0 ? side === 0 : side === 1);
+        arrow.children[0].material.opacity = .75 + Math.sin(state.elapsed * 5) * .25;
+      }
     }
     traffic.update(state); finish.update(state);
   }

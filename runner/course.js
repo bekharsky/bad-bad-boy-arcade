@@ -1,5 +1,7 @@
 export const BAANA_LENGTH = 700;
-export const RIDER_BONUS = 150;
+export const RIDER_BONUS = 50;
+export const RIDER_DODGE_BONUS = 150;
+export const OBSTACLE_PASS_BONUS = 25;
 export const RIDER_HEALTH = .4;
 export const RUN_LANES = Object.freeze([-3, 0, 3]);
 export const TRAM_LANES = Object.freeze([-2.2, 2.2]);
@@ -57,11 +59,12 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
   const riders = [...riderKinds];
   const startLane = Math.floor((lanes.length - 1) / 2);
   const crossings = crossingPoints.map((progress, i) => ({ progress, side: i % 2 ? 1 : -1, phase: 'approach', launched: 0, launchAt: Infinity }));
-  const state = { distance: 0, elapsed: 0, speed: startSpeed, x: lanes[startLane], lane: startLane, invulnerable: 0, passed: 0, cleared: 0, bonus: 0, finished: false, traffic: [], crossings };
+  const maxSpeed = speedLimit * 1.3;
+  const state = { distance: 0, elapsed: 0, speed: startSpeed, throttle: 0, x: lanes[startLane], lane: startLane, invulnerable: 0, passed: 0, cleared: 0, bonus: 0, finished: false, traffic: [], crossings };
   let nextSpawn = 0, nextId = 0, safeLane = startLane;
   const choose = count => Math.min(count - 1, Math.max(0, Math.floor(random() * count)));
   function reset() {
-    Object.assign(state, { distance: 0, elapsed: 0, speed: startSpeed, x: lanes[startLane], lane: startLane, invulnerable: 0, passed: 0, cleared: 0, bonus: 0, finished: false });
+    Object.assign(state, { distance: 0, elapsed: 0, speed: startSpeed, throttle: 0, x: lanes[startLane], lane: startLane, invulnerable: 0, passed: 0, cleared: 0, bonus: 0, finished: false });
     for (const crossing of crossings) Object.assign(crossing, { phase: 'approach', launched: 0, launchAt: Infinity });
     state.traffic.length = 0; nextSpawn = 0; nextId = 0; safeLane = startLane;
   }
@@ -72,9 +75,13 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
     // Reserve arrival times, not world-space spacing: parked roadworks and
     // oncoming riders must not converge into an unavoidable three-lane wall.
     let arrival = 3.2;
+    const minSpeed = Math.min(speedLimit, startSpeed + state.elapsed * acceleration) * .6;
+    const spacingSpeed = Math.min(speedLimit, startSpeed + (state.elapsed + 5) * acceleration) * 1.3;
+    const groupDepth = tram ? PROFILES.tram.depth : roadworks ? Math.max(...roadworkKinds.map(kind => trafficProfile(kind).depth)) : PROFILES.bike.depth;
     for (const agent of state.traffic) if (!agent.cleared && !agent.crossing) {
-      const clearance = tramChance > 0 ? trafficProfile(agent.kind).depth : 0;
-      arrival = Math.max(arrival, (agent.progress - state.distance + clearance) / (state.speed + agent.speed) + .85);
+      const clearance = trafficProfile(agent.kind).depth + groupDepth;
+      // Even a full boost must leave time to change lanes between groups.
+      arrival = Math.max(arrival, (agent.progress - state.distance + clearance + .8 * (spacingSpeed + agent.speed)) / (state.speed + agent.speed));
     }
     if (arrival > 5 || state.traffic.length + 2 > TRAFFIC_CAPACITY) return;
     const candidates = [];
@@ -83,8 +90,9 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
       const profile = trafficProfile(kind), progress = state.distance + arrival * (state.speed + speed) + (tramChance > 0 ? profile.depth : 0);
       // Keep a clear window around cross traffic. A tram must not close the
       // only escape lane while a scooter shoots out of a side street.
-      const contactTime = (progress - state.distance) / (state.speed + speed);
-      if (crossings.some(c => Math.abs((c.progress - state.distance) / state.speed - contactTime) < 1.8 + profile.depth / (state.speed + speed))) continue;
+      const gap = progress - state.distance;
+      const meetFrom = gap * minSpeed / (minSpeed + speed), meetTo = gap * maxSpeed / (maxSpeed + speed);
+      if (crossings.some(c => c.phase !== 'clear' && c.progress - state.distance + 22 + profile.depth >= meetFrom && c.progress - state.distance - 22 - profile.depth <= meetTo)) continue;
       const agent = { id: nextId, lane, safeLane, row: state.elapsed, progress, speed, kind, color: tram ? 'tram' : TRAFFIC_COLORS[choose(3)], hp: roadworks || tram ? 1.5 : RIDER_HEALTH, x: lanes[lane], z: state.distance - progress, size: profile.size, hitHeight: profile.hitHeight, alive: true, hit: false, passed: false, hitUntil: 0 };
       if (state.traffic.some(existing => trafficRoutesConflict(agent, existing))) continue;
       candidates.push(agent);
@@ -106,7 +114,7 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
     state, length, lanes, reset,
     sprayHit(id, { damage = 1, charge = 0 } = {}) {
       const agent = state.traffic.find(agent => agent.id === id);
-      if (!agent || !agent.alive || !['bike', 'scooter'].includes(agent.kind) || state.finished) return false;
+      if (!agent || !agent.alive || agent.passed || !['bike', 'scooter'].includes(agent.kind) || state.finished) return false;
       agent.hp -= damage * (.75 + Math.max(0, Math.min(1, charge)) * 1.75);
       agent.hitUntil = state.elapsed + .18;
       if (agent.hp > 0) return false;
@@ -117,16 +125,23 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
     dodge(direction) {
       if (!state.finished && direction) state.lane = Math.max(0, Math.min(lanes.length - 1, state.lane + Math.sign(direction)));
     },
+    setThrottle(value) {
+      if (!Number.isFinite(value)) throw new Error('Runner throttle must be finite');
+      if (!state.finished) state.throttle = Math.max(-1, Math.min(1, value));
+    },
     update(dt) {
       if (!Number.isFinite(dt) || dt < 0) throw new Error('Runner dt must be non-negative');
-      let hits = 0, passed = 0, warning = null;
+      let hits = 0, passed = 0, dodged = 0, warning = null;
       // Fixed maximum steps make collision, scoring and acceleration stable at
       // different refresh rates, including low-frame-rate mobile browsers.
       for (let remaining = dt; remaining > 1e-9 && !state.finished;) {
         const step = Math.min(remaining, 1 / 120); remaining -= step;
         const oldX = state.x, oldDistance = state.distance;
         state.invulnerable = Math.max(0, state.invulnerable - step);
-        state.elapsed += step; state.speed = Math.min(speedLimit, startSpeed + state.elapsed * acceleration);
+        state.elapsed += step;
+        const cruise = Math.min(speedLimit, startSpeed + state.elapsed * acceleration);
+        const targetSpeed = cruise * (1 + state.throttle * (state.throttle < 0 ? .4 : .3));
+        state.speed += Math.sign(targetSpeed - state.speed) * Math.min(Math.abs(targetSpeed - state.speed), 9 * step);
         state.distance = Math.min(length, state.distance + state.speed * step);
         const target = lanes[state.lane], change = target - state.x;
         state.x += Math.sign(change) * Math.min(Math.abs(change), 13 * step);
@@ -162,15 +177,21 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
             traffic.hit = true;
             if (state.invulnerable <= 0) { hits++; state.invulnerable = 1.2; }
           }
-          if (!traffic.passed && gap < -depth - .6) {
+          const crossedAway = traffic.crossing && (traffic.vx > 0 ? traffic.x > lanes.at(-1) + width + .6 : traffic.x < lanes[0] - width - .6);
+          if (!traffic.passed && (gap < -depth - .6 || crossedAway)) {
             traffic.passed = true;
-            if (!traffic.hit && !traffic.cleared) { passed++; state.passed++; }
+            if (!traffic.hit && !traffic.cleared) {
+              passed++; state.passed++;
+              const rider = ['bike', 'scooter'].includes(traffic.kind);
+              if (rider) dodged++;
+              state.bonus += rider ? RIDER_DODGE_BONUS : OBSTACLE_PASS_BONUS;
+            }
           }
         }
         for (let i = state.traffic.length - 1; i >= 0; i--) if (state.traffic[i].progress - state.distance < -12 || (state.traffic[i].crossing && Math.abs(state.traffic[i].x) > 19) || (state.traffic[i].cleared && state.elapsed - state.traffic[i].clearedAt > .6)) state.traffic.splice(i, 1);
         state.finished = state.distance >= length;
       }
-      return { hits, passed, warning, finished: state.finished };
+      return { hits, passed, dodged, warning, finished: state.finished };
     },
   };
 }

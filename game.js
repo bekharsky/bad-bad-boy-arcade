@@ -19,8 +19,8 @@ import { createAimAssist } from './aim-assist.js';
 import { createMouseAim } from './mouse-aim.js';
 import { bindGameInput } from './game-input.js';
 import { preventGameZoom } from './gesture-guard.js';
-import { createRunnerRun, RIDER_BONUS } from './runner/course.js';
-import { bindRunnerInput, createLaneSteering } from './runner/runner-input.js';
+import { createRunnerRun, RIDER_BONUS, RIDER_DODGE_BONUS } from './runner/course.js';
+import { bindRunnerInput, createLaneSteering, runnerThrottle } from './runner/runner-input.js';
 
 const MODEL_URL = './assets/bad-bad-boy.glb?v=20261025-opt1';
 // World metres; the hero keeps the same physical size across every map.
@@ -232,8 +232,7 @@ function syncLevelUI() {
   desktopSpray.hidden = !playing;
   document.querySelector('.game-shell').classList.toggle('runner-mode', runner);
   waveStatLabel.parentElement.hidden = runner;
-  touchControls.setHorizontalOnly(runner);
-  document.querySelector('#joystick-zone').setAttribute('aria-label', runner ? 'Drag left or right to dodge' : 'Drag to move and aim');
+  document.querySelector('#joystick-zone').setAttribute('aria-label', runner ? 'Left/right to dodge; up to accelerate, down to brake' : 'Drag to move and aim');
   runnerProgress.hidden = !runner || !playing;
   runnerProgress.setAttribute('aria-label', `${world.name} progress`);
 }
@@ -609,6 +608,7 @@ function update(dt) {
 
 function updateRunner(dt) {
   laneSteering.update(touchControls.input.x, dt);
+  runnerRun.setThrottle(runnerThrottle(keys, touchControls.input.z));
   const result = runnerRun.update(dt), state = runnerRun.state;
   player.x = state.x; player.z = 0;
   player.heading = Math.PI; player.dx = 0; player.dz = -1;
@@ -621,12 +621,13 @@ function updateRunner(dt) {
   animateHero(player.rig, player.runTime, 1);
   player.root.updateMatrixWorld(true);
   if (result.warning) showToast(result.warning);
+  else if (result.dodged && !state.crossings.some(c => c.phase === 'warning' || c.phase === 'crossing')) showToast(`DODGE +${result.dodged * RIDER_DODGE_BONUS}`);
   const firing = keys.has('Space') || keys.has('Fire') || touchControls.input.firing || player.tapTimer > 0;
   player.tapTimer = Math.max(0, player.tapTimer - dt);
   const spray = stream.update(dt, firing, player.rig.emitter, player, state.traffic);
   updateSprayGauge(spray);
   world.updateRunner(state);
-  score = runnerBaseScore + Math.floor(state.distance) * 2 + state.passed * 25 + state.bonus;
+  score = runnerBaseScore + Math.floor(state.distance) * 2 + state.bonus;
   scoreLabel.textContent = String(score).padStart(4, '0');
   runnerProgress.firstElementChild.style.transform = `scaleX(${state.distance / runnerRun.length})`;
   runnerProgress.setAttribute('aria-valuenow', String(Math.round(state.distance / runnerRun.length * 100)));
@@ -805,6 +806,7 @@ function beginSpray() {
 
 function resetInput() {
   runnerInput.reset();
+  runnerRun.setThrottle(0);
   laneSteering.reset();
   resetAimAssist();
   mouseAim.resetAim();

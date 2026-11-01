@@ -219,6 +219,6 @@ test('a brief uncharged runner spray defeats either approaching rider before col
     }
     assert.equal(agent.alive, false, `${kind} falls to a short tap`);
     assert.equal(agent.hit, false, `${kind} is defeated before touching the hero`);
-    assert.equal(run.state.bonus, 150);
+    assert.equal(run.state.bonus, 50);
   }
 });

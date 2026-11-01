@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { createSceneryModel as model } from './scenery-model.js';
-import { createCathedral, createCathedralSteps } from './senate-landmarks.js';
 
 // West-to-east route coordinates are compressed for play. North is the left
 // side (-1); the opposite Pohjola / Lundqvist pair shares one street block.
@@ -11,13 +10,14 @@ export const ALEKSI_LANDMARKS = Object.freeze([
   Object.freeze({ id: 'university', name: 'University of Helsinki Main Building', address: 'Unioninkatu 34', side: -1, from: 440, to: 540 }),
   Object.freeze({ id: 'sederholm', name: 'Sederholm House', address: 'Aleksanterinkatu 18', side: 1, from: 600, to: 640 }),
 ]);
-export const SENATE_OPENING = Object.freeze({ side: -1, from: 580, to: 680 });
+export const WATERFRONT_OPENING = Object.freeze({ side: -1, from: 580, to: 680 });
+export const QUAY_OPENING = Object.freeze({ side: 1, from: 640, to: 680 });
 
 // Reserve each real frontage before subdividing the remaining generic facades.
-// This also keeps the north side open where the street reaches Senate Square.
+// The last block opens onto the arcade waterfront and a broad finishing quay.
 export function remainingFacadeSpans(side, from, to) {
   let spans = [[from, to]];
-  for (const block of [...ALEKSI_LANDMARKS, SENATE_OPENING]) {
+  for (const block of [...ALEKSI_LANDMARKS, WATERFRONT_OPENING, QUAY_OPENING]) {
     if (block.side !== side) continue;
     const next = [];
     for (const [a, b] of spans) {
@@ -282,17 +282,4 @@ export function createAleksiLandmarks() {
     Object.assign(root.userData, { landmarkId: definition.id, side: definition.side, routeFrom: definition.from, routeTo: definition.to, address: definition.address });
     return root;
   });
-}
-
-export function createSenateApproach() {
-  const m = model('Senate Square opening');
-  m.box('#b9b3a1', -42, -.02, -630, 68, .08, 100);
-  for (let u = -675; u < -580; u += 4) m.box('#9ea18f', -42, .025, u, 68, .018, .045);
-  for (const x of [-10, -23, -36, -49, -62]) for (const z of [-584, -678]) m.box('#939b8f', x, .25, z, .35, .5, .35);
-  const root = m.finish({ vertexColors: true });
-  // Reuse the already merged landmark and stairs from the next campaign map.
-  for (const landmark of [createCathedral(), createCathedralSteps()]) {
-    landmark.rotation.y = Math.PI / 2; landmark.position.set(-7, 0, -660); root.add(landmark);
-  }
-  return root;
 }
