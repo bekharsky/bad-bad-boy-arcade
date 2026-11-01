@@ -3,9 +3,10 @@ import { createMap } from '../world/map.js';
 import { createSceneryModel as model } from './scenery-model.js';
 import { createRunnerTraffic, createRunnerFinish } from '../runner/track-renderer.js';
 import { TRAM_LANES, TRAFFIC_CAPACITY } from '../runner/course.js';
-import { createAleksiLandmarks, remainingFacadeSpans } from './aleksi-landmarks.js';
+import { createAleksiLandmarks, createAleksiFacade as facade, remainingFacadeSpans } from './aleksi-landmarks.js';
 import { createAleksiWaterfront, ALEKSI_SHORE, ALEKSI_TRAM_TURN, aleksiTramRoute } from './aleksi-waterfront.js';
 import { TRAM_CAR_OFFSET, TRAM_CAR_HALF_LENGTH, TRAM_CAR_HALF_WIDTH } from '../runner/tram-route.js';
+import { createAleksiPaving } from './aleksi-paving.js';
 
 export const ALEKSI_LENGTH = 640;
 export const ALEKSI_CROSSINGS = Object.freeze([140, 280, 420, 560]);
@@ -38,76 +39,10 @@ function rod(m, color, from, to, radius = .025) {
   m.geometry(color, geometry.translate(...a.addScaledVector(direction, .5).toArray()));
 }
 
-// Street-facing relief is actual geometry: warm stone, deep window frames,
-// bays, arches, cornices and balcony rails, inspired by the supplied photograph.
-function facade(side, progress, depth, variant) {
-  const m = model('Aleksi ornate facade');
-  const colors = ['#d5c1a0', '#ac8170', '#d8c9b3', '#b5a58d', '#a77664', '#ccd0bc'];
-  const stone = colors[variant % colors.length], pale = '#e4d5b8', dark = '#354b51';
-  const x = side * 14.3, h = 13.5 + variant % 3 * 1.5;
-  m.box(stone, x, h / 2, 0, 12, h, depth - .2);
-  m.box('#807e6b', x, h + .25, 0, 12.5, .5, depth + .3);
-  m.box(variant % 3 ? '#667c70' : '#90694c', x, h + .8, 0, 10.8, .65, depth - .7);
-  for (const y of [3.1, 6.2, 9.3, 12.4]) {
-    m.box(pale, side * 8.08, y, 0, .48, .18, depth);
-    m.box('#b2a38b', side * 8.1, y - .2, 0, .34, .1, depth);
-  }
-  for (const z of [-depth / 2 + .6, depth / 2 - .6]) {
-    m.box(pale, side * 8.05, 7.1, z, .5, 13.6, .65);
-    for (let y = .4; y < h; y += .8) m.box('#c8b79d', side * 7.98, y, z, .62, .1, .9);
-  }
-  const columns = Math.max(3, Math.floor(depth / 2.8)), spacing = (depth - 2.5) / columns;
-  for (let col = 0; col < columns; col++) {
-    const z = (col - (columns - 1) / 2) * spacing;
-    // Shop entrances and arched upper panels keep the ground floor varied.
-    m.box('#bda98c', side * 8.12, 1.45, z, .22, 2.7, 1.95);
-    m.box(dark, side * 7.98, 1.4, z, .08, 2.35, 1.65);
-    m.box('#9a8d6b', side * 7.91, 1.25, z, .05, 2.4, .07);
-    m.geometry(pale, new THREE.TorusGeometry(.85, .09, 5, 12, Math.PI).rotateY(Math.PI / 2).translate(side * 7.95, 1.9, z));
-    if (variant % 2 && col % 2 === 0) m.box(['#657d62', '#b49b69', '#965c4f'][variant % 3], side * 7.5, 2.9, z, 1.55, .17, 2.2);
-    for (let y = 4.6; y < h - 1; y += 3.1) {
-      const bay = col === Math.floor(columns / 2) && variant % 2 === 0;
-      const face = bay ? 7.55 : 8.04;
-      m.box(pale, side * face, y, z, bay ? 1.05 : .28, 2.3, 1.65);
-      m.box('#3f5a60', side * (face - (bay ? .55 : .17)), y, z, .06, 1.8, 1.2);
-      m.box('#cbbca1', side * (face - .22), y, z, .06, 1.8, .075);
-      m.box('#cbbca1', side * (face - .22), y + .15, z, .06, .07, 1.2);
-      m.box(pale, side * (face - .12), y + 1.25, z, .45, .17, 1.95);
-      if (variant % 3 === 0) m.geometry(pale, new THREE.ConeGeometry(1, .5, 4).rotateY(Math.PI / 4).scale(.22, 1, 1).translate(side * face, y + 1.5, z));
-      if (bay && y < 8) {
-        m.box('#c2b093', side * 7.1, y - 1.05, z, 1.3, .2, 2);
-        m.box('#3b514c', side * 6.7, y - .7, z, .06, .08, 2);
-        for (let dz = -.9; dz <= .91; dz += .3) m.box('#3b514c', side * 6.7, y - .85, z + dz, .045, .45, .045);
-      }
-    }
-  }
-  // Rounded pilasters and small dormers catch light above the window bands.
-  for (const z of [-depth * .28, depth * .28]) {
-    m.geometry(pale, new THREE.CylinderGeometry(.16, .2, h - 3.5, 8).translate(side * 7.98, (h + 3) / 2, z));
-    m.box('#546e67', side * 10, h + 1, z, 3.3, 1.2, 2);
-    m.box('#324c54', side * 8.25, h + 1, z, .06, .8, 1.2);
-  }
-  // Return the facade around the corners, so junctions reveal windows and
-  // cornices rather than bare walls where the building row opens up.
-  for (const end of [-1, 1]) {
-    const z = end * depth / 2;
-    for (const y of [3.1, 6.2, 9.3, 12.4]) m.box(pale, x, y, z, 12.5, .18, .35);
-    for (let y = 1.4; y < h - 1; y += 3.1) for (let col = 0; col < 4; col++) {
-      const xx = side * (9.7 + col * 2.55);
-      m.box(pale, xx, y, z, 1.8, 2.25, .18);
-      m.box(dark, xx, y, z + end * .12, 1.3, 1.8, .06);
-      m.box('#cbbca1', xx, y, z + end * .16, .07, 1.8, .04);
-    }
-  }
-  const root = m.finish({ vertexColors: true });
-  root.position.z = -progress;
-  return root;
-}
-
-function junction(progress, index) {
+function junction(progress, index, paving) {
   const m = model('Aleksi crossing square');
-  m.box('#b7b09d', 0, -.035, 0, 90, .09, 40);
-  m.box('#999f96', 0, .02, 0, 90, .04, 12);
+  paving.rectangle('square', 90, 40, 0, -progress, .01);
+  paving.rectangle('road', 90, 12, 0, -progress, .04);
   for (const z of [-15, 15]) for (let x = -4.7; x < 5; x += 1.15) m.box('#e0dcc9', x, .055, z, .65, .025, 2.2);
   for (const side of [-1, 1]) {
     // A square beyond the corner, with planting and benches instead of walls
@@ -143,6 +78,7 @@ function junction(progress, index) {
 
 function buildAleksi(root) {
   const city = new THREE.Group(); city.name = 'Aleksanterinkatu street'; root.add(city);
+  const paving = createAleksiPaving();
   const lamps = [], lampModel = model('Aleksi suspended lamp');
   rod(lampModel, '#596c62', [0, 7.7, 0], [0, 6.8, 0], .035);
   lampModel.geometry('#426a58', new THREE.CylinderGeometry(.18, .46, .36, 12).translate(0, 6.65, 0));
@@ -150,14 +86,17 @@ function buildAleksi(root) {
   const lampTemplate = lampModel.finish({ vertexColors: true }).children[0];
   const ground = model('Aleksi cobbles rails and overhead wires');
   ground.box('#b4aa94', 0, -.17, -(ALEKSI_SHORE - 60) / 2, 110, .2, ALEKSI_SHORE + 60);
+  paving.rectangle('square', 110, ALEKSI_SHORE + 60, 0, -(ALEKSI_SHORE - 60) / 2, -.068);
   for (const [from, to] of aleksiRoadSpans(-60, 642)) {
-    ground.box('#948f7e', 0, -.025, -(from + to) / 2, 12, .13, to - from);
-    for (const x of [-7.2, 7.2]) ground.box('#c8bfa9', x, .02, -(from + to) / 2, 2.4, .2, to - from);
-  }
-  for (let z = 35; z > -642; z -= 2.1) {
-    if (ALEKSI_CROSSINGS.some(crossing => Math.abs(-z - crossing) < 7)) continue;
-    ground.box('#a49d8b', 0, .043, z, 12, .012, .04);
-    for (const x of [-3.5, -.7, 2.1, 4.9]) ground.box('#a09a88', x, .044, z - .9, .035, .013, 1.7);
+    paving.rectangle('road', 12, to - from, 0, -(from + to) / 2, .04);
+    for (const side of [-1, 1]) {
+      paving.rectangle('walk', 2.4, to - from, side * 7.2, -(from + to) / 2, .12);
+      ground.box('#a4a79d', side * 6, .075, -(from + to) / 2, .18, .09, to - from);
+      for (let progress = from + 4; progress < to - 2; progress += 9) {
+        ground.box('#616e69', side * 5.76, .049, -progress, .32, .012, .7);
+        for (let n = -2; n <= 2; n++) ground.box('#9ba39a', side * 5.76, .057, -progress + n * .12, .27, .006, .035);
+      }
+    }
   }
   for (const lane of TRAM_LANES) for (const offset of [-.76, .76]) {
     ground.box('#47524f', lane + offset, .055, (40 - ALEKSI_TRAM_TURN.start) / 2, .18, .025, ALEKSI_TRAM_TURN.start + 40);
@@ -182,7 +121,7 @@ function buildAleksi(root) {
   }
   lampTemplate.material.dispose();
   city.add(ground.finish({ vertexColors: true }));
-  const squares = ALEKSI_CROSSINGS.map(junction);
+  const squares = ALEKSI_CROSSINGS.map((progress, index) => junction(progress, index, paving));
   for (const square of squares) city.add(square.root);
   const intervals = [[-40, 120], [160, 260], [300, 400], [440, 540], [580, 680]];
   let variant = 0;
@@ -196,8 +135,8 @@ function buildAleksi(root) {
       }
     }
   }
-  const waterfront = createAleksiWaterfront();
-  city.add(...createAleksiLandmarks(), waterfront.root);
+  const waterfront = createAleksiWaterfront(paving);
+  city.add(...createAleksiLandmarks(), waterfront.root, paving.finish());
   const traffic = createRunnerTraffic(root, 'Aleksanterinkatu', aleksanterinkatuMap.runner);
   const finish = createRunnerFinish(root, 'Aleksanterinkatu', ALEKSI_LENGTH);
   let currentState = { distance: 0, elapsed: 0, traffic: [], crossings: [] }, colliderTime = -1;

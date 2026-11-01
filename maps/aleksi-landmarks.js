@@ -77,6 +77,67 @@ function pediment(m, color, u, bottom, w, h, x = 7.8) {
 function sphere(m, color, x, y, z, radius, scale = [1, 1, 1]) {
   m.geometry(color, new THREE.SphereGeometry(radius, 8, 6).scale(...scale).translate(x, y, z));
 }
+
+// The infill uses the same proportions and modelling vocabulary as the real
+// landmarks: individual storeys, shop portals, stone bases and pitched roofs.
+export function createAleksiFacade(side, progress, depth, variant) {
+  const m = model('Aleksi ornate facade'), style = variant % 4;
+  const wall = ['#d1c2a6', '#a7614e', '#c2c6b7', '#d6c5b1'][style];
+  const trim = style === 1 ? '#b6a28b' : '#ded3bb', base = style === 1 ? '#8e8c7e' : '#aaa89a';
+  const h = [13.1, 14.8, 16.2][variant % 3], rows = [];
+  m.box(wall, 14.3, h / 2, 0, 12, h, depth - .12);
+  m.box(base, 14.3, 1.5, 0, 12.2, 3, depth);
+  for (let y = .55; y < 3; y += .55) band(m, '#92978a', y, depth, 12.25, .045);
+  for (let y = 4.5; y < h - 1; y += 3.05) rows.push([y, style === 2 ? 2.1 : 1.9]);
+  for (const y of [3.05, ...rows.map(([y]) => y + 1.35), h + .05]) band(m, trim, y, depth, 12.55, y > h ? .3 : .13);
+  const count = Math.max(3, Math.floor(depth / 3.1)), step = (depth - 2.1) / count;
+  for (let col = 0; col < count; col++) {
+    const u = (col - (count - 1) / 2) * step;
+    if (style === 0 || style === 1) {
+      arch(m, u, .18, Math.min(2.1, step - .35), 2.55, '#bdb49e', 7.98);
+      m.box(trim, 7.8, 2.83, u, .28, .35, .3);
+    } else window(m, u, 1.5, Math.min(2.1, step - .35), 2.5, '#a4a38f', 7.98);
+    m.box('#879185', 7.73, 1.28, u, .035, 2.2, .065);
+    if (col % 3 === 1) {
+      m.box(['#667f6c', '#c3b595', '#8c9c8c', '#986b59'][style], 7.35, 2.98, u, 1.45, .15, step - .1);
+      m.box('#3c5353', 7.63, 1.36, u, .055, 2.2, .65);
+      m.box('#b5ab82', 7.58, 1.32, u + .22, .04, .25, .035);
+    }
+    for (const [index, [y, wh]] of rows.entries()) {
+      const bay = style === 3 && col === Math.floor(count / 2) && index < 3;
+      if (bay) m.box(trim, 7.82, y, u, 1.1, wh + .5, 2.2);
+      window(m, u, y, style === 2 ? 1.35 : 1.2, wh, trim, bay ? 7.22 : 8.05);
+      m.box(trim, bay ? 7.15 : 7.93, y - wh / 2 - .16, u, bay ? 1.25 : .52, .16, 1.75);
+      if (index === 0 && style === 0) pediment(m, trim, u, y + 1.13, 1.85, .5, 7.9);
+      else if (style === 1 && index === 1) arch(m, u, y - wh / 2 - .1, 1.65, wh + .45, '#b77f66', 8.1);
+      if (style === 2 && index > 0) {
+        m.box('#aab19f', 7.92, y + 1.1, u, .24, .12, 1.9);
+        sphere(m, '#c8c7b0', 7.72, y + 1.33, u, .13, [.5, 1, 1]);
+      }
+    }
+    if (style === 0 && col === Math.floor(count / 2)) {
+      m.box(trim, 7.18, 6.45, u, 1.7, .2, 2.4);
+      m.box('#4d625a', 6.42, 6.98, u, .06, .09, 2.25);
+      for (let dz = -1; dz <= 1; dz += .25) m.box('#4d625a', 6.42, 6.72, u + dz, .045, .58, .045);
+    }
+  }
+  for (const u of [-depth / 2 + .42, depth / 2 - .42]) {
+    m.box(trim, 8.02, h / 2, u, .5, h, .58);
+    for (let y = 3.5; y < h; y += .75) m.box(trim, 7.92, y, u, .62, .22, .82);
+  }
+  returnWindows(m, depth, [[1.45, 2.4], ...rows], trim);
+  roof(m, style === 1 ? '#68776c' : '#687373', h + .18, 2.1, depth);
+  for (let u = -depth / 2 + 3.5; u < depth / 2 - 1; u += 6) {
+    m.box('#929c8c', 9.5, h + .95, u, 2.7, 1.35, 1.75);
+    window(m, u, h + .95, .95, 1, trim, 8.06);
+    m.box('#536b63', 9.5, h + 1.7, u, 3, .2, 2.1);
+  }
+  m.box('#8b8877', 17.1, h + 1.85, -depth * .22, 1.05, 2.1, .8);
+  const root = m.finish({ vertexColors: true });
+  root.rotation.y = side < 0 ? Math.PI : 0; root.position.z = -progress;
+  return root;
+}
+
 function stockmann({ to, from }) {
   const depth = to - from, m = model('Stockmann department store');
   const brick = '#865d4b', bronze = '#a49270', roofColor = '#6b746c';
@@ -87,9 +148,11 @@ function stockmann({ to, from }) {
     const u = (i - (columns - 1) / 2) * step;
     window(m, u, 1.45, 2.65, 2.45, '#766c55');
     // Long vertical bays are the defining Frosterus facade rhythm.
-    m.box(bronze, 8.12, 8.4, u, .26, 10.4, 1.85);
-    m.box('#466168', 7.95, 8.4, u, .045, 10.05, 1.4);
-    for (const y of [5.2, 8.5, 11.8]) m.box(bronze, 7.91, y, u, .035, .075, 1.4);
+    m.box('#795746', 8.12, 8.5, u, .26, 10.7, 1.85);
+    for (const y of [4.5, 7.3, 10.1, 12.9]) {
+      m.box(bronze, 8.02, y, u, .18, 2.12, 1.5);
+      m.box('#466168', 7.91, y, u, .045, 1.85, 1.15);
+    }
     m.box('#a5785d', 8.04, 8.7, u + step / 2, .45, 11.5, .32);
     window(m, u, 16.55, 1.35, 1.65, '#9b8265');
     for (const dz of [-.95, 0, .95]) {
@@ -98,7 +161,7 @@ function stockmann({ to, from }) {
     }
   }
   for (const y of [3, 14.05, 15.3, 17.7, 19]) band(m, y === 15.3 ? '#6f8877' : '#a07b60', y, depth);
-  returnWindows(m, depth, [[1.45, 2.45], [8.4, 10.05], [16.55, 1.65]], bronze);
+  returnWindows(m, depth, [[1.45, 2.45], [4.5, 1.85], [7.3, 1.85], [10.1, 1.85], [12.9, 1.85], [16.55, 1.65]], bronze);
   roof(m, roofColor, 19.1, 2.5, depth);
   for (let u = -depth / 2 + 6; u < depth / 2; u += 9) {
     m.box('#7b806f', 10.5, 19.75, u, 4.1, 1.2, 2.3);
