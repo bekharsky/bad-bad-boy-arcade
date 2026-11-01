@@ -4,9 +4,10 @@ import { createTrafficModel, animateTraffic } from './traffic-models.js';
 import { RUN_LANES, TRAFFIC_COLORS, TRAFFIC_CAPACITY, ROADWORK_TYPES } from './course.js';
 
 // Geometry is shared within this map; hit-flash materials belong to each slot.
-export function createRunnerTraffic(root, name, { riderKinds = ['bike', 'scooter'], lanes = RUN_LANES, tramChance = 0, roadworkKinds = ROADWORK_TYPES } = {}) {
+export function createRunnerTraffic(root, name, { riderKinds = ['bike', 'scooter'], lanes = RUN_LANES, tramChance = 0, tramRoute = null, roadworkKinds = ROADWORK_TYPES } = {}) {
   const trafficPool = [], trafficMaterials = [];
   const templates = [];
+  const pose = {};
   for (const kind of riderKinds) for (const color of TRAFFIC_COLORS) templates.push(createTrafficModel(kind, color));
   for (const kind of roadworkKinds) templates.push(createTrafficModel(kind, 'roadwork'));
   if (tramChance > 0) templates.push(createTrafficModel('tram', 'tram'));
@@ -34,11 +35,27 @@ export function createRunnerTraffic(root, name, { riderKinds = ['bike', 'scooter
       material.emissive.set(agent?.hitUntil > state.elapsed ? '#ffe58c' : '#000000');
       material.emissiveIntensity = agent?.hitUntil > state.elapsed ? .7 : 0;
       if (!agent) continue;
-      object.position.set(agent.x ?? lanes[agent.lane], 0, state.distance - agent.progress);
-      object.rotation.y = agent.crossing ? Math.sign(agent.vx) * Math.PI / 2 : 0;
+      if (agent.kind === 'tram' && tramRoute) {
+        tramRoute(agent.progress, lanes[agent.lane], pose);
+        object.position.set(pose.x, 0, state.distance + pose.z); object.rotation.y = pose.heading;
+      } else {
+        object.position.set(agent.x ?? lanes[agent.lane], 0, state.distance - agent.progress);
+        object.rotation.y = agent.crossing ? Math.sign(agent.vx) * Math.PI / 2 : 0;
+      }
       for (const variant of object.children) {
         variant.visible = variant.name === `${ROADWORK_TYPES.includes(agent.kind) ? 'roadwork' : agent.color} ${agent.kind}`;
-        if (variant.visible) animateTraffic(variant, state.elapsed + agent.id, agent.crossing ? Math.abs(agent.vx) : agent.speed + state.speed);
+        if (variant.visible) {
+          if (agent.kind === 'tram' && tramRoute) for (const part of variant.children) {
+            const offset = part.userData.tramOffset;
+            if (offset === undefined) continue;
+            tramRoute(agent.progress - offset, lanes[agent.lane], pose);
+            const dx = pose.x - object.position.x, dz = state.distance + pose.z - object.position.z;
+            const c = Math.cos(object.rotation.y), s = Math.sin(object.rotation.y);
+            part.position.set(dx * c - dz * s, 0, dx * s + dz * c);
+            part.rotation.y = pose.heading - object.rotation.y;
+          }
+          animateTraffic(variant, state.elapsed + agent.id, agent.crossing ? Math.abs(agent.vx) : agent.speed + state.speed);
+        }
       }
     }
   } };

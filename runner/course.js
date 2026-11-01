@@ -1,3 +1,5 @@
+import { TRAM_CAR_OFFSET } from './tram-route.js';
+
 export const BAANA_LENGTH = 700;
 export const RIDER_BONUS = 50;
 export const RIDER_DODGE_BONUS = 150;
@@ -49,11 +51,12 @@ export function trafficContact(x0, gap0, x1, gap1, laneX, width = 1.05, depth = 
   return true;
 }
 
-export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, riderKinds = ['bike', 'scooter'], lanes = RUN_LANES, tramChance = 0, roadworkKinds = ROADWORK_TYPES, crossingPoints = [], startSpeed = 9, speedLimit = 17, acceleration = .08 } = {}) {
+export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, riderKinds = ['bike', 'scooter'], lanes = RUN_LANES, tramChance = 0, tramRoute = null, roadworkKinds = ROADWORK_TYPES, crossingPoints = [], startSpeed = 9, speedLimit = 17, acceleration = .08 } = {}) {
   if (!Number.isFinite(length) || length <= 0) throw new Error('Runner length must be positive');
   if (!Array.isArray(riderKinds) || !riderKinds.length || riderKinds.some(kind => !['bike', 'scooter'].includes(kind))) throw new Error('Runner requires supported rider kinds');
   if (!Array.isArray(lanes) || lanes.length < 2 || lanes.some((x, i) => !Number.isFinite(x) || (i && x <= lanes[i - 1]))) throw new Error('Runner lanes must be ordered positions');
   if (!Number.isFinite(tramChance) || tramChance < 0 || tramChance > 1) throw new Error('Invalid tram chance');
+  if (tramRoute !== null && typeof tramRoute !== 'function') throw new Error('Invalid tram route');
   if (!Array.isArray(roadworkKinds) || roadworkKinds.some(kind => !ROADWORK_TYPES.includes(kind))) throw new Error('Invalid roadwork kinds');
   if (![startSpeed, speedLimit, acceleration].every(Number.isFinite) || startSpeed <= 0 || speedLimit < startSpeed || acceleration < 0) throw new Error('Invalid runner speed');
   if (!Array.isArray(crossingPoints) || crossingPoints.some((p, i) => !Number.isFinite(p) || p <= 50 || p >= length - 30 || (i && p <= crossingPoints[i - 1]))) throw new Error('Invalid crossing points');
@@ -64,6 +67,18 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
   const maxSpeed = speedLimit * RUNNER_BOOST;
   const state = { distance: 0, elapsed: 0, speed: startSpeed, cruiseSpeed: startSpeed, throttle: 0, x: lanes[startLane], lane: startLane, invulnerable: 0, passed: 0, cleared: 0, bonus: 0, finished: false, traffic: [], crossings };
   let nextSpawn = 0, nextId = 0, safeLane = startLane;
+  const oldPose = {}, pose = {};
+  function tramContact(agent, oldProgress, oldX, oldDistance) {
+    for (const offset of [-TRAM_CAR_OFFSET, TRAM_CAR_OFFSET]) {
+      tramRoute(oldProgress + offset, lanes[agent.lane], oldPose);
+      tramRoute(agent.progress + offset, lanes[agent.lane], pose);
+      const dx0 = oldX - oldPose.x, dz0 = -oldDistance - oldPose.z;
+      const dx1 = state.x - pose.x, dz1 = -state.distance - pose.z;
+      const c0 = Math.cos(oldPose.heading), s0 = Math.sin(oldPose.heading), c1 = Math.cos(pose.heading), s1 = Math.sin(pose.heading);
+      if (trafficContact(dx0 * c0 - dz0 * s0, dx0 * s0 + dz0 * c0, dx1 * c1 - dz1 * s1, dx1 * s1 + dz1 * c1, 0, PROFILES.tram.width, PROFILES.tram.depth - TRAM_CAR_OFFSET)) return true;
+    }
+    return false;
+  }
   const choose = count => Math.min(count - 1, Math.max(0, Math.floor(random() * count)));
   function reset() {
     Object.assign(state, { distance: 0, elapsed: 0, speed: startSpeed, cruiseSpeed: startSpeed, throttle: 0, x: lanes[startLane], lane: startLane, invulnerable: 0, passed: 0, cleared: 0, bonus: 0, finished: false });
@@ -94,6 +109,7 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
     for (let lane = 0; lane < lanes.length; lane++) {
       const kind = tram ? 'tram' : roadworks ? roadworkKinds[choose(roadworkKinds.length)] : riders[choose(riders.length)];
       const profile = trafficProfile(kind), progress = state.distance + arrival * (state.speed + speed) + (tramChance > 0 ? profile.depth : 0);
+      if (kind !== 'tram' && progress > length) continue;
       // Keep a clear window around cross traffic. A tram must not close the
       // only escape lane while a scooter shoots out of a side street.
       const gap = progress - state.distance;
@@ -176,14 +192,20 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
           if (crossing.launched === 2 && state.elapsed > crossing.launchAt + 3) crossing.phase = 'clear';
         }
         for (const traffic of state.traffic) {
+          const oldProgress = traffic.progress;
           const oldGap = traffic.progress - oldDistance;
           const oldTrafficX = traffic.x ?? lanes[traffic.lane];
           if (traffic.crossing) traffic.x += traffic.vx * step;
           else { traffic.progress -= traffic.speed * step; traffic.x = lanes[traffic.lane]; }
           const gap = traffic.progress - state.distance;
           traffic.z = -gap;
+          const routedTram = traffic.kind === 'tram' && tramRoute;
+          if (routedTram) {
+            tramRoute(traffic.progress, lanes[traffic.lane], pose);
+            traffic.x = pose.x; traffic.z = state.distance + pose.z; traffic.heading = pose.heading;
+          }
           const profile = trafficProfile(traffic.kind), width = traffic.crossing ? profile.depth : profile.width, depth = traffic.crossing ? profile.width : profile.depth;
-          if (!traffic.cleared && !traffic.hit && trafficContact(oldX - oldTrafficX, oldGap, state.x - traffic.x, gap, 0, width, depth)) {
+          if (!traffic.cleared && !traffic.hit && (routedTram ? tramContact(traffic, oldProgress, oldX, oldDistance) : trafficContact(oldX - oldTrafficX, oldGap, state.x - traffic.x, gap, 0, width, depth))) {
             traffic.hit = true;
             if (state.invulnerable <= 0) { hits++; state.invulnerable = 1.2; }
           }

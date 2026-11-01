@@ -14,7 +14,7 @@ The route runs west to east. North is on the player's left. Landmark sides and r
 
 The City Museum's visitor address is Aleksanterinkatu 16; the individual Sederholm House is number 18. Reference photographs are used for research only and are not distributed as game assets. All new geometry is generated locally. Facade lettering and shop signs are omitted.
 
-`maps/aleksi-landmarks.js` owns the individual models and their reserved frontages. The generic facade builder subtracts these spans before filling the remaining blocks, so buildings do not overlap or close the final waterfront opening. Side elevations have windows too. The end-of-street vista is a deliberately compressed arcade waterfront: a broad quay, rail buffers, lamps, terminal and cruise ferry. The cathedral remains on the separate Senate Square map.
+`maps/aleksi-landmarks.js` owns the individual models and their reserved frontages. The generic facade builder subtracts these spans before filling the remaining blocks, so buildings do not overlap or close the final waterfront opening. Side elevations have windows too. The end-of-street vista is a deliberately compressed arcade waterfront: a broad quay, a left turn of both tram tracks along the shoreline, lamps, terminal and cruise ferry. The cathedral remains on the separate Senate Square map. The terminal sits inland of the bend; the quay is wide enough for both tracks and the whole tram body. The two cars follow the shared route separately, and their collision and liquid blockers follow their actual positions. This runner tram is a different, longer green-and-cream model from the green-and-yellow tram shared by the three arena maps.
 
 Geometry remains merged by building, within the 563,701-vertex budget of checkpoint `62ff149`.
 

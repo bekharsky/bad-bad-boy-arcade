@@ -4,7 +4,8 @@ import { createSceneryModel as model } from './scenery-model.js';
 import { createRunnerTraffic, createRunnerFinish } from '../runner/track-renderer.js';
 import { TRAM_LANES, TRAFFIC_CAPACITY } from '../runner/course.js';
 import { createAleksiLandmarks, remainingFacadeSpans } from './aleksi-landmarks.js';
-import { createAleksiWaterfront, ALEKSI_SHORE } from './aleksi-waterfront.js';
+import { createAleksiWaterfront, ALEKSI_SHORE, ALEKSI_TRAM_TURN, aleksiTramRoute } from './aleksi-waterfront.js';
+import { TRAM_CAR_OFFSET, TRAM_CAR_HALF_LENGTH, TRAM_CAR_HALF_WIDTH } from '../runner/tram-route.js';
 
 export const ALEKSI_LENGTH = 640;
 export const ALEKSI_CROSSINGS = Object.freeze([140, 280, 420, 560]);
@@ -23,7 +24,7 @@ export function aleksiRoadSpans(from, to) {
 }
 export const aleksanterinkatuMap = {
   id: 'aleksanterinkatu', name: 'Aleksanterinkatu', mode: 'runner',
-  runner: { length: ALEKSI_LENGTH, lanes: TRAM_LANES, tramChance: .42, roadworkKinds: [], crossingPoints: ALEKSI_CROSSINGS, startSpeed: 10.5, speedLimit: 18, acceleration: .12 },
+  runner: { length: ALEKSI_LENGTH, lanes: TRAM_LANES, tramChance: .42, tramRoute: aleksiTramRoute, roadworkKinds: [], crossingPoints: ALEKSI_CROSSINGS, startSpeed: 10.5, speedLimit: 18, acceleration: .12 },
   spawn: { x: TRAM_LANES[0], z: 0, heading: Math.PI },
   bounds: { minX: -5.3, maxX: 5.3, minZ: -150, maxZ: 35 },
   environment: { background: new THREE.Color('#9ebbc1'), fog: new THREE.Fog('#9ebbc1', 65, 165) },
@@ -159,10 +160,10 @@ function buildAleksi(root) {
     for (const x of [-3.5, -.7, 2.1, 4.9]) ground.box('#a09a88', x, .044, z - .9, .035, .013, 1.7);
   }
   for (const lane of TRAM_LANES) for (const offset of [-.76, .76]) {
-    ground.box('#47524f', lane + offset, .055, -307, .18, .025, 694);
-    ground.box('#b0bab5', lane + offset, .073, -307, .065, .025, 694);
-    rod(ground, '#4c6159', [lane, 5.12, 40], [lane, 5.12, -654], .018);
+    ground.box('#47524f', lane + offset, .055, (40 - ALEKSI_TRAM_TURN.start) / 2, .18, .025, ALEKSI_TRAM_TURN.start + 40);
+    ground.box('#b0bab5', lane + offset, .073, (40 - ALEKSI_TRAM_TURN.start) / 2, .065, .025, ALEKSI_TRAM_TURN.start + 40);
   }
+  for (const lane of TRAM_LANES) rod(ground, '#4c6159', [lane, 5.12, 40], [lane, 5.12, -ALEKSI_TRAM_TURN.start], .018);
   for (let z = 12; z > -642; z -= 24) {
     // At the open waterfront, poles take over from the facade wire anchors.
     if (z < -580) for (const x of [-9, 9]) {
@@ -200,15 +201,20 @@ function buildAleksi(root) {
   const traffic = createRunnerTraffic(root, 'Aleksanterinkatu', aleksanterinkatuMap.runner);
   const finish = createRunnerFinish(root, 'Aleksanterinkatu', ALEKSI_LENGTH);
   let currentState = { distance: 0, elapsed: 0, traffic: [], crossings: [] }, colliderTime = -1;
-  const tramColliders = [], colliderPool = Array.from({ length: TRAFFIC_CAPACITY }, () => ({ minX: 0, maxX: 0, minZ: 0, maxZ: 0, height: 3.2 }));
+  const tramColliders = [], colliderPool = Array.from({ length: TRAFFIC_CAPACITY * 2 }, () => ({ minX: 0, maxX: 0, minZ: 0, maxZ: 0, height: 3.2 }));
+  const tramPose = {};
   function dynamicColliders() {
     if (colliderTime !== currentState.elapsed) {
       colliderTime = currentState.elapsed; tramColliders.length = 0;
       for (const agent of currentState.traffic) if (agent.kind === 'tram' && !agent.cleared) {
-        const c = colliderPool[tramColliders.length];
-        c.minX = agent.x - 1.25; c.maxX = agent.x + 1.25;
-        c.minZ = agent.z - 7.6; c.maxZ = agent.z + 7.6;
-        tramColliders.push(c);
+        for (const offset of [-TRAM_CAR_OFFSET, TRAM_CAR_OFFSET]) {
+          aleksiTramRoute(agent.progress + offset, TRAM_LANES[agent.lane], tramPose);
+          const c = colliderPool[tramColliders.length], s = Math.abs(Math.sin(tramPose.heading)), cos = Math.abs(Math.cos(tramPose.heading));
+          const halfX = TRAM_CAR_HALF_WIDTH * cos + TRAM_CAR_HALF_LENGTH * s, halfZ = TRAM_CAR_HALF_LENGTH * cos + TRAM_CAR_HALF_WIDTH * s;
+          c.minX = tramPose.x - halfX; c.maxX = tramPose.x + halfX;
+          c.minZ = currentState.distance + tramPose.z - halfZ; c.maxZ = currentState.distance + tramPose.z + halfZ;
+          tramColliders.push(c);
+        }
       }
     }
     return tramColliders;
