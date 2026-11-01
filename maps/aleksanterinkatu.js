@@ -3,6 +3,7 @@ import { createMap } from '../world/map.js';
 import { createSceneryModel as model } from './scenery-model.js';
 import { createRunnerTraffic, createRunnerFinish } from '../runner/track-renderer.js';
 import { TRAM_LANES, TRAFFIC_CAPACITY } from '../runner/course.js';
+import { createAleksiLandmarks, createSenateApproach, remainingFacadeSpans } from './aleksi-landmarks.js';
 
 export const ALEKSI_LENGTH = 640;
 export const ALEKSI_CROSSINGS = Object.freeze([140, 280, 420, 560]);
@@ -28,7 +29,7 @@ function facade(side, progress, depth, variant) {
   const m = model('Aleksi ornate facade');
   const colors = ['#d5c1a0', '#ac8170', '#d8c9b3', '#b5a58d', '#a77664', '#ccd0bc'];
   const stone = colors[variant % colors.length], pale = '#e4d5b8', dark = '#354b51';
-  const x = side * 14.3, front = side * 8.25, h = 13.5 + variant % 3 * 1.5;
+  const x = side * 14.3, h = 13.5 + variant % 3 * 1.5;
   m.box(stone, x, h / 2, 0, 12, h, depth - .2);
   m.box('#807e6b', x, h + .25, 0, 12.5, .5, depth + .3);
   m.box(variant % 3 ? '#667c70' : '#90694c', x, h + .8, 0, 10.8, .65, depth - .7);
@@ -161,10 +162,17 @@ function buildAleksi(root) {
   for (const square of squares) city.add(square.root);
   const intervals = [[-40, 120], [160, 260], [300, 400], [440, 540], [580, 680]];
   let variant = 0;
-  for (const [from, to] of intervals) {
-    const count = Math.ceil((to - from) / 23), depth = (to - from) / count;
-    for (let i = 0; i < count; i++) for (const side of [-1, 1]) city.add(facade(side, from + (i + .5) * depth, depth, variant++));
+  for (const [from, to] of intervals) for (const side of [-1, 1]) {
+    for (const [start, end] of remainingFacadeSpans(side, from, to)) {
+      const count = Math.ceil((end - start) / 23), depth = (end - start) / count;
+      for (let i = 0; i < count; i++) {
+        const building = facade(side, start + (i + .5) * depth, depth, variant++);
+        Object.assign(building.userData, { side, routeFrom: start + i * depth, routeTo: start + (i + 1) * depth });
+        city.add(building);
+      }
+    }
   }
+  city.add(...createAleksiLandmarks(), createSenateApproach());
   const traffic = createRunnerTraffic(root, 'Aleksanterinkatu', aleksanterinkatuMap.runner);
   const finish = createRunnerFinish(root, 'Aleksanterinkatu', ALEKSI_LENGTH);
   let currentState = { distance: 0, elapsed: 0, traffic: [], crossings: [] }, colliderTime = -1;

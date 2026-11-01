@@ -10,6 +10,7 @@ registerHooks({ resolve(specifier, context, next) {
 globalThis.document = { createElement: () => ({ getContext: () => ({ fillRect() {}, fillText() {} }) }) };
 const THREE = await import('three');
 const { aleksanterinkatuMap, ALEKSI_LENGTH, ALEKSI_CROSSINGS } = await import('../maps/aleksanterinkatu.js');
+const { ALEKSI_LANDMARKS, SENATE_OPENING, remainingFacadeSpans } = await import('../maps/aleksi-landmarks.js');
 const { baanaMap } = await import('../maps/baana.js');
 const { senateSquareMap } = await import('../maps/senate-square.js');
 const { maps, mapOrder } = await import('../maps/index.js');
@@ -110,7 +111,11 @@ test('facades frame real cross-street openings; traffic geometry and material co
   const map = aleksanterinkatuMap.create(), run = createRunnerRun({ ...aleksanterinkatuMap.runner, random: seeded(42) });
   const city = map.root.getObjectByName('Aleksanterinkatu street');
   const facades = city.children.filter(node => node.name === 'Aleksi ornate facade');
-  assert.ok(facades.length > 35);
+  assert.ok(facades.length > 20);
+  for (const facade of facades) for (const reserved of [...ALEKSI_LANDMARKS, SENATE_OPENING]) {
+    const { side, routeFrom, routeTo } = facade.userData;
+    assert.ok(side !== reserved.side || routeTo <= reserved.from + 1e-8 || routeFrom >= reserved.to - 1e-8, 'Generic fronts never cover a landmark or the open square');
+  }
   const squares = city.children.filter(node => node.name === 'Aleksi crossing square');
   assert.equal(squares.length, ALEKSI_CROSSINGS.length);
   assert.deepEqual(squares.map(node => -node.position.z), ALEKSI_CROSSINGS);
@@ -134,7 +139,13 @@ test('the complete tram body blocks liquid and map switches release every owned 
   world.activate('baana'); assert.equal(world.runner.lanes, undefined);
   world.activate('aleksanterinkatu'); assert.deepEqual(world.runner.lanes, TRAM_LANES);
   const root = scene.children[0], resources = new Set(), disposals = new Map();
-  root.traverse(node => { if (node.geometry) resources.add(node.geometry); if (node.material) resources.add(node.material); });
+  root.traverse(node => {
+    if (node.geometry) resources.add(node.geometry);
+    if (node.material) {
+      resources.add(node.material);
+      for (const value of Object.values(node.material)) if (value?.isTexture) resources.add(value);
+    }
+  });
   for (const resource of resources) resource.addEventListener('dispose', () => disposals.set(resource, (disposals.get(resource) ?? 0) + 1));
   const state = { elapsed: 1, distance: 0, traffic: [{ id: 1, kind: 'tram', color: 'tram', lane: 0, x: -2.2, z: -10, progress: 10, speed: 7.5, alive: true }] };
   world.updateRunner(state);
@@ -147,4 +158,38 @@ test('the complete tram body blocks liquid and map switches release every owned 
   assert.equal(world.mode, 'arena'); assert.equal(world.runner, undefined);
   assert.equal(disposals.size, resources.size); assert.ok([...disposals.values()].every(count => count === 1));
   world.dispose();
+});
+
+test('real frontages keep their street sides, opposite neighbours and a lower Sederholm roofline', () => {
+  const map = aleksanterinkatuMap.create();
+  const city = map.root.getObjectByName('Aleksanterinkatu street');
+  const buildings = city.children.filter(node => node.userData.landmarkId);
+  assert.deepEqual(buildings.map(node => node.userData.landmarkId), ['stockmann', 'pohjola', 'lundqvist', 'university', 'sederholm']);
+  for (const building of buildings) {
+    const bounds = new THREE.Box3().setFromObject(building);
+    assert.ok(building.userData.side > 0 ? bounds.min.x > 5.3 : bounds.max.x < -5.3, `${building.name} leaves both tram lanes clear`);
+    assert.equal(building.position.z, -(building.userData.routeFrom + building.userData.routeTo) / 2);
+  }
+  const [stockmann, pohjola, lundqvist, , sederholm] = buildings;
+  assert.equal(pohjola.position.z, lundqvist.position.z, 'The two buildings face one another');
+  assert.equal(pohjola.userData.side, 1); assert.equal(lundqvist.userData.side, -1);
+  const height = node => new THREE.Box3().setFromObject(node).getSize(new THREE.Vector3()).y;
+  assert.ok(height(sederholm) < height(stockmann) * .6);
+  assert.ok(map.root.getObjectByName('Helsinki Cathedral'));
+  const square = new THREE.Box3().setFromObject(map.root.getObjectByName('Senate Square opening'));
+  assert.ok(square.max.x < -5.3);
+  const geometries = new Set(); map.root.traverse(node => { if (node.geometry) geometries.add(node.geometry); });
+  assert.ok([...geometries].reduce((sum, geometry) => sum + geometry.attributes.position.count, 0) <= 563701, 'Landmark detail stays within the previous street geometry budget');
+  map.dispose();
+});
+
+test('facade reservations split blocks without closing cross streets or the Senate Square opening', () => {
+  assert.deepEqual(remainingFacadeSpans(1, -40, 120), [[-40, -20]]);
+  assert.deepEqual(remainingFacadeSpans(-1, 300, 400), [[352, 400]]);
+  assert.deepEqual(remainingFacadeSpans(1, 580, 680), [[580, 600], [640, 680]]);
+  assert.deepEqual(remainingFacadeSpans(-1, 580, 680), []);
+  for (const definition of ALEKSI_LANDMARKS) {
+    // Only the reserved frontage may replace a facade; none spans a junction.
+    assert.ok(ALEKSI_CROSSINGS.every(progress => definition.to <= progress - 20 || definition.from >= progress + 20));
+  }
 });
