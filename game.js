@@ -205,7 +205,7 @@ let score = 0;
 let audioContext = null;
 let frameTime = 0;
 let runnerRun = createRunnerRun();
-let runnerComplete = false, runnerBaseScore = 0;
+let runnerBaseScore = 0;
 const isRunner = () => world.mode === 'runner';
 const runnerInput = bindRunnerInput({
   canvas,
@@ -382,7 +382,6 @@ function applyWave(plan) {
     placePlayerAtSpawn();
     if (!isRunner()) { medkits.reset(player); batteries.reset(player); }
   }
-  runnerComplete = false;
   syncLevelUI();
   if (isRunner()) {
     runnerRun = createRunnerRun(world.runner); runnerBaseScore = score; player.invulnerable = 0;
@@ -641,7 +640,7 @@ function updateRunner(dt) {
   cameraRig.frameRunner(runnerRun.pace, dt);
   if (state.finished) {
     score += 500; scoreLabel.textContent = String(score).padStart(4, '0');
-    runnerComplete = true; endGame();
+    waves.completeMap();
   }
 }
 
@@ -768,8 +767,8 @@ function endGame() {
   player.moveSpeed = 0;
   player.turnSpeed = 0;
   endScreen.classList.remove('hidden');
-  document.querySelector('#end-title').textContent = runnerComplete ? `${world.name.replace(/ Run$/, '').toUpperCase()} CLEAR` : 'WASTED';
-  restartButton.textContent = runnerComplete ? 'CONTINUE' : 'PLAY AGAIN';
+  document.querySelector('#end-title').textContent = 'WASTED';
+  restartButton.textContent = 'PLAY AGAIN';
   player.model.material.opacity = 1;
   player.model.material.transparent = false;
   blip(80, 0.25);
@@ -933,10 +932,7 @@ bindGameInput({
 });
 startButton.addEventListener('click', () => { startGame(); requestMouseAim(); });
 restartButton.addEventListener('click', () => {
-  if (runnerComplete) {
-    playing = true; waves.completeMap(); endScreen.classList.add('hidden');
-    touchControls.setEnabled(!mapTransition.active); syncLevelUI(); canvas.focus({ preventScroll: true }); requestMouseAim();
-  } else { startGame(); requestMouseAim(); }
+  startGame(); requestMouseAim();
 });
 soundSetting.checked = soundEnabled;
 soundSetting.addEventListener('change', () => {
