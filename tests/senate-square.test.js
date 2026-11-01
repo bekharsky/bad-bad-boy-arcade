@@ -63,6 +63,26 @@ test('the common scale falls between the previous close harbor and distant squar
   }
 });
 
+test('runner speed opens and closes the lens smoothly, pause freezes it and arena framing restores it', () => {
+  for (const [width, height, touch] of [[1280, 720, false], [577, 774, true]]) {
+    const rig = createGameCamera(); rig.resize(width, height, touch); rig.frame(0, 0, 0, true);
+    const base = rig.camera.fov, projection = rig.camera.projectionMatrix.clone();
+    rig.frameRunner(1, 0); assert.equal(rig.camera.fov, base);
+    rig.frameRunner(1, 1 / 60); assert.ok(rig.camera.fov > base && rig.camera.fov < base + 2);
+    for (let i = 0; i < 120; i++) rig.frameRunner(1, 1 / 60);
+    assert.ok(Math.abs(rig.camera.fov - base - 12) < .02);
+    assert.notDeepEqual(rig.camera.projectionMatrix.elements, projection.elements);
+    for (let i = 0; i < 120; i++) rig.frameRunner(-1, 1 / 60);
+    assert.ok(Math.abs(rig.camera.fov - base + 8) < .02);
+    const paused = rig.camera.fov; rig.frameRunner(1, 0); assert.equal(rig.camera.fov, paused);
+    assert.deepEqual(rig.camera.position.toArray(), [0, 12, 15], 'Lane geometry and hero collision stay aligned');
+    rig.frame(20, 10, 0, true); assert.equal(rig.camera.fov, base);
+    rig.resize(844, 390, true); assert.equal(rig.camera.fov, 58);
+    rig.frameRunner(1, 1); rig.resize(1280, 720, false);
+    rig.frame(0, 0, 0, true); assert.equal(rig.camera.fov, 56);
+  }
+});
+
 test('Senate Square is the fifth district and direct links preserve the new campaign order', () => {
   const campaign = createCampaign(maps.map(map => map.id));
   assert.equal(campaign.plan(1).mapId, 'harbor');

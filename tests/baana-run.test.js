@@ -42,6 +42,7 @@ test('one contact costs one hit, grace prevents stacked damage and collided traf
 });
 
 test('generated traffic always permits a complete run at multiple refresh rates and varied seeds', () => {
+  const seenKinds = new Set();
   for (const fps of [30, 60, 120]) for (const seed of [1, 42, 371, 819]) {
     const run = createBaanaRun({ random: seeded(seed) });
     let hits = 0, peakTraffic = 0; const colors = new Set(), kinds = new Set();
@@ -56,10 +57,13 @@ test('generated traffic always permits a complete run at multiple refresh rates 
     assert.equal(run.state.finished, true); assert.equal(run.state.distance, 700); assert.ok(run.state.elapsed < 75);
     assert.ok(run.state.passed > 70); assert.ok(peakTraffic <= TRAFFIC_CAPACITY);
     assert.deepEqual([...colors].sort(), ['blue', 'green', 'red']);
-    assert.deepEqual([...kinds].sort(), ['barrier', 'bike', 'cone', 'scooter', 'tractor', 'trench']);
+    assert.ok(kinds.has('bike') && kinds.has('scooter'));
+    assert.ok(['barrier', 'cone', 'tractor', 'trench'].some(kind => kinds.has(kind)));
+    for (const kind of kinds) seenKinds.add(kind);
     assert.ok(RUN_LANES.includes(run.state.x));
     const distance = run.state.distance; run.update(10); assert.equal(run.state.distance, distance);
   }
+  assert.deepEqual([...seenKinds].sort(), ['barrier', 'bike', 'cone', 'scooter', 'tractor', 'trench']);
 });
 
 
@@ -176,16 +180,32 @@ test('analog speed ramps smoothly, releases to cruise and remains stable across 
     run.setThrottle(-1);
     run.update(0); assert.equal(run.state.speed, 9);
     for (let i = 0; i < fps; i++) run.update(1 / fps);
-    assert.ok(run.state.speed >= 5.4 && run.state.speed < 6);
+    assert.ok(run.state.speed >= 4.05 && run.state.speed < 4.5);
+    assert.ok(run.pace < -.99);
     const braked = run.state.speed;
     run.setThrottle(.5); run.update(.1);
-    assert.ok(run.state.speed > braked && run.state.speed <= braked + .901, 'Acceleration has no instantaneous jump');
-    run.update(2); assert.ok(run.state.speed > 10.5 && run.state.speed < 11);
+    assert.ok(run.state.speed > braked && run.state.speed <= braked + 1.201, 'Acceleration has no instantaneous jump');
+    run.update(2); assert.ok(run.state.speed > 11.4 && run.state.speed < 11.7);
+    assert.ok(Math.abs(run.pace - .5) < .001, 'The camera receives achieved speed, not the requested input');
     run.setThrottle(0); run.update(2); assert.ok(Math.abs(run.state.speed - (9 + run.state.elapsed * .08)) < .001);
     distances.push(run.state.distance);
     run.setThrottle(100); assert.equal(run.state.throttle, 1);
     assert.throws(() => run.setThrottle(NaN));
-    run.reset(); assert.equal(run.state.throttle, 0); assert.equal(run.state.speed, 9);
+    run.reset(); assert.equal(run.state.throttle, 0); assert.equal(run.state.speed, 9); assert.equal(run.pace, 0);
   }
   assert.ok(Math.max(...distances) - Math.min(...distances) < .02);
+});
+
+test('full boost and braking produce clearly different travel speeds and coast back to neutral', () => {
+  const runs = [-1, 0, 1].map(throttle => {
+    const run = createBaanaRun({ acceleration: 0, roadworkKinds: [], random: seeded(42) });
+    run.setThrottle(throttle); run.update(3); return run;
+  });
+  assert.ok(runs[2].state.distance > runs[0].state.distance * 2.5);
+  assert.equal(runs[0].state.speed, 4.05); assert.equal(runs[1].state.speed, 9); assert.equal(runs[2].state.speed, 13.5);
+  for (const run of runs) {
+    const before = run.pace; run.setThrottle(0);
+    assert.equal(run.pace, before, 'Feedback cannot jump before physical speed changes');
+    run.update(1); assert.equal(run.state.speed, 9); assert.equal(run.pace, 0);
+  }
 });

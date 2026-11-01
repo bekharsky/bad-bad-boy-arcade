@@ -2,6 +2,8 @@ export const BAANA_LENGTH = 700;
 export const RIDER_BONUS = 50;
 export const RIDER_DODGE_BONUS = 150;
 export const OBSTACLE_PASS_BONUS = 25;
+export const RUNNER_BRAKE = .45;
+export const RUNNER_BOOST = 1.5;
 export const RIDER_HEALTH = .4;
 export const RUN_LANES = Object.freeze([-3, 0, 3]);
 export const TRAM_LANES = Object.freeze([-2.2, 2.2]);
@@ -59,12 +61,12 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
   const riders = [...riderKinds];
   const startLane = Math.floor((lanes.length - 1) / 2);
   const crossings = crossingPoints.map((progress, i) => ({ progress, side: i % 2 ? 1 : -1, phase: 'approach', launched: 0, launchAt: Infinity }));
-  const maxSpeed = speedLimit * 1.3;
-  const state = { distance: 0, elapsed: 0, speed: startSpeed, throttle: 0, x: lanes[startLane], lane: startLane, invulnerable: 0, passed: 0, cleared: 0, bonus: 0, finished: false, traffic: [], crossings };
+  const maxSpeed = speedLimit * RUNNER_BOOST;
+  const state = { distance: 0, elapsed: 0, speed: startSpeed, cruiseSpeed: startSpeed, throttle: 0, x: lanes[startLane], lane: startLane, invulnerable: 0, passed: 0, cleared: 0, bonus: 0, finished: false, traffic: [], crossings };
   let nextSpawn = 0, nextId = 0, safeLane = startLane;
   const choose = count => Math.min(count - 1, Math.max(0, Math.floor(random() * count)));
   function reset() {
-    Object.assign(state, { distance: 0, elapsed: 0, speed: startSpeed, throttle: 0, x: lanes[startLane], lane: startLane, invulnerable: 0, passed: 0, cleared: 0, bonus: 0, finished: false });
+    Object.assign(state, { distance: 0, elapsed: 0, speed: startSpeed, cruiseSpeed: startSpeed, throttle: 0, x: lanes[startLane], lane: startLane, invulnerable: 0, passed: 0, cleared: 0, bonus: 0, finished: false });
     for (const crossing of crossings) Object.assign(crossing, { phase: 'approach', launched: 0, launchAt: Infinity });
     state.traffic.length = 0; nextSpawn = 0; nextId = 0; safeLane = startLane;
   }
@@ -75,13 +77,17 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
     // Reserve arrival times, not world-space spacing: parked roadworks and
     // oncoming riders must not converge into an unavoidable three-lane wall.
     let arrival = 3.2;
-    const minSpeed = Math.min(speedLimit, startSpeed + state.elapsed * acceleration) * .6;
-    const spacingSpeed = Math.min(speedLimit, startSpeed + (state.elapsed + 5) * acceleration) * 1.3;
+    const minSpeed = Math.min(speedLimit, startSpeed + state.elapsed * acceleration) * RUNNER_BRAKE;
+    const spacingSpeed = Math.min(speedLimit, startSpeed + (state.elapsed + 5) * acceleration) * RUNNER_BOOST;
     const groupDepth = tram ? PROFILES.tram.depth : roadworks ? Math.max(...roadworkKinds.map(kind => trafficProfile(kind).depth)) : PROFILES.bike.depth;
     for (const agent of state.traffic) if (!agent.cleared && !agent.crossing) {
-      const clearance = trafficProfile(agent.kind).depth + groupDepth;
-      // Even a full boost must leave time to change lanes between groups.
-      arrival = Math.max(arrival, (agent.progress - state.distance + clearance + .8 * (spacingSpeed + agent.speed)) / (state.speed + agent.speed));
+      const gap = agent.progress - state.distance, depth = trafficProfile(agent.kind).depth;
+      const relativeSpeed = speed - agent.speed;
+      // Keep the next front behind the previous rear for every achievable
+      // speed, including braking beside a rider then boosting at roadworks.
+      const clearTime = Math.max(0, (gap + depth) / ((relativeSpeed > 0 ? minSpeed : maxSpeed) + agent.speed));
+      const requiredGap = gap + depth + groupDepth + relativeSpeed * clearTime + .7 * (spacingSpeed + speed);
+      arrival = Math.max(arrival, requiredGap / (state.speed + speed));
     }
     if (arrival > 5 || state.traffic.length + 2 > TRAFFIC_CAPACITY) return;
     const candidates = [];
@@ -112,6 +118,10 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
 
   return {
     state, length, lanes, reset,
+    get pace() {
+      const ratio = state.speed / state.cruiseSpeed - 1;
+      return Math.max(-1, Math.min(1, ratio / (ratio < 0 ? 1 - RUNNER_BRAKE : RUNNER_BOOST - 1)));
+    },
     sprayHit(id, { damage = 1, charge = 0 } = {}) {
       const agent = state.traffic.find(agent => agent.id === id);
       if (!agent || !agent.alive || agent.passed || !['bike', 'scooter'].includes(agent.kind) || state.finished) return false;
@@ -139,9 +149,9 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
         const oldX = state.x, oldDistance = state.distance;
         state.invulnerable = Math.max(0, state.invulnerable - step);
         state.elapsed += step;
-        const cruise = Math.min(speedLimit, startSpeed + state.elapsed * acceleration);
-        const targetSpeed = cruise * (1 + state.throttle * (state.throttle < 0 ? .4 : .3));
-        state.speed += Math.sign(targetSpeed - state.speed) * Math.min(Math.abs(targetSpeed - state.speed), 9 * step);
+        state.cruiseSpeed = Math.min(speedLimit, startSpeed + state.elapsed * acceleration);
+        const targetSpeed = state.cruiseSpeed * (1 + state.throttle * (state.throttle < 0 ? 1 - RUNNER_BRAKE : RUNNER_BOOST - 1));
+        state.speed += Math.sign(targetSpeed - state.speed) * Math.min(Math.abs(targetSpeed - state.speed), 12 * step);
         state.distance = Math.min(length, state.distance + state.speed * step);
         const target = lanes[state.lane], change = target - state.x;
         state.x += Math.sign(change) * Math.min(Math.abs(change), 13 * step);

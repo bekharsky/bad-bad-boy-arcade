@@ -19,7 +19,7 @@ import { createAimAssist } from './aim-assist.js';
 import { createMouseAim } from './mouse-aim.js';
 import { bindGameInput } from './game-input.js';
 import { preventGameZoom } from './gesture-guard.js';
-import { createRunnerRun, RIDER_BONUS, RIDER_DODGE_BONUS } from './runner/course.js';
+import { createRunnerRun } from './runner/course.js';
 import { bindRunnerInput, createLaneSteering, runnerThrottle } from './runner/runner-input.js';
 
 const MODEL_URL = './assets/bad-bad-boy.glb?v=20261025-opt1';
@@ -162,7 +162,6 @@ scene.add(player.root);
 function hitEnemy(enemy, direction, impact) {
   if (isRunner()) {
     if (runnerRun.sprayHit(enemy.id, impact)) {
-      showToast(`+${RIDER_BONUS}`);
       burst(enemy.x, enemy.hitHeight, enemy.z, 0xffd34e, 20, null, 3);
       blip(440 + Math.random() * 280, .045);
     }
@@ -229,6 +228,8 @@ function finishMapTransition() {
 
 function syncLevelUI() {
   const runner = isRunner();
+  toast.hidden = runner;
+  if (runner) { clearTimeout(showToast.timer); toast.classList.remove('visible'); }
   desktopSpray.hidden = !playing;
   document.querySelector('.game-shell').classList.toggle('runner-mode', runner);
   waveStatLabel.parentElement.hidden = runner;
@@ -388,7 +389,6 @@ function applyWave(plan) {
     runnerProgress.firstElementChild.style.transform = 'scaleX(0)';
     runnerProgress.setAttribute('aria-valuenow', '0');
     world.updateRunner(runnerRun.state);
-    showToast(`${world.name.toUpperCase()} · ← →`);
     return;
   }
   waveLabel.textContent = String(plan.number).padStart(2, '0');
@@ -435,6 +435,7 @@ function showBite(enemy) {
 }
 
 function showToast(message) {
+  if (isRunner()) return;
   toast.textContent = message;
   toast.classList.add('visible');
   clearTimeout(showToast.timer);
@@ -616,12 +617,10 @@ function updateRunner(dt) {
   player.runTime += state.speed * dt * Math.PI * 2 / (HERO_HEIGHT * .45);
   player.runBlend = 1; player.moveSpeed = state.speed;
   player.body.position.y = Math.abs(Math.sin(player.runTime)) * .035 * HERO_SCALE;
-  player.body.rotation.x = -.05;
+  player.body.rotation.x = THREE.MathUtils.damp(player.body.rotation.x, -.05 - runnerRun.pace * .15, 8, dt);
   player.body.rotation.z = THREE.MathUtils.damp(player.body.rotation.z, (runnerRun.lanes[state.lane] - state.x) * -.055, 12, dt);
   animateHero(player.rig, player.runTime, 1);
   player.root.updateMatrixWorld(true);
-  if (result.warning) showToast(result.warning);
-  else if (result.dodged && !state.crossings.some(c => c.phase === 'warning' || c.phase === 'crossing')) showToast(`DODGE +${result.dodged * RIDER_DODGE_BONUS}`);
   const firing = keys.has('Space') || keys.has('Fire') || touchControls.input.firing || player.tapTimer > 0;
   player.tapTimer = Math.max(0, player.tapTimer - dt);
   const spray = stream.update(dt, firing, player.rig.emitter, player, state.traffic);
@@ -639,7 +638,7 @@ function updateRunner(dt) {
   player.model.material.opacity = state.invulnerable > 0 && Math.floor(state.elapsed * 18) % 2 === 0 ? .4 : 1;
   player.model.material.transparent = state.invulnerable > 0;
   // Lane changes move the hero across the screen; the camera holds the route centre.
-  cameraRig.frame(0, 0, dt);
+  cameraRig.frameRunner(runnerRun.pace, dt);
   if (state.finished) {
     score += 500; scoreLabel.textContent = String(score).padStart(4, '0');
     runnerComplete = true; endGame();
