@@ -77,22 +77,6 @@ function pediment(m, color, u, bottom, w, h, x = 7.8) {
 function sphere(m, color, x, y, z, radius, scale = [1, 1, 1]) {
   m.geometry(color, new THREE.SphereGeometry(radius, 8, 6).scale(...scale).translate(x, y, z));
 }
-function lettering(text, width, height, color = '#ece7d6', vertical = false) {
-  const canvas = document.createElement('canvas');
-  canvas.width = vertical ? 128 : 1024; canvas.height = vertical ? 1024 : 128;
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = color; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.font = `600 ${vertical ? 100 : 88}px Arial, sans-serif`;
-  if (vertical) [...text].forEach((letter, i) => ctx.fillText(letter, 64, (i + .5) * 1024 / text.length, 112));
-  else ctx.fillText(text, 512, 67, 990);
-  const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace;
-  return new THREE.Mesh(new THREE.PlaneGeometry(width, height), new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false, toneMapped: false }));
-}
-function streetSign(root, text, u, y, w, h, color, vertical = false, x = 7.77) {
-  const sign = lettering(text, w, h, color, vertical);
-  sign.rotation.y = -Math.PI / 2; sign.position.set(x, y, u); root.add(sign);
-}
-
 function stockmann({ to, from }) {
   const depth = to - from, m = model('Stockmann department store');
   const brick = '#865d4b', bronze = '#a49270', roofColor = '#6b746c';
@@ -127,10 +111,7 @@ function stockmann({ to, from }) {
   m.box('#323b36', 6.18, 2.9, entrance - 5, .48, .62, .62);
   m.box('#e9dfbe', 5.925, 2.9, entrance - 5, .02, .045, .4);
   m.box('#e9dfbe', 5.91, 3.03, entrance - 5, .025, .3, .04);
-  const root = m.finish({ vertexColors: true });
-  streetSign(root, 'STOCKMANN', entrance, 3.9, 13, .8, '#f0ece0');
-  streetSign(root, 'STOCKMANN', entrance + 8.2, 8.5, .72, 8.4, '#f0ece0', true);
-  return root;
+  return m.finish({ vertexColors: true });
 }
 
 function pohjola({ to, from, side }) {
@@ -175,9 +156,7 @@ function pohjola({ to, from, side }) {
   m.geometry(copper, new THREE.CylinderGeometry(1.05, 3.25, 2.8, 4).rotateY(Math.PI / 4).translate(10, 17.4, u));
   m.geometry('#76a791', new THREE.ConeGeometry(1.5, 3.2, 4).rotateY(Math.PI / 4).translate(10, 20.3, u));
   m.box('#4c7a68', 10, 22.3, u, .06, .95, .06);
-  const root = m.finish({ vertexColors: true });
-  streetSign(root, 'POHJOLA', portal, 3.85, 4.1, .55, '#dedac4', false, 7.35);
-  return root;
+  return m.finish({ vertexColors: true });
 }
 
 function lundqvist({ to, from, side }) {
@@ -268,9 +247,7 @@ function sederholm({ to, from }) {
   pediment(m, blue, 0, 7.62, 7.2, 1.45, 7.6);
   sphere(m, '#b4a25c', 7.34, 8.24, 0, .29, [.15, 1, .8]);
   for (const u of [-depth / 2 + .65, depth / 2 - .65]) m.box(white, 7.95, 3.9, u, .55, 7.5, .65);
-  const root = m.finish({ vertexColors: true });
-  streetSign(root, '1757', 0, 7.95, 2, .4, '#6a756e', false, 7.38);
-  return root;
+  return m.finish({ vertexColors: true });
 }
 
 const builders = { stockmann, pohjola, lundqvist, university, sederholm };
