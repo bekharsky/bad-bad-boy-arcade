@@ -29,3 +29,7 @@ The open approach is furnished as an arcade interpretation of a Helsinki market 
 All exposed street, crossing, sidewalk, market and quay surfaces use generated granite setts. One colour texture and one height texture are shared by three paving batches. World-coordinate UVs keep stone scale and joints consistent between patches; mipmaps and anisotropic filtering reduce shimmer while moving. Road spans still stop at cross streets, so surfaces do not become coplanar. No photographic textures are bundled. Market props share one vertex-coloured material.
 
 The market tests verify paving coverage and shared texture disposal, the free running corridor, and clearance between every market prop and both articulated tram paths. Visual checks cover the street, crossing, market approach and finish.
+
+## Crossing scooter challenge
+
+The two lateral scooters use different lines through each square (centre −6 m and +7 m) at 18 and 20 m/s. Their timing first threatens the source-side lane and then the opposite lane, with offsets that leave a dodge route even at full braking or boost. Remaining in either lane costs a hit; taking both dangerous lines costs two. Contacts each cost one health point, and crossing contacts grant only 0.45 s of protection. A red pooled impact burst makes the damage visible without a toast. Scooters have 1.8 health: a single stray splash cannot remove them, while a charged direct hit still can. Normal cyclists keep their previous health.

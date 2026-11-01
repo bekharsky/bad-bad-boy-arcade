@@ -130,12 +130,16 @@ test('dense generated traffic never intersects or overtakes on its visible route
 });
 
 
-test('both generated rider types clear on one uncharged hit and award the bonus once', () => {
+test('generated bikes clear on one uncharged hit; scooters resist a splash but clear on a charged direct hit', () => {
   for (const [kind, value] of [['bike', .3], ['scooter', .6]]) {
     const run = createBaanaRun({ random: () => value }); run.update(.01);
     const agent = run.state.traffic[0];
     assert.equal(agent.kind, kind);
-    assert.equal(run.sprayHit(agent.id, { damage: 1, charge: 0 }), true);
+    if (kind === 'scooter') {
+      assert.equal(run.sprayHit(agent.id, { damage: .6, charge: 1, groundSplash: true }), false);
+      assert.equal(agent.alive, true); assert.equal(run.state.bonus, 0);
+    }
+    assert.equal(run.sprayHit(agent.id, { damage: 1, charge: kind === 'scooter' ? 1 : 0 }), true);
     assert.equal(agent.alive, false); assert.equal(run.state.bonus, RIDER_BONUS);
     assert.equal(run.sprayHit(agent.id, { damage: 1, charge: 0 }), false);
     assert.equal(run.state.bonus, RIDER_BONUS);

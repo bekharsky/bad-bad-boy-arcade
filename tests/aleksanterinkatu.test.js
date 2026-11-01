@@ -53,9 +53,12 @@ test('the tram course has exactly two bounded lanes while Baana retains three', 
 function steer(run) {
   const state = run.state;
   const next = state.traffic.filter(a => !a.crossing && a.progress - state.distance > -trafficProfile(a.kind).depth - .6).sort((a, b) => a.progress - b.progress)[0];
-  const crossing = state.crossings.find(c => (c.phase === 'warning' || c.phase === 'crossing') && c.progress - state.distance > -4);
+  const crossing = state.crossings.find(c => (c.phase === 'warning' || c.phase === 'crossing') && c.progress + 10 > state.distance);
   const closeTraffic = next && next.progress - state.distance < (state.speed + next.speed) * .75 + trafficProfile(next.kind).depth;
-  if (crossing && !closeTraffic) { run.dodge((crossing.side < 0 ? 1 : 0) - state.lane); return; }
+  if (crossing && !closeTraffic) {
+    const away = state.distance < crossing.progress;
+    run.dodge(((crossing.side < 0) === away ? 1 : 0) - state.lane); return;
+  }
   if (next) run.dodge(next.safeLane - state.lane);
 }
 
