@@ -38,4 +38,4 @@ The city environment is generated in `maps/harbor.js` and `maps/harbor-scenery.j
 
 ## Asset preparation tools
 
-Uses meshoptimizer 1.3.0. Copyright (c) 2016–2026, Arseny Kapoulkine (MIT). Used offline to simplify and reorder the hero mesh; no decoder is required by the game. Texture preparation uses Sharp 0.34.5 (Apache-2.0).
+Uses meshoptimizer 1.3.0. Copyright (c) 2016–2026, Arseny Kapoulkine (MIT). Used offline to simplify and reorder the hero mesh; no decoder is required by the game. Texture preparation uses Sharp 0.35.5 (Apache-2.0).
