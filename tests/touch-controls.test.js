@@ -163,20 +163,19 @@ test('disabled controls ignore input and a new round starts cleanly', () => {
 });
 
 
-test('runner locks stick to horizontal movement without weakening it on vertical drags; arenas restore both axes', () => {
+test('vertical speed and diagonal lane input preserve independent spray and release resets both axes', () => {
   const { controls, zone, thumb, fireButton } = setup();
-  controls.setHorizontalOnly(true);
   pointer(zone, 'pointerdown');
   pointer(zone, 'pointermove', 1, 100, 400);
-  assert.deepEqual(controls.input, { x: 0, z: 0, firing: false });
-  pointer(zone, 'pointermove', 1, 144, 400);
+  assert.deepEqual(controls.input, { x: 0, z: 1, firing: false });
+  pointer(zone, 'pointermove', 1, 144, 200);
   assert.equal(controls.input.x, 1); assert.equal(controls.input.z, 0);
   assert.equal(thumb.style.transform, 'translate(44px, 0px)');
   pointer(fireButton, 'pointerdown', 2);
-  pointer(zone, 'pointermove', 1, 56, 0);
-  assert.deepEqual(controls.input, { x: -1, z: 0, firing: true });
-  pointer(zone, 'pointerup'); assert.equal(controls.input.firing, true);
-  controls.setHorizontalOnly(false);
+  pointer(zone, 'pointermove', 1, 56, 156);
+  assert.ok(controls.input.x < -.7 && controls.input.z < -.7);
+  assert.equal(controls.input.firing, true);
+  pointer(zone, 'pointerup'); assert.deepEqual(controls.input, { x: 0, z: 0, firing: true });
   pointer(zone, 'pointerdown', 3);
   pointer(zone, 'pointermove', 3, 100, 156);
   assert.equal(controls.input.z, -1);

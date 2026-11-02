@@ -32,7 +32,7 @@ test('switching between actual districts preserves hero size, screen position an
     const scene = new THREE.Scene(), world = createMapManager(scene, maps, .736), rig = createGameCamera();
     rig.resize(width, height, touch);
     let previous;
-    for (const id of ['harbor', 'baana', 'kamppi', 'senate-square', 'harbor']) {
+    for (const id of ['harbor', 'baana', 'kamppi', 'aleksanterinkatu', 'senate-square', 'harbor']) {
       world.activate(id);
       rig.frame(world.spawn.x, world.spawn.z, 0, true);
       const next = heroProjection(rig.camera, world.spawn);
@@ -63,14 +63,34 @@ test('the common scale falls between the previous close harbor and distant squar
   }
 });
 
-test('Senate Square is the fourth district and direct links preserve the new campaign order', () => {
+test('runner speed opens and closes the lens smoothly, pause freezes it and arena framing restores it', () => {
+  for (const [width, height, touch] of [[1280, 720, false], [577, 774, true]]) {
+    const rig = createGameCamera(); rig.resize(width, height, touch); rig.frame(0, 0, 0, true);
+    const base = rig.camera.fov, projection = rig.camera.projectionMatrix.clone();
+    rig.frameRunner(1, 0); assert.equal(rig.camera.fov, base);
+    rig.frameRunner(1, 1 / 60); assert.ok(rig.camera.fov > base && rig.camera.fov < base + 2);
+    for (let i = 0; i < 120; i++) rig.frameRunner(1, 1 / 60);
+    assert.ok(Math.abs(rig.camera.fov - base - 12) < .02);
+    assert.notDeepEqual(rig.camera.projectionMatrix.elements, projection.elements);
+    for (let i = 0; i < 120; i++) rig.frameRunner(-1, 1 / 60);
+    assert.ok(Math.abs(rig.camera.fov - base + 8) < .02);
+    const paused = rig.camera.fov; rig.frameRunner(1, 0); assert.equal(rig.camera.fov, paused);
+    assert.deepEqual(rig.camera.position.toArray(), [0, 12, 15], 'Lane geometry and hero collision stay aligned');
+    rig.frame(20, 10, 0, true); assert.equal(rig.camera.fov, base);
+    rig.resize(844, 390, true); assert.equal(rig.camera.fov, 58);
+    rig.frameRunner(1, 1); rig.resize(1280, 720, false);
+    rig.frame(0, 0, 0, true); assert.equal(rig.camera.fov, 56);
+  }
+});
+
+test('Senate Square is the fifth district and direct links preserve the new campaign order', () => {
   const campaign = createCampaign(maps.map(map => map.id));
   assert.equal(campaign.plan(1).mapId, 'harbor');
   assert.equal(campaign.plan(4).mapId, 'baana');
   assert.equal(campaign.plan(7).mapId, 'kamppi');
-  assert.equal(campaign.plan(10).mapId, 'senate-square');
-  assert.equal(campaign.plan(13).mapId, 'harbor');
-  assert.deepEqual(mapOrder('senate-square').map(map => map.id), ['senate-square', 'harbor', 'baana', 'kamppi']);
+  assert.equal(campaign.plan(10).mapId, 'aleksanterinkatu');
+  assert.equal(campaign.plan(13).mapId, 'senate-square');
+  assert.deepEqual(mapOrder('senate-square').map(map => map.id), ['senate-square', 'harbor', 'baana', 'kamppi', 'aleksanterinkatu']);
   assert.deepEqual(mapOrder('unknown'), maps);
   assert.equal(maps[0].id, 'harbor', 'Previewing never mutates the campaign registry');
 });
@@ -165,7 +185,7 @@ test('the cathedral fits the shared camera and real map switches dispose their o
 });
 
 
-test('only harbor replaces the fog with open water, and all other districts restore the original environment', () => {
+test('harbor and Aleksanterinkatu use their own environments and other districts restore the original', () => {
   const scene = new THREE.Scene();
   const background = scene.background = new THREE.Color('#7c929f');
   const fog = scene.fog = new THREE.Fog('#7c929f', 40, 100);
@@ -175,6 +195,11 @@ test('only harbor replaces the fog with open water, and all other districts rest
     world.activate(id); assert.equal(scene.fog, fog); assert.equal(scene.background, background);
     assert.equal(scene.fog.near, 40); assert.equal(scene.fog.far, 100);
   }
+  world.activate('aleksanterinkatu');
+  assert.equal(scene.background.getHexString(), '9ebbc1');
+  assert.equal(scene.fog.near, 65); assert.equal(scene.fog.far, 165);
+  world.activate('senate-square');
+  assert.equal(scene.fog, fog); assert.equal(scene.background, background);
   world.activate('harbor'); world.dispose();
   assert.equal(scene.fog, fog); assert.equal(scene.background, background);
 });

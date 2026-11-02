@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createBaanaRun, trafficContact, TRAFFIC_CAPACITY, RUN_LANES, trafficProfile, trafficRoutesConflict, RIDER_HEALTH } from '../runner/baana-run.js';
+import { createBaanaRun, trafficContact, TRAFFIC_CAPACITY, RUN_LANES, trafficProfile, trafficRoutesConflict, RIDER_HEALTH, RIDER_BONUS, RIDER_DODGE_BONUS, OBSTACLE_PASS_BONUS } from '../runner/baana-run.js';
 
 const seeded = seed => () => ((seed = seed * 16807 % 2147483647) - 1) / 2147483646;
 
@@ -42,6 +42,7 @@ test('one contact costs one hit, grace prevents stacked damage and collided traf
 });
 
 test('generated traffic always permits a complete run at multiple refresh rates and varied seeds', () => {
+  const seenKinds = new Set();
   for (const fps of [30, 60, 120]) for (const seed of [1, 42, 371, 819]) {
     const run = createBaanaRun({ random: seeded(seed) });
     let hits = 0, peakTraffic = 0; const colors = new Set(), kinds = new Set();
@@ -56,10 +57,13 @@ test('generated traffic always permits a complete run at multiple refresh rates 
     assert.equal(run.state.finished, true); assert.equal(run.state.distance, 700); assert.ok(run.state.elapsed < 75);
     assert.ok(run.state.passed > 70); assert.ok(peakTraffic <= TRAFFIC_CAPACITY);
     assert.deepEqual([...colors].sort(), ['blue', 'green', 'red']);
-    assert.deepEqual([...kinds].sort(), ['barrier', 'bike', 'cone', 'scooter', 'tractor', 'trench']);
+    assert.ok(kinds.has('bike') && kinds.has('scooter'));
+    assert.ok(['barrier', 'cone', 'tractor', 'trench'].some(kind => kinds.has(kind)));
+    for (const kind of kinds) seenKinds.add(kind);
     assert.ok(RUN_LANES.includes(run.state.x));
     const distance = run.state.distance; run.update(10); assert.equal(run.state.distance, distance);
   }
+  assert.deepEqual([...seenKinds].sort(), ['barrier', 'bike', 'cone', 'scooter', 'tractor', 'trench']);
 });
 
 
@@ -73,9 +77,9 @@ test('spraying clears riders, charged hits are stronger and clearing prevents da
     assert.ok(agent.hitUntil > run.state.elapsed);
     const before = run.state.bonus;
     while (agent.alive) run.sprayHit(agent.id, { charge: 1 });
-    assert.equal(run.state.bonus - before, 150);
+    assert.equal(run.state.bonus - before, RIDER_BONUS);
     assert.equal(run.sprayHit(agent.id, { charge: 1 }), false);
-    assert.equal(run.state.bonus - before, 150);
+    assert.equal(run.state.bonus - before, RIDER_BONUS);
     assert.equal(run.update(.3).hits, 0);
   }
   run.reset(); assert.equal(run.state.bonus, 0); assert.equal(run.state.cleared, 0);
@@ -126,14 +130,86 @@ test('dense generated traffic never intersects or overtakes on its visible route
 });
 
 
-test('both generated rider types clear on one uncharged hit and award the bonus once', () => {
+test('generated bikes clear on one uncharged hit; scooters resist a splash but clear on a charged direct hit', () => {
   for (const [kind, value] of [['bike', .3], ['scooter', .6]]) {
     const run = createBaanaRun({ random: () => value }); run.update(.01);
     const agent = run.state.traffic[0];
     assert.equal(agent.kind, kind);
-    assert.equal(run.sprayHit(agent.id, { damage: 1, charge: 0 }), true);
-    assert.equal(agent.alive, false); assert.equal(run.state.bonus, 150);
+    if (kind === 'scooter') {
+      assert.equal(run.sprayHit(agent.id, { damage: .6, charge: 1, groundSplash: true }), false);
+      assert.equal(agent.alive, true); assert.equal(run.state.bonus, 0);
+    }
+    assert.equal(run.sprayHit(agent.id, { damage: 1, charge: kind === 'scooter' ? 1 : 0 }), true);
+    assert.equal(agent.alive, false); assert.equal(run.state.bonus, RIDER_BONUS);
     assert.equal(run.sprayHit(agent.id, { damage: 1, charge: 0 }), false);
-    assert.equal(run.state.bonus, 150);
+    assert.equal(run.state.bonus, RIDER_BONUS);
+  }
+});
+
+test('clean rider dodges beat spraying, including lateral exits, without double rewards', () => {
+  assert.ok(RIDER_DODGE_BONUS > RIDER_BONUS);
+  for (const kind of ['bike', 'scooter', 'tram', 'tractor']) {
+    const run = createBaanaRun({ random: seeded(42) }); run.update(.01);
+    run.state.traffic.length = 0;
+    const agent = { id: 1000, kind, lane: 0, x: -3, progress: run.state.distance + 2, speed: 5.2, alive: true, hp: RIDER_HEALTH, hit: false, passed: false };
+    run.state.traffic.push(agent);
+    const rider = ['bike', 'scooter'].includes(kind);
+    const result = run.update(1.1);
+    assert.equal(result.hits, 0); assert.equal(result.passed, 1);
+    assert.equal(result.dodged, rider ? 1 : 0);
+    assert.equal(run.state.bonus, rider ? RIDER_DODGE_BONUS : OBSTACLE_PASS_BONUS);
+    const bonus = run.state.bonus;
+    assert.equal(run.sprayHit(agent.id), false, 'Passed riders cannot also award spray points');
+    run.update(.01); assert.equal(run.state.bonus, bonus);
+  }
+  for (const side of [-1, 1]) {
+    const run = createBaanaRun(); run.update(.01); run.state.traffic.length = 0;
+    const agent = { id: 1000, kind: 'scooter', crossing: true, vx: side * 15, x: side * 4, progress: 15, speed: 0, alive: true, hp: RIDER_HEALTH, hit: false, passed: false };
+    run.state.traffic.push(agent);
+    assert.equal(run.update(.2).dodged, 1, 'A scooter that leaves sideways earns points even when braking before the junction');
+    assert.equal(run.state.bonus, RIDER_DODGE_BONUS);
+    run.update(.1); assert.equal(run.state.bonus, RIDER_DODGE_BONUS);
+  }
+  const sprayed = createBaanaRun(); sprayed.update(.01);
+  const rider = sprayed.state.traffic[0];
+  Object.assign(rider, { kind: 'bike', hp: RIDER_HEALTH, alive: true, lane: 0, progress: 2 });
+  assert.equal(sprayed.sprayHit(rider.id), true);
+  sprayed.update(.5); assert.equal(sprayed.state.bonus, RIDER_BONUS); assert.equal(sprayed.state.passed, 0);
+});
+
+test('analog speed ramps smoothly, releases to cruise and remains stable across frame rates and reset', () => {
+  const distances = [];
+  for (const fps of [15, 30, 60, 120]) {
+    const run = createBaanaRun({ roadworkKinds: [], random: seeded(42) });
+    run.setThrottle(-1);
+    run.update(0); assert.equal(run.state.speed, 9);
+    for (let i = 0; i < fps; i++) run.update(1 / fps);
+    assert.ok(run.state.speed >= 4.05 && run.state.speed < 4.5);
+    assert.ok(run.pace < -.99);
+    const braked = run.state.speed;
+    run.setThrottle(.5); run.update(.1);
+    assert.ok(run.state.speed > braked && run.state.speed <= braked + 1.201, 'Acceleration has no instantaneous jump');
+    run.update(2); assert.ok(run.state.speed > 11.4 && run.state.speed < 11.7);
+    assert.ok(Math.abs(run.pace - .5) < .001, 'The camera receives achieved speed, not the requested input');
+    run.setThrottle(0); run.update(2); assert.ok(Math.abs(run.state.speed - (9 + run.state.elapsed * .08)) < .001);
+    distances.push(run.state.distance);
+    run.setThrottle(100); assert.equal(run.state.throttle, 1);
+    assert.throws(() => run.setThrottle(NaN));
+    run.reset(); assert.equal(run.state.throttle, 0); assert.equal(run.state.speed, 9); assert.equal(run.pace, 0);
+  }
+  assert.ok(Math.max(...distances) - Math.min(...distances) < .02);
+});
+
+test('full boost and braking produce clearly different travel speeds and coast back to neutral', () => {
+  const runs = [-1, 0, 1].map(throttle => {
+    const run = createBaanaRun({ acceleration: 0, roadworkKinds: [], random: seeded(42) });
+    run.setThrottle(throttle); run.update(3); return run;
+  });
+  assert.ok(runs[2].state.distance > runs[0].state.distance * 2.5);
+  assert.equal(runs[0].state.speed, 4.05); assert.equal(runs[1].state.speed, 9); assert.equal(runs[2].state.speed, 13.5);
+  for (const run of runs) {
+    const before = run.pace; run.setThrottle(0);
+    assert.equal(run.pace, before, 'Feedback cannot jump before physical speed changes');
+    run.update(1); assert.equal(run.state.speed, 9); assert.equal(run.pace, 0);
   }
 });

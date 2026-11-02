@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { bindRunnerInput, createLaneSteering } from '../runner/runner-input.js';
+import { bindRunnerInput, createLaneSteering, runnerThrottle } from '../runner/runner-input.js';
 
 function setup() {
   globalThis.window = new EventTarget(); globalThis.document = new EventTarget();
@@ -21,6 +21,17 @@ test('horizontal swipes work without pointer capture and cannot repeat within a 
   assert.deepEqual(game.steps, [1, -1]);
   game.pointer('pointerup'); game.pointer('pointerdown'); game.pointer('pointermove', 110, 200);
   assert.equal(game.steps.length, 2, 'Vertical movement is not a dodge');
+});
+
+test('vertical stick and W/S or arrow keys control speed independently of lateral steering', () => {
+  assert.equal(runnerThrottle(new Set(), -1), 1);
+  assert.equal(runnerThrottle(new Set(), .6), -.6);
+  assert.equal(runnerThrottle(new Set(), .1), 0);
+  for (const key of ['ArrowUp', 'KeyW']) assert.equal(runnerThrottle(new Set([key]), 1), 1);
+  for (const key of ['ArrowDown', 'KeyS']) assert.equal(runnerThrottle(new Set([key]), -1), -1);
+  assert.equal(runnerThrottle(new Set(['KeyW', 'ArrowDown']), -1), 0);
+  assert.equal(runnerThrottle(new Set(['ArrowLeft']), -.7), .7);
+  assert.equal(runnerThrottle(new Set(), 0), 0, 'Resetting the stick restores cruise');
 });
 
 test('cancel, pause/reset and backgrounding discard an unfinished swipe', () => {

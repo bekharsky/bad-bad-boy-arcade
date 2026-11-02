@@ -19,8 +19,8 @@ import { createAimAssist } from './aim-assist.js';
 import { createMouseAim } from './mouse-aim.js';
 import { bindGameInput } from './game-input.js';
 import { preventGameZoom } from './gesture-guard.js';
-import { createBaanaRun, RUN_LANES, RIDER_BONUS } from './runner/baana-run.js';
-import { bindRunnerInput, createLaneSteering } from './runner/runner-input.js';
+import { createRunnerRun } from './runner/course.js';
+import { bindRunnerInput, createLaneSteering, runnerThrottle } from './runner/runner-input.js';
 
 const MODEL_URL = './assets/bad-bad-boy.glb?v=20261025-opt1';
 // World metres; the hero keeps the same physical size across every map.
@@ -64,7 +64,6 @@ const settingsDone = document.querySelector('#settings-done');
 const soundSetting = document.querySelector('#sound-setting');
 const waveStatLabel = document.querySelector('#wave-stat-label');
 const runnerProgress = document.querySelector('#runner-progress');
-const transitionLabel = document.querySelector('#map-transition');
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const query = new URLSearchParams(window.location.search);
 const debugMaps = query.get('debug') === 'maps';
@@ -161,8 +160,7 @@ scene.add(player.root);
 
 function hitEnemy(enemy, direction, impact) {
   if (isRunner()) {
-    if (baanaRun.sprayHit(enemy.id, impact)) {
-      showToast(`+${RIDER_BONUS}`);
+    if (runnerRun.sprayHit(enemy.id, impact)) {
       burst(enemy.x, enemy.hitHeight, enemy.z, 0xffd34e, 20, null, 3);
       blip(440 + Math.random() * 280, .045);
     }
@@ -205,23 +203,22 @@ let gameTime = 0;
 let score = 0;
 let audioContext = null;
 let frameTime = 0;
-const baanaRun = createBaanaRun();
-let runnerComplete = false, runnerBaseScore = 0;
+let runnerRun = createRunnerRun();
+let runnerBaseScore = 0;
 const isRunner = () => world.mode === 'runner';
 const runnerInput = bindRunnerInput({
   canvas,
   canInteract: () => playing && isRunner() && !controlsDialog.open && !mapTransition.active,
-  dodge: direction => baanaRun.dodge(direction),
+  dodge: direction => runnerRun.dodge(direction),
   setFiring: firing => firing ? keys.add('Fire') : keys.delete('Fire'), beginSpray,
 });
 
-const laneSteering = createLaneSteering(direction => baanaRun.dodge(direction));
+const laneSteering = createLaneSteering(direction => runnerRun.dodge(direction));
 const transitionRenderer = createTransitionRenderer(renderer);
 const mapTransition = createMapTransition({ onSwap: applyWave, onFinish: finishMapTransition });
 
 function finishMapTransition() {
   document.querySelector('.game-shell').classList.remove('map-changing');
-  transitionLabel.hidden = true;
   resetInput();
   touchControls.setEnabled(playing);
   syncMouseAim();
@@ -229,12 +226,14 @@ function finishMapTransition() {
 
 function syncLevelUI() {
   const runner = isRunner();
+  toast.hidden = runner;
+  if (runner) { clearTimeout(showToast.timer); toast.classList.remove('visible'); }
   desktopSpray.hidden = !playing;
   document.querySelector('.game-shell').classList.toggle('runner-mode', runner);
   waveStatLabel.parentElement.hidden = runner;
-  touchControls.setHorizontalOnly(runner);
-  document.querySelector('#joystick-zone').setAttribute('aria-label', runner ? 'Drag left or right to dodge' : 'Drag to move and aim');
+  document.querySelector('#joystick-zone').setAttribute('aria-label', runner ? 'Left/right to dodge; up to accelerate, down to brake' : 'Drag to move and aim');
   runnerProgress.hidden = !runner || !playing;
+  runnerProgress.setAttribute('aria-label', `${world.name} progress`);
 }
 
 if (debugMaps) {
@@ -361,8 +360,6 @@ function spawnWave(plan) {
     syncMouseAim();
     touchControls.setEnabled(false);
     document.querySelector('.game-shell').classList.add('map-changing');
-    transitionLabel.querySelector('strong').textContent = maps.find(map => map.id === plan.mapId).name;
-    transitionLabel.style.opacity = '0'; transitionLabel.hidden = false;
     return;
   }
   applyWave(plan);
@@ -379,21 +376,20 @@ function applyWave(plan) {
     updateHealth();
     world.reset();
     placePlayerAtSpawn();
-    if (!isRunner()) { medkits.reset(player); batteries.reset(player); }
+    medkits.reset(player);
+    if (!isRunner()) batteries.reset(player);
   }
-  runnerComplete = false;
   syncLevelUI();
   if (isRunner()) {
-    baanaRun.reset(); runnerBaseScore = score; player.invulnerable = 0;
+    runnerRun = createRunnerRun(world.runner); runnerBaseScore = score; player.invulnerable = 0;
     runnerProgress.firstElementChild.style.transform = 'scaleX(0)';
     runnerProgress.setAttribute('aria-valuenow', '0');
-    world.updateRunner(baanaRun.state);
-    showToast('BAANA · ← →');
+    world.updateRunner(runnerRun.state);
     return;
   }
   waveLabel.textContent = String(plan.number).padStart(2, '0');
   spawnEnemies(plan.enemyCount, plan.number);
-  if (plan.number > 1) showToast(changedMap ? `WAVE ${plan.number} · ${world.name.toUpperCase()}` : `WAVE ${plan.number}`);
+  if (plan.number > 1) showToast(`WAVE ${plan.number}`);
 }
 
 function removeEnemy(enemy, pop = false) {
@@ -435,6 +431,7 @@ function showBite(enemy) {
 }
 
 function showToast(message) {
+  if (isRunner()) return;
   toast.textContent = message;
   toast.classList.add('visible');
   clearTimeout(showToast.timer);
@@ -513,7 +510,7 @@ function update(dt) {
   gameTime += dt;
   // Finish the final bite's splash even after the round ends.
   biteEffects.update(dt);
-  effects.update(dt, playing && isRunner() ? baanaRun.state.speed : 0);
+  effects.update(dt, playing && isRunner() ? runnerRun.state.speed : 0);
   if (!playing) return;
   if (isRunner()) { updateRunner(dt); return; }
   const announcement = world.update(dt, [player, ...enemies]);
@@ -608,15 +605,16 @@ function update(dt) {
 
 function updateRunner(dt) {
   laneSteering.update(touchControls.input.x, dt);
-  const result = baanaRun.update(dt), state = baanaRun.state;
+  runnerRun.setThrottle(runnerThrottle(keys, touchControls.input.z));
+  const result = runnerRun.update(dt), state = runnerRun.state;
   player.x = state.x; player.z = 0;
   player.heading = Math.PI; player.dx = 0; player.dz = -1;
   player.root.position.set(player.x, 0, 0); player.root.rotation.y = Math.PI;
   player.runTime += state.speed * dt * Math.PI * 2 / (HERO_HEIGHT * .45);
   player.runBlend = 1; player.moveSpeed = state.speed;
   player.body.position.y = Math.abs(Math.sin(player.runTime)) * .035 * HERO_SCALE;
-  player.body.rotation.x = -.05;
-  player.body.rotation.z = THREE.MathUtils.damp(player.body.rotation.z, (RUN_LANES[state.lane] - state.x) * -.055, 12, dt);
+  player.body.rotation.x = THREE.MathUtils.damp(player.body.rotation.x, -.05 - runnerRun.pace * .15, 8, dt);
+  player.body.rotation.z = THREE.MathUtils.damp(player.body.rotation.z, (runnerRun.lanes[state.lane] - state.x) * -.055, 12, dt);
   animateHero(player.rig, player.runTime, 1);
   player.root.updateMatrixWorld(true);
   const firing = keys.has('Space') || keys.has('Fire') || touchControls.input.firing || player.tapTimer > 0;
@@ -624,22 +622,24 @@ function updateRunner(dt) {
   const spray = stream.update(dt, firing, player.rig.emitter, player, state.traffic);
   updateSprayGauge(spray);
   world.updateRunner(state);
-  score = runnerBaseScore + Math.floor(state.distance) * 2 + state.passed * 25 + state.bonus;
+  score = runnerBaseScore + Math.floor(state.distance) * 2 + state.bonus;
   scoreLabel.textContent = String(score).padStart(4, '0');
-  runnerProgress.firstElementChild.style.transform = `scaleX(${state.distance / baanaRun.length})`;
-  runnerProgress.setAttribute('aria-valuenow', String(Math.round(state.distance / baanaRun.length * 100)));
+  runnerProgress.firstElementChild.style.transform = `scaleX(${state.distance / runnerRun.length})`;
+  runnerProgress.setAttribute('aria-valuenow', String(Math.round(state.distance / runnerRun.length * 100)));
   if (result.hits) {
     player.hp = Math.max(0, player.hp - result.hits); updateHealth(); blip(110, .12);
+    burst(player.x, HERO_HEIGHT * .4, 0, 0xe85e55, 16, null, 2);
     if (player.hp === 0) { endGame(); return; }
   }
+  medkits.update(dt, player, collectMedkit, state);
   player.invulnerable = state.invulnerable;
   player.model.material.opacity = state.invulnerable > 0 && Math.floor(state.elapsed * 18) % 2 === 0 ? .4 : 1;
   player.model.material.transparent = state.invulnerable > 0;
   // Lane changes move the hero across the screen; the camera holds the route centre.
-  cameraRig.frame(0, 0, dt);
+  cameraRig.frameRunner(runnerRun.pace, dt);
   if (state.finished) {
     score += 500; scoreLabel.textContent = String(score).padStart(4, '0');
-    runnerComplete = true; endGame();
+    waves.completeMap();
   }
 }
 
@@ -712,7 +712,7 @@ function placePlayerAtSpawn() {
   player.root.position.set(player.x, 0, player.z);
   player.body.position.set(0, 0, 0);
   player.body.rotation.set(0, 0, 0);
-  cameraRig.frame(player.x, player.z, 0, true);
+  cameraRig.frame(isRunner() ? 0 : player.x, player.z, 0, true);
   animateHero(player.rig, 0, 0);
 }
 
@@ -766,8 +766,8 @@ function endGame() {
   player.moveSpeed = 0;
   player.turnSpeed = 0;
   endScreen.classList.remove('hidden');
-  document.querySelector('#end-title').textContent = runnerComplete ? 'BAANA CLEAR' : 'WASTED';
-  restartButton.textContent = runnerComplete ? 'CONTINUE' : 'PLAY AGAIN';
+  document.querySelector('#end-title').textContent = 'WASTED';
+  restartButton.textContent = 'PLAY AGAIN';
   player.model.material.opacity = 1;
   player.model.material.transparent = false;
   blip(80, 0.25);
@@ -789,8 +789,7 @@ function animate(now) {
   update(dt);
   if (player.model) world.updateVisibility(camera, player.root, HERO_HEIGHT, dt);
   if (mapTransition.active) {
-    const frame = transitionRenderer.render(scene, camera, mapTransition.progress, reducedMotion.matches);
-    transitionLabel.style.opacity = String(frame.title);
+    transitionRenderer.render(scene, camera, mapTransition.progress, reducedMotion.matches);
   } else renderer.render(scene, camera);
   updateHeroHp();
 }
@@ -803,6 +802,7 @@ function beginSpray() {
 
 function resetInput() {
   runnerInput.reset();
+  runnerRun.setThrottle(0);
   laneSteering.reset();
   resetAimAssist();
   mouseAim.resetAim();
@@ -899,7 +899,7 @@ window.addEventListener('keydown', (event) => {
   }
   if (playing && isRunner() && ['ArrowLeft', 'ArrowRight', 'KeyA', 'KeyD'].includes(event.code)) {
     event.preventDefault();
-    if (!event.repeat) baanaRun.dodge(event.code === 'ArrowLeft' || event.code === 'KeyA' ? -1 : 1);
+    if (!event.repeat) runnerRun.dodge(event.code === 'ArrowLeft' || event.code === 'KeyA' ? -1 : 1);
     return;
   }
   if (!mouseAim.locked && event.target instanceof Element && event.target.closest('select, input')) return;
@@ -930,10 +930,7 @@ bindGameInput({
 });
 startButton.addEventListener('click', () => { startGame(); requestMouseAim(); });
 restartButton.addEventListener('click', () => {
-  if (runnerComplete) {
-    playing = true; waves.completeMap(); endScreen.classList.add('hidden');
-    touchControls.setEnabled(!mapTransition.active); syncLevelUI(); canvas.focus({ preventScroll: true }); requestMouseAim();
-  } else { startGame(); requestMouseAim(); }
+  startGame(); requestMouseAim();
 });
 soundSetting.checked = soundEnabled;
 soundSetting.addEventListener('change', () => {

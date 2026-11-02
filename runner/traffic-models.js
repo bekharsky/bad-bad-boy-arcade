@@ -1,9 +1,11 @@
 import * as THREE from 'three';
 import { createSceneryModel } from '../maps/scenery-model.js';
+import { TRAM_CAR_OFFSET } from './tram-route.js';
 
 export const TRAFFIC_PALETTE = { green: '#64c94c', blue: '#51bde0', red: '#e45c5c' };
 
 export function createTrafficModel(kind, color) {
+  if (kind === 'tram') return createRunnerTram();
   const model = createSceneryModel(`${color} ${kind}`), { box } = model;
   const paint = TRAFFIC_PALETTE[color];
   function rod(shade, a, b, radius = .055) {
@@ -104,6 +106,48 @@ export function createTrafficModel(kind, color) {
   }
   box('#f0df9b', 0, .87, wheelZ + .08, .15, .15, .06);
   return model.finish({ vertexColors: true });
+}
+
+
+// Separate rigid cars share the original runner tram's dimensions and colours,
+// but can articulate along a curve. Pool clones still share all geometry.
+function createRunnerTram() {
+  const root = new THREE.Group(); root.name = 'tram tram';
+  const green = '#347758', cream = '#e2d09a', glass = '#294a52';
+  for (const end of [-1, 1]) {
+    const car = createSceneryModel(end > 0 ? 'Tram front car' : 'Tram rear car'), { box } = car;
+    box(green, 0, 1.05, 0, 2.45, 1.45, 7.2);
+    box(cream, 0, 2.35, 0, 2.48, 1.15, 7.2);
+    box('#d2d6bd', 0, 3.04, 0, 2.5, .22, 7.25);
+    box('#e4b94e', 0, 1.73, 0, 2.49, .17, 7.22);
+    for (const side of [-1, 1]) {
+      for (let n = -2; n <= 2; n++) box(glass, side * 1.252, 2.38, n * 1.28, .03, .85, 1.06);
+      for (const offset of [-2.6, 2.6]) {
+        box('#3e4e43', side * 1.26, 1.3, offset, .035, 2.15, .065);
+        box('#c5c9ad', side * 1.28, .42, offset, .12, .14, 1.05);
+      }
+      for (const offset of [-1.9, 1.9]) box('#253338', side * .96, .38, offset, .3, .65, .8);
+    }
+    box(glass, 0, 2.36, end * 3.63, 2.03, .9, .04);
+    box('#223e35', 0, 3, end * 3.66, 1.65, .3, .04);
+    for (const x of [-.75, .75]) box('#f4e6a9', x, 1, end * 3.67, .27, .22, .04);
+    box('#d7b65f', 0, .66, end * 3.65, 2.4, .15, .07);
+    if (end < 0) {
+      for (const side of [-1, 1]) {
+        box('#344e46', side * .38, 3.63, 1.85, .07, 1.2, .08, side * -.7);
+        box('#344e46', side * .38, 4.47, 1.85, .07, 1.2, .08, side * .7);
+      }
+      box('#344e46', 0, 4.96, 1.85, 1.65, .08, .12);
+    }
+    const part = car.finish({ vertexColors: true });
+    part.userData.tramOffset = end * TRAM_CAR_OFFSET; part.position.z = part.userData.tramOffset;
+    root.add(part);
+  }
+  const joint = createSceneryModel('Tram articulation');
+  joint.box('#515d53', 0, 1.72, 0, 2.2, 2.25, .6);
+  for (const z of [-.22, 0, .22]) joint.box('#293a35', 0, 1.72, z, 2.29, 2.28, .055);
+  root.add(joint.finish({ vertexColors: true }));
+  return root;
 }
 
 export function animateTraffic(root, time, speed) {

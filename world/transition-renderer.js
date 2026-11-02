@@ -5,7 +5,6 @@ export function transitionFrame(progress, reducedMotion = false) {
   return {
     pixels: reducedMotion ? 0 : Math.sin(Math.PI * p) ** 2,
     cover: THREE.MathUtils.smoothstep(p, .22, .47) * (1 - THREE.MathUtils.smoothstep(p, .53, .82)),
-    title: THREE.MathUtils.smoothstep(p, .12, .35) * (1 - THREE.MathUtils.smoothstep(p, .72, 1)),
   };
 }
 

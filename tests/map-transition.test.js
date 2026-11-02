@@ -42,11 +42,11 @@ test('pause preserves transition time and cancelling a run prevents a stale swap
 test('shader cover conceals the swap while both ends match ordinary rendering', () => {
   for (const progress of [0, 1]) {
     const frame = transitionFrame(progress);
-    assert.ok(frame.pixels < 1e-10); assert.equal(frame.cover, 0); assert.equal(frame.title, 0);
+    assert.ok(frame.pixels < 1e-10); assert.equal(frame.cover, 0);
   }
   for (const progress of [.47, .49, .5, .51, .53]) assert.equal(transitionFrame(progress).cover, 1);
   for (const progress of [0, .3, .5, .8, 1]) assert.equal(transitionFrame(progress, true).pixels, 0);
-  assert.equal(transitionFrame(.5).pixels, 1); assert.equal(transitionFrame(.5).title, 1);
+  assert.equal(transitionFrame(.5).pixels, 1);
 });
 
 test('the GPU pass resizes with the drawing buffer, restores the target and releases its resources', () => {

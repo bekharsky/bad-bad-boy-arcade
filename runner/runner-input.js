@@ -41,3 +41,11 @@ export function createLaneSteering(dodge) {
     },
   };
 }
+
+// Both runner maps use the vertical stick axis for speed. Keyboard input takes
+// precedence so opposite held keys cancel rather than exposing stale touch input.
+export function runnerThrottle(keys, stickZ = 0) {
+  const up = keys.has('ArrowUp') || keys.has('KeyW'), down = keys.has('ArrowDown') || keys.has('KeyS');
+  if (up || down) return Number(up) - Number(down);
+  return Math.abs(stickZ) > .12 ? Math.max(-1, Math.min(1, -stickZ)) : 0;
+}
