@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createHero, animateHero, HERO_BASE_HEIGHT } from './hero.js';
+import { loadHero } from './models/hero-loader.js';
 import { maps, mapOrder } from './maps/index.js';
 import { createArenaCombat } from './arena-combat.js';
 import { createFrameClock } from './world/frame-clock.js';
@@ -21,12 +21,11 @@ import { createAimAssist } from './aim-assist.js';
 import { createMouseAim } from './mouse-aim.js';
 import { bindGameInput } from './game-input.js';
 import { preventGameZoom } from './gesture-guard.js';
-import { createRunnerRun } from './runner/course.js';
-import { bindRunnerInput, createLaneSteering, runnerThrottle } from './runner/runner-input.js';
+import { bindRunnerInput } from './runner/runner-input.js';
+import { createRunnerSession } from './runner/session.js';
 import { createSeagulls } from './seagulls.js';
 import { aimingUp, createSprayAim } from './spray-aim.js';
 
-const MODEL_URL = './assets/bad-bad-boy.glb?v=20261025-opt1';
 // World metres; the hero keeps the same physical size across every map.
 const HERO_HEIGHT = 3.45;
 const HERO_SCALE = HERO_HEIGHT / HERO_BASE_HEIGHT;
@@ -165,7 +164,7 @@ scene.add(player.root);
 function hitEnemy(enemy, direction, impact) {
   if (enemy.kind === 'gull') { seagulls.repel(enemy); return; }
   if (isRunner()) {
-    if (runnerRun.sprayHit(enemy.id, impact)) {
+    if (runnerSession.sprayHit(enemy.id, impact)) {
       burst(enemy.x, enemy.hitHeight, enemy.z, 0xffd34e, 20, null, 3);
       blip(440 + Math.random() * 280, .045);
     }
@@ -217,7 +216,7 @@ const seagulls = createSeagulls(scene, world, {
     if (impact.type === 'drop' || impact.hit) burst(impact.x, impact.y, impact.z, impact.type === 'drop' ? '#eee9cf' : '#e85e55', 12, null, 2);
     if (!impact.hit || player.invulnerable > 0 || !playing) return;
     player.hp = Math.max(0, player.hp - 1); player.invulnerable = .9;
-    if (isRunner()) runnerRun.state.invulnerable = Math.max(runnerRun.state.invulnerable, .9);
+    if (isRunner()) runnerSession.state.invulnerable = Math.max(runnerSession.state.invulnerable, .9);
     updateHealth(); blip(105, .12);
     if (player.hp === 0) endGame();
   },
@@ -229,17 +228,36 @@ let gameTime = 0;
 let score = 0;
 let audioContext = null;
 const frameClock = createFrameClock();
-let runnerRun = createRunnerRun();
-let runnerBaseScore = 0;
 const isRunner = () => world.mode === 'runner';
+const runnerSession = createRunnerSession({
+  world, player, cameraRig, seagulls, medkits, touchControls, keys,
+  heroHeight: HERO_HEIGHT, heroScale: HERO_SCALE,
+  isPlaying: () => playing,
+  onDamage(hits) {
+    player.hp = Math.max(0, player.hp - hits); updateHealth(); blip(110, .12);
+    burst(player.x, HERO_HEIGHT * .4, 0, 0xe85e55, 16, null, 2);
+    if (player.hp === 0) { endGame(); return false; }
+    return true;
+  },
+  onSpray(dt, firing, traffic) { updateSprayGauge(updateSpray(dt, firing, traffic)); },
+  onCollect: collectMedkit,
+  onScore(value) { score = value; scoreLabel.textContent = String(score).padStart(4, '0'); },
+  onProgress(fraction) {
+    runnerProgress.firstElementChild.style.transform = `scaleX(${fraction})`;
+    runnerProgress.setAttribute('aria-valuenow', String(Math.round(fraction * 100)));
+  },
+  onFinish() {
+    score += 500; scoreLabel.textContent = String(score).padStart(4, '0');
+    waves.completeMap();
+  },
+});
 const runnerInput = bindRunnerInput({
   canvas,
   canInteract: () => playing && isRunner() && !controlsDialog.open && !mapTransition.active,
-  dodge: direction => runnerRun.dodge(direction),
+  dodge: direction => runnerSession.dodge(direction),
   setFiring: firing => firing ? keys.add('Fire') : keys.delete('Fire'), beginSpray,
 });
 
-const laneSteering = createLaneSteering(direction => runnerRun.dodge(direction));
 const transitionRenderer = createTransitionRenderer(renderer);
 const mapTransition = createMapTransition({ onSwap: applyWave, onFinish: finishMapTransition });
 
@@ -290,57 +308,11 @@ if (debugMaps) {
   }
 }
 
-async function loadHero() {
-  const url = new URL(MODEL_URL, import.meta.url);
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`Hero download failed: HTTP ${response.status}`);
-  let bytes;
-  if (response.body) {
-    const reader = response.body.getReader();
-    const chunks = [], header = new Uint8Array(12);
-    let loaded = 0, headerLength = 0, total = 0;
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value); loaded += value.byteLength;
-        if (headerLength < header.length) {
-          const part = value.subarray(0, header.length - headerLength);
-          header.set(part, headerLength); headerLength += part.length;
-          if (headerLength === header.length) {
-            const view = new DataView(header.buffer);
-            if (view.getUint32(0, true) !== 0x46546c67 || view.getUint32(4, true) !== 2) throw new Error('Invalid hero GLB header');
-            // GLB stores the decoded size. HTTP Content-Length can describe
-            // compressed bytes, while fetch streams already decoded bytes.
-            total = view.getUint32(8, true);
-            if (total < 20) throw new Error('Invalid hero GLB length');
-          }
-        }
-        if (total) {
-          if (loaded > total) throw new Error('Hero GLB exceeds its declared length');
-          const percent = Math.max(0, Math.min(99, Math.floor(loaded / total * 100)));
-          status.textContent = `Loading the hero… ${percent}%`;
-        }
-      }
-    } finally {
-      reader.releaseLock();
-    }
-    if (!total || loaded !== total) throw new Error('Hero GLB download is incomplete');
-    bytes = new Uint8Array(loaded);
-    let offset = 0;
-    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
-  } else {
-    bytes = new Uint8Array(await response.arrayBuffer());
-  }
-  status.textContent = 'Preparing the models…';
-  return new GLTFLoader().parseAsync(bytes.buffer, new URL('.', url).href);
-}
-
 async function loadModels() {
   try {
     status.textContent = 'Loading the hero, barnacle geese, and Spanish slugs…';
     const [gltf] = await Promise.all([
-      loadHero(),
+      loadHero(message => { status.textContent = message; }),
       loadEnemyModels(),
     ]);
     player.rig = createHero(gltf.scene);
@@ -357,7 +329,7 @@ async function loadModels() {
     window.dispatchEvent(new Event('game:ready'));
   } catch (error) {
     console.error('Could not load game models:', error);
-    status.textContent = 'Could not load the models. Start the local server, then refresh the page.';
+    status.textContent = 'Could not load the models. Check the connection, then refresh the page.';
     window.dispatchEvent(new CustomEvent('game:load-error', { detail: error }));
   }
 }
@@ -408,10 +380,7 @@ function applyWave(plan) {
   }
   syncLevelUI();
   if (isRunner()) {
-    runnerRun = createRunnerRun(world.runner); runnerBaseScore = score; player.invulnerable = 0;
-    runnerProgress.firstElementChild.style.transform = 'scaleX(0)';
-    runnerProgress.setAttribute('aria-valuenow', '0');
-    world.updateRunner(runnerRun.state);
+    runnerSession.start(world.runner, score);
     return;
   }
   waveLabel.textContent = String(plan.number).padStart(2, '0');
@@ -545,9 +514,9 @@ function update(dt) {
   gameTime += dt;
   // Finish the final bite's splash even after the round ends.
   biteEffects.update(dt);
-  effects.update(dt, playing && isRunner() ? runnerRun.state.speed : 0);
+  effects.update(dt, playing && isRunner() ? runnerSession.state.speed : 0);
   if (!playing) return;
-  if (isRunner()) { updateRunner(dt); return; }
+  if (isRunner()) { runnerSession.update(dt); return; }
   const announcement = world.update(dt, [player, ...enemies]);
   if (announcement) showToast(announcement);
 
@@ -599,56 +568,6 @@ function update(dt) {
   }
   // Pan with a fixed viewing angle so movement does not swing the aiming view.
   cameraRig.frame(player.x, player.z, dt);
-}
-
-function updateRunner(dt) {
-  laneSteering.update(touchControls.input.x, dt);
-  runnerRun.setThrottle(runnerThrottle(keys, touchControls.input.z));
-  const result = runnerRun.update(dt), state = runnerRun.state;
-  player.x = state.x; player.z = 0;
-  player.heading = Math.PI; player.dx = 0; player.dz = -1;
-  player.root.position.set(player.x, 0, 0); player.root.rotation.y = Math.PI;
-  player.runTime += state.speed * dt * Math.PI * 2 / (HERO_HEIGHT * .45);
-  player.runBlend = 1; player.moveSpeed = state.speed;
-  player.body.position.y = Math.abs(Math.sin(player.runTime)) * .035 * HERO_SCALE;
-  player.body.rotation.x = THREE.MathUtils.damp(player.body.rotation.x, -.05 - runnerRun.pace * .15, 8, dt);
-  player.body.rotation.z = THREE.MathUtils.damp(player.body.rotation.z, (runnerRun.lanes[state.lane] - state.x) * -.055, 12, dt);
-  animateHero(player.rig, player.runTime, 1);
-  player.root.updateMatrixWorld(true);
-  player.invulnerable = state.invulnerable;
-  const firing = keys.has('Space') || keys.has('Fire') || touchControls.input.firing || player.tapTimer > 0;
-  player.tapTimer = Math.max(0, player.tapTimer - dt);
-  world.updateRunner(state);
-  if (result.hits) {
-    player.hp = Math.max(0, player.hp - result.hits); updateHealth(); blip(110, .12);
-    burst(player.x, HERO_HEIGHT * .4, 0, 0xe85e55, 16, null, 2);
-    if (player.hp === 0) { endGame(); return; }
-  }
-  seagulls.update(dt, player, { scroll: state.speed, attacks: !state.finished });
-  if (!playing) return;
-  const spray = updateSpray(dt, firing, state.traffic);
-  updateSprayGauge(spray);
-  // Settle after spray damage so a hit on the finishing frame carries into
-  // the next district along with the distance and obstacle bonuses.
-  syncRunnerScore();
-  runnerProgress.firstElementChild.style.transform = `scaleX(${state.distance / runnerRun.length})`;
-  runnerProgress.setAttribute('aria-valuenow', String(Math.round(state.distance / runnerRun.length * 100)));
-  medkits.update(dt, player, collectMedkit, state);
-  player.invulnerable = state.invulnerable;
-  player.model.material.opacity = state.invulnerable > 0 && Math.floor(state.elapsed * 18) % 2 === 0 ? .4 : 1;
-  player.model.material.transparent = state.invulnerable > 0;
-  // Lane changes move the hero across the screen; the camera holds the route centre.
-  cameraRig.frameRunner(runnerRun.pace, dt);
-  if (state.finished) {
-    score += 500; scoreLabel.textContent = String(score).padStart(4, '0');
-    waves.completeMap();
-  }
-}
-
-function syncRunnerScore() {
-  const state = runnerRun.state;
-  score = runnerBaseScore + Math.floor(state.distance) * 2 + state.bonus;
-  scoreLabel.textContent = String(score).padStart(4, '0');
 }
 
 function updateSpray(dt, firing, groundTargets, powered = false) {
@@ -772,7 +691,7 @@ function clearArena() {
 }
 
 function endGame() {
-  if (isRunner()) syncRunnerScore();
+  if (isRunner()) runnerSession.syncScore();
   playing = false;
   desktopSpray.hidden = true;
   syncMouseAim();
@@ -822,8 +741,7 @@ function beginSpray() {
 
 function resetInput() {
   runnerInput.reset();
-  runnerRun.setThrottle(0);
-  laneSteering.reset();
+  runnerSession.resetInput();
   resetAimAssist();
   mouseAim.resetAim();
   keys.clear();
@@ -919,7 +837,7 @@ window.addEventListener('keydown', (event) => {
   }
   if (playing && isRunner() && ['ArrowLeft', 'ArrowRight', 'KeyA', 'KeyD'].includes(event.code)) {
     event.preventDefault();
-    if (!event.repeat) runnerRun.dodge(event.code === 'ArrowLeft' || event.code === 'KeyA' ? -1 : 1);
+    if (!event.repeat) runnerSession.dodge(event.code === 'ArrowLeft' || event.code === 'KeyA' ? -1 : 1);
     return;
   }
   if (!mouseAim.locked && event.target instanceof Element && event.target.closest('select, input')) return;

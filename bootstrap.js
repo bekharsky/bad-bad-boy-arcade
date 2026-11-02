@@ -26,5 +26,5 @@
     clearTimeout(timeout);
     retry.hidden = true;
   });
-  import('game').catch(fail);
+  import('./game.js').catch(fail);
 })();

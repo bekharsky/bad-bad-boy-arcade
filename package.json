@@ -4,12 +4,19 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "python3 server.py",
+    "start": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "publish:arcade": "npm run build && bash scripts/publish-arcade.sh",
     "test": "node --test",
     "prepare-model": "node scripts/prepare-model.mjs"
   },
   "devDependencies": {
     "meshoptimizer": "1.3.0",
-    "sharp": "0.34.5"
+    "sharp": "^0.35.5",
+    "vite": "^7.3.7"
+  },
+  "dependencies": {
+    "three": "0.180.0"
   }
 }

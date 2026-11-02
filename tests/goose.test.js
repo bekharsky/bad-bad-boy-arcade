@@ -22,7 +22,7 @@ test('geese replace the snail model without downloads, sharing one mesh but keep
     return { scene, animations: [] };
   });
   await loadEnemyModels();
-  assert.deepEqual(loaded, ['./assets/enemies/slug.glb']);
+  assert.deepEqual(loaded, [new URL('../assets/enemies/slug.glb', import.meta.url).href]);
   assert.deepEqual(ENEMY_HEALTH, { goose: 2, slug: 1 });
   const first = createEnemy('goose', 1), second = createEnemy('goose', 1);
   const meshes = enemy => { const result = []; enemy.model.traverse(node => { if (node.isMesh) result.push(node); }); return result; };
