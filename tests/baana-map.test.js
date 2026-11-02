@@ -20,13 +20,16 @@ test('Baana recycles scenery and traffic with bounded geometry and all rider col
   assert.equal(map.pickupCapacity('medkit'), 0);
   const meshCount = () => { let count = 0; map.root.traverse(node => { if (node.isMesh) count++; }); return count; };
   const initialCount = meshCount();
+  assert.ok(initialCount < 200, 'Only shared templates are built before traffic appears');
   for (let i = 0; i < 100; i++) { run.update(.5); map.updateRunner(run.state); }
-  assert.equal(meshCount(), initialCount);
+  assert.ok(meshCount() <= initialCount + TRAFFIC_CAPACITY * 3, 'Traffic variants stay bounded by active slots');
   const pool = map.root.children.filter(node => node.name === 'Baana traffic');
   assert.equal(pool.length, TRAFFIC_CAPACITY);
   assert.equal(pool.filter(node => node.visible).length, run.state.traffic.length);
-  assert.deepEqual(pool[0].children.map(node => node.name).sort(), ['blue bike', 'blue scooter', 'green bike', 'green scooter', 'red bike', 'red scooter', 'roadwork barrier', 'roadwork cone', 'roadwork tractor', 'roadwork trench']);
-  for (const object of pool.filter(node => node.visible)) assert.equal(object.children.filter(child => child.visible).length, 1);
+  const templates = map.root.getObjectByName('Baana traffic templates');
+  assert.deepEqual(templates.children.map(node => node.name).filter(Boolean).sort(), ['blue bike', 'blue scooter', 'green bike', 'green scooter', 'red bike', 'red scooter', 'roadwork barrier', 'roadwork cone', 'roadwork tractor', 'roadwork trench']);
+  assert.ok(pool.every(object => object.children.length <= 1));
+  for (const object of pool.filter(node => node.visible)) assert.equal(object.children.length, 1);
   const sections = map.root.children.filter(node => node.name === 'Baana cutting section');
   assert.equal(sections.length, 5); assert.ok(sections.every(node => node.position.z >= -128 && node.position.z < 32));
   map.reset(); assert.equal(pool.some(node => node.visible), false);
@@ -61,6 +64,11 @@ test('rider hit flash is isolated to its slot and cleared models disappear at fu
   assert.notEqual(material(pool[0]), material(pool[1]));
   state.elapsed = 2; map.updateRunner(state);
   assert.equal(material(pool[0]).emissiveIntensity, 0);
+  const oldVariant = pool[0].children[0];
+  agents[0].kind = 'scooter'; map.updateRunner(state);
+  assert.equal(pool[0].children.length, 1);
+  assert.equal(pool[0].children[0].name, 'red scooter');
+  assert.notEqual(pool[0].children[0], oldVariant);
   agents[0].cleared = true; map.updateRunner(state);
   assert.equal(pool[0].visible, false);
   assert.deepEqual(pool[0].scale.toArray(), [1, 1, 1]);
