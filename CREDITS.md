@@ -1,12 +1,18 @@
 # Models and credits
 
-## Snail
+## Barnacle goose
+
+- Original procedural model in `goose.js`, including walking, wing and peck animation.
+- No external model, texture or downloaded reference image is included.
+- Plumage reference: [Cornell Lab of Ornithology — Barnacle Goose identification](https://www.allaboutbirds.org/guide/Barnacle_Goose/id).
+
+## Snail (legacy asset)
 
 - **Snail** by **Poly by Google**.
 - Source: https://poly.pizza/m/aZ_cT-AIu2y
 - Licence: **Creative Commons Attribution 3.0 Unported (CC BY 3.0)**, https://creativecommons.org/licenses/by/3.0/
 - File: `assets/enemies/snail.glb`.
-- In-game changes: scale, position, material settings, and a procedural crawling sway. The geometry and texture in the GLB are unchanged.
+- Retained in the repository for attribution and asset history; replaced by barnacle geese in gameplay. The geometry and texture in the GLB are unchanged.
 
 ## Slug
 
