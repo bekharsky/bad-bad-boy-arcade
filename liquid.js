@@ -40,11 +40,12 @@ export function createLiquidStream(scene, city, onHit, { scale = 1, refraction =
   const predicted = new THREE.Vector3();
   const previousPrediction = new THREE.Vector3();
   const targetPosition = new THREE.Vector3();
-  const state = { charge: 0, range: 0, blocked: false };
+  const state = { charge: 0, range: 0, blocked: false, airborne: false };
   const dummy = new THREE.Object3D();
   let time = 0, accumulator = 0, emission = 0, sequence = 0, batch = 0;
   let heldTime = 0, speed = MIN_SPEED, lift = MIN_LIFT;
   let wasFiring = false, nextSplash = 0, nextRipple = 0;
+  let aimTarget = null;
   // Battery side streams start later, but must share the centre jet's cooldown.
   const hitTime = getHitTime ?? (() => time);
 
@@ -95,12 +96,26 @@ export function createLiquidStream(scene, city, onHit, { scale = 1, refraction =
     speed = THREE.MathUtils.lerp(MIN_SPEED, MAX_SPEED, pressure);
     lift = THREE.MathUtils.lerp(MIN_LIFT, MAX_LIFT, pressure);
     launchVelocity.copy(direction).multiplyScalar(speed).setY(lift);
+    if (state.airborne) {
+      if (aimTarget?.alive) {
+        const flight = .65 - state.charge * .12;
+        targetPosition.set(
+          aimTarget.x + THREE.MathUtils.clamp(aimTarget.vx || 0, -14, 14) * flight,
+          aimTarget.hitHeight + THREE.MathUtils.clamp(aimTarget.vy || 0, -6, 6) * flight,
+          aimTarget.z + THREE.MathUtils.clamp(aimTarget.vz || 0, -14, 14) * flight,
+        );
+        launchVelocity.subVectors(targetPosition, origin).divideScalar(flight);
+        launchVelocity.y += .5 * GRAVITY * flight;
+        launchVelocity.clampLength(0, 24);
+      } else launchVelocity.multiplyScalar(.55).setY(8 + state.charge * 4);
+    }
   }
 
   function updateLandingMarker(firing) {
-    const duration = flightTime(origin.y, lift);
-    state.range = speed * duration;
+    const duration = flightTime(origin.y, launchVelocity.y);
+    state.range = Math.hypot(launchVelocity.x, launchVelocity.z) * duration;
     state.blocked = false;
+    if (state.airborne) { landingMarker.visible = false; return; }
     previousPrediction.copy(origin);
     for (let i = 1; i <= 32; i++) {
       const t = duration * i / 32;
@@ -184,7 +199,7 @@ export function createLiquidStream(scene, city, onHit, { scale = 1, refraction =
 
   function damageGroundSplash(point, velocity, charge, enemies) {
     for (const enemy of enemies) {
-      if (!enemy.alive || hitTime() < (enemy.nextJetHit ?? 0)) continue;
+      if (!enemy.alive || enemy.airborne || hitTime() < (enemy.nextJetHit ?? 0)) continue;
       const reach = SPLASH_RADIUS + radius + enemy.size;
       if ((enemy.x - point.x) ** 2 + (enemy.z - point.z) ** 2 > reach * reach) continue;
       targetPosition.set(enemy.x, enemy.hitHeight, enemy.z);
@@ -254,6 +269,7 @@ export function createLiquidStream(scene, city, onHit, { scale = 1, refraction =
     function addRing(position, velocity, age, id, batchId, charge) {
       tangent.copy(velocity).normalize();
       side.crossVectors(tangent, UP).normalize();
+      if (side.lengthSq() < .001) side.set(1, 0, 0);
       normal.crossVectors(side, tangent).normalize();
       const pulse = 1 + 0.12 * Math.sin(id * 1.8 - time * 9) + 0.07 * Math.sin(id * 0.6 + time * 17);
       const ringRadius = visualRadius * (.85 + charge * .65) * pulse * (1 + age * 0.3);
@@ -321,6 +337,10 @@ export function createLiquidStream(scene, city, onHit, { scale = 1, refraction =
 
   function update(dt, firing, emitter, facing, enemies) {
     emitter.getWorldPosition(origin);
+    const airborne = !!facing.airborne;
+    if (airborne !== state.airborne && firing && wasFiring) batch++;
+    state.airborne = airborne;
+    aimTarget = facing.target ?? null;
     direction.set(facing.dx, 0, facing.dz).normalize();
     if (firing && !wasFiring) { batch++; heldTime = 0; emission = 0; previousOrigin.copy(origin); }
     if (!firing) { heldTime = 0; emission = 0; }
@@ -342,7 +362,7 @@ export function createLiquidStream(scene, city, onHit, { scale = 1, refraction =
           position.y -= 0.5 * GRAVITY * age * age;
           velocity.y -= GRAVITY * age;
           if (parcels.length >= MAX_PARCELS) parcels.shift();
-          const breakupTime = Math.max(0.18, flightTime(emissionOrigin.y, lift) * 0.78);
+          const breakupTime = Math.max(0.18, flightTime(emissionOrigin.y, launchVelocity.y) * 0.78);
           parcels.push({ position, previous: position.clone(), velocity, charge: state.charge, age, id: ++sequence, batch, breakupTime });
         }
       }
@@ -359,7 +379,7 @@ export function createLiquidStream(scene, city, onHit, { scale = 1, refraction =
   function clear() {
     parcels.length = splashes.length = 0;
     accumulator = emission = 0; wasFiring = false;
-    heldTime = 0; state.charge = 0; state.blocked = false;
+    heldTime = 0; state.charge = 0; state.blocked = false; state.airborne = false; aimTarget = null;
     surface.visible = false; droplets.count = 0; droplets.visible = false;
     landingMarker.visible = false;
     for (const ripple of ripples) { ripple.age = 1; ripple.mesh.visible = false; }
