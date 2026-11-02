@@ -50,7 +50,7 @@ test('empty liquid stays hidden without scheduling empty buffer uploads', () => 
 
 const target = (x, z, hp = 100) => ({ alive: true, x, z, hp, hitHeight: .3, size: .43 });
 
-test('early-wave slugs take one direct hit and snails two at low and full pressure', () => {
+test('early-wave slugs take one direct hit and geese two at low and full pressure', () => {
   for (const charged of [false, true]) {
     const hitsToKill = kind => {
       const { advance, impacts } = setup();
@@ -65,7 +65,7 @@ test('early-wave slugs take one direct hit and snails two at low and full pressu
       return impacts.length;
     };
     assert.equal(hitsToKill('slug'), 1);
-    assert.equal(hitsToKill('snail'), 2);
+    assert.equal(hitsToKill('goose'), 2);
   }
 });
 
@@ -76,21 +76,21 @@ test('enemy health increases by one only after each three-wave block', async con
     return { scene, animations: [] };
   });
   await loadEnemyModels();
-  for (const [wave, slug, snail] of [[1, 1, 2], [3, 1, 2], [4, 2, 3], [6, 2, 3], [7, 3, 4], [9, 3, 4], [10, 4, 5]]) {
+  for (const [wave, slug, goose] of [[1, 1, 2], [3, 1, 2], [4, 2, 3], [6, 2, 3], [7, 3, 4], [9, 3, 4], [10, 4, 5]]) {
     assert.equal(createEnemy('slug', wave).hp, slug, `Slug health on wave ${wave}`);
-    assert.equal(createEnemy('snail', wave).hp, snail, `Snail health on wave ${wave}`);
+    assert.equal(createEnemy('goose', wave).hp, goose, `Goose health on wave ${wave}`);
   }
 });
 
-test('one short close tap kills an early slug and leaves a snail needing one more hit', () => {
-  for (const [kind, remaining] of [['slug', 0], ['snail', 1]]) {
+test('one short close tap kills an early slug and leaves a goose needing one more hit', () => {
+  for (const [kind, remaining] of [['slug', 0], ['goose', 1]]) {
     const { advance, impacts } = setup();
     const enemy = target(0, .7, ENEMY_HEALTH[kind]);
     advance(5, true, [enemy]);
     advance(60, false, [enemy]);
     assert.equal(impacts.length, 1);
     assert.equal(enemy.hp, remaining);
-    assert.equal(enemy.alive, kind === 'snail');
+    assert.equal(enemy.alive, kind === 'goose');
     assert.ok(impacts.every(hit => hit.charge < .1));
   }
 });

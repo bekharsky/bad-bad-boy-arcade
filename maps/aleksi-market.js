@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { addTree } from './vegetation.js';
 import { createSceneryModel as model } from './scenery-model.js';
 
 function sphere(m, colour, x, y, z, r, scale = [1, 1, 1]) {
@@ -18,9 +19,7 @@ function arch(m, colour, x, y, z, w, h, turn = 0) {
 function tree(m) {
   m.box('#a2a294', 0, .38, 0, 2.3, .76, 2.3);
   m.box('#647257', 0, .78, 0, 2.05, .06, 2.05);
-  rod(m, '#766e50', [0, .8, 0], [0, 4, 0], .14);
-  m.geometry('#7b9466', new THREE.IcosahedronGeometry(1.6, 1).scale(1, 1.2, 1).translate(0, 4.1, 0));
-  m.geometry('#8ba16e', new THREE.IcosahedronGeometry(1.1, 0).translate(-.35, 5, .25));
+  addTree(m, { y: .81, height: 5, radius: 1.55, variant: 2 });
 }
 function stall(m, colour, flowers = false) {
   for (const x of [-2.4, 2.4]) for (const z of [-1.25, 1.25]) m.box('#75664c', x, 1.6, z, .1, 3.2, .1);

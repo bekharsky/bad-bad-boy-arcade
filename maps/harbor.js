@@ -1,5 +1,9 @@
 import * as THREE from 'three';
 import { createTram, createHarbor } from './harbor-scenery.js';
+import { registerBuilding } from '../world/building-visibility.js';
+import { createSceneryModel } from './scenery-model.js';
+import { addFacadeDetails, addPitchedRoof } from './facade-details.js';
+import { addTree } from './vegetation.js';
 import { createMap } from '../world/map.js';
 import { overlaps } from '../world/navigation.js';
 
@@ -39,8 +43,12 @@ function buildHarbor(scene) {
   let seed = 37;
   const random = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
   function part(shape, color, x, y, z, sx, sy, sz, ry = 0, glow = false) {
-    const target = activeBuilding?.batches ?? batches;
-    if (activeBuilding) { x -= activeBuilding.x; z -= activeBuilding.z; }
+    if (activeBuilding) {
+      const builder = glow ? activeBuilding.glowing : activeBuilding.solid;
+      builder.geometry(color, geometries[shape].clone().scale(sx, sy, sz).rotateY(ry).translate(x - activeBuilding.x, y, z - activeBuilding.z));
+      return;
+    }
+    const target = batches;
     const key = `${shape}:${color}:${glow}`;
     if (!target.has(key)) target.set(key, { shape, color, glow, transforms: [] });
     target.get(key).transforms.push([x, y, z, sx, sy, sz, ry]);
@@ -109,7 +117,6 @@ function buildHarbor(scene) {
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, width * 96 / 512), new THREE.MeshStandardMaterial({ map: t, roughness: 0.8 }));
     mesh.position.set(x - (activeBuilding?.x ?? 0), y, z - (activeBuilding?.z ?? 0));
     (activeBuilding?.group ?? scene).add(mesh);
-    if (activeBuilding) { activeBuilding.materials.push(mesh.material); activeBuilding.meshes.push(mesh); }
     return mesh;
   }
   function shopLogo(d, h) {
@@ -126,7 +133,6 @@ function buildHarbor(scene) {
     mesh.position.set(0, h + 1.025, d / 2 - .35); mesh.rotation.z = .12;
     mesh.castShadow = mesh.receiveShadow = true;
     activeBuilding.group.add(mesh);
-    activeBuilding.materials.push(material); activeBuilding.meshes.push(mesh);
   }
   const colors = ['#cd9a7f', '#d5c590', '#8fa9a4', '#ceb7a4', '#b38b84', '#a6b2be'];
   let buildingIndex = 0;
@@ -136,8 +142,8 @@ function buildHarbor(scene) {
     group.position.set(x, 0, z);
     group.rotation.y = options.turn ?? 0;
     activeBuilding = {
-      group, x, z, batches: new Map(), materials: [], meshes: [], opacity: 1, hiddenUntil: 0,
-      bounds: new THREE.Box3(),
+      group, x, z,
+      solid: createSceneryModel(group.name), glowing: createSceneryModel('Lit windows'),
     };
     const kind = options.kind ?? 'residential';
     const color = options.color ?? colors[buildingIndex % colors.length];
@@ -209,9 +215,15 @@ function buildHarbor(scene) {
           part('box', '#e2d7bd', wx, wy, z + side * (d / 2 + .025), .67, .85, .07);
           part('box', random() > .42 ? '#edce87' : '#536f79', wx, wy, z + side * (d / 2 + .07), .49, .66, .05, 0, true);
           part('box', '#c8bfa8', wx, wy, z + side * (d / 2 + .11), .04, .67, .035);
+          part('box', '#c8bfa8', wx, wy + .1, z + side * (d / 2 + .11), .5, .035, .035);
+          part('box', '#e2d7bd', wx, wy - .46, z + side * (d / 2 + .14), .77, .1, .25);
         }
         for (let row = 0; row < floors; row++) for (let col = 0; col < Math.floor(d / 1.3); col++) {
-          part('box', '#dfcda3', x + side * (w / 2 + .03), .85 + row * STOREY_HEIGHT, z + (col - (Math.floor(d / 1.3) - 1) / 2) * 1.2, .07, .78, .55);
+          const wy = .85 + row * STOREY_HEIGHT, wz = z + (col - (Math.floor(d / 1.3) - 1) / 2) * 1.2;
+          part('box', '#dfcda3', x + side * (w / 2 + .03), wy, wz, .07, .78, .55);
+          part('box', (row + col) % 3 ? '#536f79' : '#d9c387', x + side * (w / 2 + .08), wy, wz, .04, .59, .38, 0, true);
+          part('box', '#dfcda3', x + side * (w / 2 + .12), wy, wz, .035, .6, .035);
+          part('box', '#dfcda3', x + side * (w / 2 + .12), wy - .43, wz, .23, .09, .66);
         }
       }
       part('box', '#31434a', x, .6, front + .1, .8, 1.2, .15);
@@ -220,8 +232,34 @@ function buildHarbor(scene) {
         part('box', '#395b60', x, .9, front + .1, w * .72, 1.45, .12);
       }
     }
-    buildings.push(activeBuilding);
+    const detail = activeBuilding.solid;
+    if (kind === 'residential') {
+      addFacadeDetails(detail, { width: w, depth: d, height: h, storey: STOREY_HEIGHT, windowBase: .85, windowHeight: .85, variant: buildingIndex, balcony: buildingIndex % 2 === 0 });
+      addPitchedRoof(detail, { width: w, depth: d, height: h + .35, rise: .6, color: buildingIndex % 2 ? '#5b7671' : '#747f81' });
+      // Recessed entrance, brass handle and a transom over the front door.
+      detail.box('#e1d3b6', 0, 1.3, d / 2 + .16, 1.05, .12, .25);
+      detail.box('#9caeaa', 0, 1.02, d / 2 + .19, .6, .22, .035);
+      detail.box('#d4b975', .25, .55, d / 2 + .2, .045, .19, .05);
+      if (options.cafe) {
+        for (let px = -w * .4; px < w * .4; px += .42) detail.box('#d7bd86', px, 1.904, d / 2 + .45, .18, .025, 1.08);
+        detail.box('#375f59', 0, 1.67, d / 2 + .98, w * .85, .19, .06);
+      }
+    } else if (kind === 'warehouse') {
+      // Loading-door planks, iron hinges and a brick chimney.
+      for (const px of [-w * .27, w * .27]) {
+        for (let i = -3; i <= 3; i++) detail.box('#6d8279', px + i * .17, .96, d / 2 + .31, .025, 1.72, .025);
+        for (const y of [.55, 1.45]) detail.box('#293f44', px, y, d / 2 + .33, 1.22, .06, .035);
+      }
+      detail.box('#9f6953', w * .3, h + .65, 0, .7, 1.2, .7);
+      detail.box('#535d58', w * .3, h + 1.25, 0, .83, .14, .83);
+    }
+    for (const builder of [activeBuilding.solid, activeBuilding.glowing]) {
+      const glow = builder === activeBuilding.glowing;
+      const built = builder.finish({ vertexColors: true, roughness: .85, emissive: glow ? '#ebce96' : '#000000', emissiveIntensity: glow ? .16 : 0 });
+      for (const mesh of [...built.children]) group.add(mesh);
+    }
     scene.add(group);
+    buildings.push(registerBuilding(group));
     activeBuilding = null;
   }
   // The industrial waterfront is opposite the colourful homes and cafés.
@@ -244,12 +282,12 @@ function buildHarbor(scene) {
     part('box', '#33454b', x, 2.9, z, 0.4, 0.09, 0.4);
     obstacle(x, z, 0.28, 0.28, 2.95);
   }
+  const planting = createSceneryModel('Harbor garden trees');
+  let treeIndex = 0;
   function planter(x, z) {
     part('box', '#727a77', x, 0.22, z, 1.3, 0.44, 1.3);
     part('box', '#433e33', x, 0.45, z, 1.15, 0.05, 1.15);
-    part('cylinder', '#75513b', x, 1.1, z, 0.16, 1.4, 0.16);
-    part('sphere', '#67845b', x, 2.15, z, 1.7, 2.1, 1.7);
-    part('sphere', '#7d985f', x - 0.3, 2.65, z, 1.25, 1.2, 1.25);
+    addTree(planting, { x, y: .48, z, height: 2.75, radius: .91, variant: treeIndex++ });
     obstacle(x, z, 1.3, 1.3, 3.25);
   }
   for (const x of [-24, -8, 8, 25]) {
@@ -257,6 +295,7 @@ function buildHarbor(scene) {
     lamp(x, -24.7);
   }
   for (const [x, z] of [[-9, 13.7], [9.2, 13.7], [9.2, 3.3], [-10, -25.6], [7, -25.6]]) planter(x, z);
+  scene.add(planting.finish({ vertexColors: true, roughness: .9 }));
   // Café terraces face the open square, leaving broad paths around the tables.
   for (const [x, z] of [[12.2, 4.5], [12.2, 8], [16, 21.7]]) {
     part('cylinder', '#c8b592', x, .75, z, .95, .12, .95);
@@ -315,48 +354,6 @@ function buildHarbor(scene) {
     mesh.computeBoundingSphere(); scene.add(mesh);
   }
 
-  // Merge each house into a few coloured meshes, so it can fade independently
-  // without adding a draw call for every window or affecting other houses.
-  const position = new THREE.Vector3(), vertexNormal = new THREE.Vector3();
-  const normalMatrix = new THREE.Matrix3();
-  for (const house of buildings) {
-    for (const glow of [false, true]) {
-      const parts = [...house.batches.values()].filter(batch => batch.glow === glow);
-      const vertexCount = parts.reduce((count, batch) => count + geometries[batch.shape].attributes.position.count * batch.transforms.length, 0);
-      const indexCount = parts.reduce((count, batch) => count + geometries[batch.shape].index.count * batch.transforms.length, 0);
-      if (!vertexCount) continue;
-      const positions = new Float32Array(vertexCount * 3), normals = new Float32Array(vertexCount * 3), colors = new Float32Array(vertexCount * 3);
-      const indices = new Uint32Array(indexCount);
-      let vertexOffset = 0, indexOffset = 0;
-      for (const batch of parts) {
-        const source = geometries[batch.shape], color = new THREE.Color(batch.color);
-        for (const [x, y, z, sx, sy, sz, ry] of batch.transforms) {
-          dummy.position.set(x, y, z); dummy.scale.set(sx, sy, sz); dummy.rotation.set(0, ry, 0); dummy.updateMatrix();
-          normalMatrix.getNormalMatrix(dummy.matrix);
-          for (let i = 0; i < source.attributes.position.count; i++) {
-            position.fromBufferAttribute(source.attributes.position, i).applyMatrix4(dummy.matrix);
-            vertexNormal.fromBufferAttribute(source.attributes.normal, i).applyNormalMatrix(normalMatrix);
-            const offset = (vertexOffset + i) * 3;
-            position.toArray(positions, offset); vertexNormal.toArray(normals, offset); color.toArray(colors, offset);
-          }
-          for (let i = 0; i < source.index.count; i++) indices[indexOffset++] = vertexOffset + source.index.getX(i);
-          vertexOffset += source.attributes.position.count;
-        }
-      }
-      const geometry = new THREE.BufferGeometry();
-      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-      geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
-      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-      geometry.setIndex(new THREE.BufferAttribute(indices, 1));
-      geometry.computeBoundingSphere();
-      const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, emissive: glow ? '#ebce96' : '#000000', emissiveIntensity: glow ? 0.16 : 0 });
-      const mesh = new THREE.Mesh(geometry, material);
-      mesh.castShadow = mesh.receiveShadow = true;
-      house.group.add(mesh); house.meshes.push(mesh); house.materials.push(material);
-    }
-    house.batches.clear();
-    house.bounds.setFromObject(house.group).expandByScalar(0.06);
-  }
 
   let sceneryTime = 0, tramCell = null;
   return {
