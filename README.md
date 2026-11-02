@@ -25,4 +25,4 @@ In the running districts, left and right change lanes; up and down accelerate or
 
 ## Credits
 
-Inspired by Tommi Toija's *Bad Bad Boy* sculpture. See the [model and asset credits](./CREDITS.md) and the [in-game credits](https://bekharsky.github.io/bad-bad-boy-arcade/credits.html). For a closer look at the districts and game rules, see the [gameplay notes](./docs/gameplay-and-development-notes.md).
+Inspired by Tommi Toija's *Bad Bad Boy* sculpture. See the [model and asset credits](./CREDITS.md) and the [in-game credits](https://bekharsky.github.io/bad-bad-boy-arcade/credits.html). The [working notes](./docs/gameplay-and-development-notes.md) describe the current game structure and development workflow.
