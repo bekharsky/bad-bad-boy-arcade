@@ -149,7 +149,8 @@ test('facades frame real cross-street openings; traffic geometry and material co
   assert.deepEqual(after, resources);
   const pool = map.root.children.filter(node => node.name === 'Aleksanterinkatu traffic');
   assert.equal(pool.length, TRAFFIC_CAPACITY);
-  assert.ok(pool.every(node => node.children.some(variant => variant.name === 'tram tram')));
+  assert.ok(map.root.getObjectByName('Aleksanterinkatu traffic templates').children.some(variant => variant.name === 'tram tram'));
+  assert.ok(pool.every(node => node.children.length <= 1));
   map.reset(); assert.ok(pool.every(node => !node.visible));
   map.dispose();
 });
