@@ -77,10 +77,37 @@ test('runner speed opens and closes the lens smoothly, pause freezes it and aren
     const paused = rig.camera.fov; rig.frameRunner(1, 0); assert.equal(rig.camera.fov, paused);
     assert.deepEqual(rig.camera.position.toArray(), [0, 12, 15], 'Lane geometry and hero collision stay aligned');
     rig.frame(20, 10, 0, true); assert.equal(rig.camera.fov, base);
-    rig.resize(844, 390, true); assert.equal(rig.camera.fov, 58);
+    rig.resize(844, 390, true); assert.equal(rig.camera.fov, 65);
     rig.frameRunner(1, 1); rig.resize(1280, 720, false);
     rig.frame(0, 0, 0, true); assert.equal(rig.camera.fov, 56);
   }
+});
+
+test('mobile framing reserves space below the hero in portrait and landscape, including braking and boosting', () => {
+  for (const [width, height, touch] of [[320, 780, true], [390, 844, true], [844, 390, true], [596, 780, false]]) {
+    const rig = createGameCamera(); rig.resize(width, height, touch); rig.frame(0, 0, 0, true);
+    for (const pace of [0, -1, 1, 0]) {
+      for (let i = 0; i < 180; i++) rig.frameRunner(pace, 1 / 60);
+      const projection = heroProjection(rig.camera, { x: 0, z: 0 });
+      const feet = (1 - projection.footY) / 2;
+      assert.ok(Math.abs(feet - .72) < 1e-10, 'The lower 28% stays available around the touch controls');
+      assert.ok(feet - projection.height / 2 > .4, 'The entire hero remains below the HUD');
+    }
+  }
+});
+
+test('mobile lens shift keeps aiming aligned and resizing back restores the desktop projection', () => {
+  const rig = createGameCamera(); rig.resize(1280, 720); rig.frame(0, 0, 0, true);
+  const desktop = rig.camera.projectionMatrix.clone();
+  rig.resize(390, 844, true); rig.camera.updateMatrixWorld(true);
+  const point = new THREE.Vector3(2, 0, -4), screen = point.clone().project(rig.camera);
+  const ray = new THREE.Raycaster(); ray.setFromCamera(new THREE.Vector2(screen.x, screen.y), rig.camera);
+  const contact = ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), new THREE.Vector3());
+  assert.ok(contact.distanceTo(point) < 1e-10);
+  rig.resize(844, 390, true);
+  assert.ok(Math.abs((1 - heroProjection(rig.camera, { x: 0, z: 0 }).footY) / 2 - .72) < 1e-10);
+  rig.resize(1280, 720, false);
+  assert.deepEqual(rig.camera.projectionMatrix.elements, desktop.elements);
 });
 
 test('Senate Square is the fifth district and direct links preserve the new campaign order', () => {
