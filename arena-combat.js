@@ -17,7 +17,11 @@ export function createArenaCombat({ world, player, enemies, animateEnemy, onBite
           for (const other of enemies) {
             if (other === enemy || !other.alive) continue;
             const sx = enemy.x - other.x, sz = enemy.z - other.z;
-            const separation = Math.hypot(sx, sz), spacing = (enemy.size + other.size) * .88;
+            const spacing = (enemy.size + other.size) * .88;
+            // Most pairs are far apart. Check a cheap square first, then take
+            // the square root only for actors that could actually overlap.
+            if (Math.abs(sx) >= spacing || Math.abs(sz) >= spacing) continue;
+            const separation = Math.hypot(sx, sz);
             if (separation > .001 && separation < spacing) {
               direction.x += sx / separation * (spacing - separation) * 1.8;
               direction.z += sz / separation * (spacing - separation) * 1.8;
