@@ -6,7 +6,7 @@ A browser arcade game starring Helsinki's Bad Bad Boy sculpture. The textured ch
 
 [Play Golden Blast](https://bekharsky.github.io/bad-bad-boy-arcade/)
 
-`main` contains the source code. GitHub Pages serves the root of `bekharsky/arcade`, which contains only the Vite build (`dist`), including `.nojekyll`. After merging a source PR into `main`, publish that exact revision with `npm run publish:arcade`. The publish script builds, checks that local `main` matches `origin/main`, and commits the build to the deployment branch.
+`main` contains the source code. Each push to `main` runs the publish workflow: it tests and builds the game, updates `bekharsky/arcade` with only the Vite build (`dist`), then deploys that same build to GitHub Pages. The built branch includes `source-revision.txt` so its source commit can be checked. To republish the current `main` manually, run the **Publish arcade** workflow from GitHub Actions. The local `npm run publish:arcade` command remains available for updating the built branch directly; it requires a clean local `main` matching `origin/main`.
 
 ## Run locally
 
