@@ -29,6 +29,9 @@ export function createSpraySystem(scene, world, onHit, options) {
         const c = Math.cos(angle), s = Math.sin(angle);
         facing.dx = direction.dx * c - direction.dz * s;
         facing.dz = direction.dx * s + direction.dz * c;
+        facing.airborne = direction.airborne;
+        // The fan stays a fan instead of converging all three jets on a bird.
+        facing.target = null;
         sides[i].update(dt, firing, emitter, facing, enemies);
       }
       return state;

@@ -5,14 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#12151f" />
     <title>Golden Blast Helsinki — Bad Bad Boy Arcade</title>
-    <link rel="stylesheet" href="./style.css?v=20261102-runner-controls1" />
+    <link rel="stylesheet" href="./style.css?v=20261102-gulls1" />
     <script type="importmap">
       {
         "imports": {
           "three": "./vendor/three-0.180.0/build/three.module.min.js",
           "three/addons/": "./vendor/three-0.180.0/examples/jsm/",
-          "game": "./game.js?v=20261102-no-district-title1",
-          "./spray-system.js": "./spray-system.js?v=20261029-cleanup1",
+          "game": "./game.js?v=20261102-gulls1",
+          "./seagulls.js": "./seagulls.js?v=20261102-gulls1",
+          "./gull-flight.js": "./gull-flight.js?v=20261102-gulls1",
+          "./spray-aim.js": "./spray-aim.js?v=20261102-gulls1",
+          "./spray-system.js": "./spray-system.js?v=20261102-gulls1",
           "./burst-effects.js": "./burst-effects.js?v=20261029-cleanup1",
           "./gesture-guard.js": "./gesture-guard.js?v=20261027-mobile1",
           "./waves.js": "./waves.js?v=20261028-three-waves1",
@@ -31,7 +34,7 @@
           "./maps/baana.js": "./maps/baana.js?v=20261101-variety1",
           "./runner/baana-run.js": "./runner/baana-run.js?v=20261101-scooter-challenge1",
           "./runner/traffic-models.js": "./runner/traffic-models.js?v=20261101-tram-turn1",
-          "./touch-controls.js": "./touch-controls.js?v=20261101-runner2",
+          "./touch-controls.js": "./touch-controls.js?v=20261102-gulls1",
           "./runner/runner-input.js": "./runner/runner-input.js?v=20261101-runner2",
           "./maps/kamppi-square.js": "./maps/kamppi-square.js?v=20261028-kamppi4",
           "./maps/kamppi-landmarks.js": "./maps/kamppi-landmarks.js?v=20261028-kamppi4",
@@ -56,7 +59,7 @@
           "./aim-assist.js": "./aim-assist.js?v=20261026-assist1",
           "./hero.js": "./hero.js?v=20261025-medkits1",
           "./enemies.js": "./enemies.js?v=20261028-transitions1",
-          "./liquid.js": "./liquid.js?v=20261029-cleanup1",
+          "./liquid.js": "./liquid.js?v=20261102-gulls1",
           "./bites.js": "./bites.js?v=20261025-medkits1",
           "./medkits.js": "./medkits.js?v=20261102-runner-medkit1"
         }
@@ -128,6 +131,7 @@
         <label class="assist-setting"><input type="checkbox" data-aim-assist checked /><span class="assist-switch" aria-hidden="true"></span><span class="assist-copy"><strong>Aim assist</strong><span>Direct only</span></span></label>
         <label class="assist-setting" hidden><input type="checkbox" data-mouse-aim checked /><span class="assist-switch" aria-hidden="true"></span><span class="assist-copy"><strong>Mouse aim</strong></span></label>
         <label class="assist-setting"><input id="sound-setting" type="checkbox" /><span class="assist-switch" aria-hidden="true"></span><span class="assist-copy"><strong>Sound</strong></span></label>
+        <p class="air-controls"><span class="air-keyboard"><kbd>E</kbd> + spray · aim up</span><span class="air-touch">Drag SPRAY up · aim at gulls</span></p>
         <form method="dialog"><button id="settings-done" class="primary-button" type="submit">DONE</button></form>
         <section class="debug-maps" data-debug-maps aria-label="Maps" hidden></section>
         <a class="credits-link" href="./credits.html" target="_blank" rel="noopener">Models & credits ↗</a>
@@ -139,6 +143,7 @@
           <div id="joystick" class="joystick" aria-hidden="true" hidden><div id="joystick-thumb" class="joystick-thumb"></div></div>
         </div>
         <button id="mobile-fire" class="fire-button touch-control" type="button" aria-label="Fire spray">
+          <span class="spray-up-cue" aria-hidden="true">⌃</span>
           <svg class="spray-gauge" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
             <circle class="spray-gauge-track" cx="50" cy="50" r="46" />
             <circle id="spray-gauge-fill" class="spray-gauge-fill" cx="50" cy="50" r="46" pathLength="100" data-spray-gauge-fill />
