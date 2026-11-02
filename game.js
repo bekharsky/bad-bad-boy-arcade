@@ -31,7 +31,8 @@ const HERO_HEIGHT = 3.45;
 const HERO_SCALE = HERO_HEIGHT / HERO_BASE_HEIGHT;
 const keys = new Set();
 let controlMode = 'tank';
-let usingTouchControls = window.matchMedia('(pointer: coarse)').matches;
+const coarsePointer = window.matchMedia('(pointer: coarse)').matches;
+let usingTouchControls = coarsePointer;
 let aimAssistEnabled = true;
 let mouseAimEnabled = true;
 let soundEnabled = false;
@@ -100,7 +101,9 @@ const touchControls = createTouchControls({
 });
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+// High-density touch screens need fewer shaded pixels and a smaller shadow
+// atlas; desktop keeps the full detail tier.
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, coarsePointer ? 1.5 : 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -122,7 +125,8 @@ scene.add(new THREE.HemisphereLight(0xd8e9ff, 0x757264, 2.3));
 const keyLight = new THREE.DirectionalLight(0xffdfad, 2.6);
 keyLight.position.set(-12, 25, 10);
 keyLight.castShadow = true;
-keyLight.shadow.mapSize.set(2048, 2048);
+const shadowSize = coarsePointer ? 1024 : 2048;
+keyLight.shadow.mapSize.set(shadowSize, shadowSize);
 keyLight.shadow.camera.left = -38;
 keyLight.shadow.camera.right = 38;
 keyLight.shadow.camera.top = 38;
