@@ -6,7 +6,7 @@ import { BAANA_LENGTH } from '../runner/course.js';
 
 export const baanaMap = {
   id: 'baana', name: 'Baana Run', mode: 'runner',
-  runner: { length: BAANA_LENGTH },
+  runner: { length: BAANA_LENGTH, variety: true },
   spawn: { x: 0, z: 0, heading: Math.PI },
   bounds: { minX: -5.5, maxX: 5.5, minZ: -130, maxZ: 30 },
   create() { return createMap(baanaMap, buildBaana); },

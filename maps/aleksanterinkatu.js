@@ -25,7 +25,7 @@ export function aleksiRoadSpans(from, to) {
 }
 export const aleksanterinkatuMap = {
   id: 'aleksanterinkatu', name: 'Aleksanterinkatu', mode: 'runner',
-  runner: { length: ALEKSI_LENGTH, lanes: TRAM_LANES, tramChance: .42, tramRoute: aleksiTramRoute, roadworkKinds: [], crossingPoints: ALEKSI_CROSSINGS, startSpeed: 10.5, speedLimit: 18, acceleration: .12 },
+  runner: { length: ALEKSI_LENGTH, variety: true, lanes: TRAM_LANES, tramChance: .42, tramRoute: aleksiTramRoute, roadworkKinds: [], crossingPoints: ALEKSI_CROSSINGS, startSpeed: 10.5, speedLimit: 18, acceleration: .12 },
   spawn: { x: TRAM_LANES[0], z: 0, heading: Math.PI },
   bounds: { minX: -5.3, maxX: 5.3, minZ: -150, maxZ: 35 },
   environment: { background: new THREE.Color('#9ebbc1'), fog: new THREE.Fog('#9ebbc1', 65, 165) },
@@ -73,7 +73,17 @@ function junction(progress, index, paving) {
     object.children[0].material.transparent = true; object.children[0].material.depthWrite = false;
     root.add(object); object.visible = false; arrows.push(object);
   }
-  return { root, arrows };
+  const targets = [];
+  for (let index = 0; index < 2; index++) {
+    const hint = model('Scooter crossing lane marker');
+    hint.geometry('#ffd35e', new THREE.RingGeometry(.94, 1.05, 16).rotateX(-Math.PI / 2).translate(0, .096, 0));
+    for (const x of [-.38, .38]) for (const z of [-.35, .35]) rod(hint, '#ffd35e', [x - .2, .1, z], [x + .2, .1, 0], .055);
+    const object = hint.finish({ vertexColors: true });
+    object.children[0].material.transparent = true; object.children[0].material.depthWrite = false;
+    object.children[0].material.emissive.set('#ffd35e'); object.children[0].material.emissiveIntensity = .6;
+    object.visible = false; root.add(object); targets.push(object);
+  }
+  return { root, arrows, targets };
 }
 
 function buildAleksi(root) {
@@ -175,6 +185,18 @@ function buildAleksi(root) {
         const arrow = squares[i].arrows[side];
         arrow.visible = !!event && (event.phase === 'warning' || event.phase === 'crossing') && (event.side < 0 ? side === 0 : side === 1);
         arrow.children[0].material.opacity = .75 + Math.sin(state.elapsed * 5) * .25;
+      }
+      for (const [index, marker] of squares[i].targets.entries()) {
+        const pass = event?.passes?.[index];
+        const active = event && (event.phase === 'warning' || event.phase === 'crossing');
+        const expiry = pass ? pass.launchAt + Math.abs(event.side * 14 - TRAM_LANES[pass.targetLane]) / pass.speed + .25 : 0;
+        marker.visible = !!pass && active && state.elapsed < expiry && state.distance < pass.progress + 2;
+        if (marker.visible) {
+          marker.position.set(TRAM_LANES[pass.targetLane], 0, event.progress - pass.progress);
+          marker.scale.x = event.side < 0 ? 1 : -1;
+          const first = event.passes[0], firstExpiry = first.launchAt + Math.abs(event.side * 14 - TRAM_LANES[first.targetLane]) / first.speed + .25;
+          marker.children[0].material.opacity = index === 0 || state.elapsed >= firstExpiry ? .75 + Math.sin(state.elapsed * 5) * .2 : .4;
+        }
       }
     }
     traffic.update(state); finish.update(state);

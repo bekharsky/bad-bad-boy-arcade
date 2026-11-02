@@ -49,15 +49,17 @@ test('the tram course has exactly two bounded lanes while Baana retains three', 
 });
 
 // Use only the information a player can see: longitudinal traffic and the
-// direction of each warned side-street approach. No invulnerability or kills.
+// marked lanes of each warned side-street approach. No invulnerability or kills.
 function steer(run) {
   const state = run.state;
   const next = state.traffic.filter(a => !a.crossing && a.progress - state.distance > -trafficProfile(a.kind).depth - .6).sort((a, b) => a.progress - b.progress)[0];
   const crossing = state.crossings.find(c => (c.phase === 'warning' || c.phase === 'crossing') && c.progress + 10 > state.distance);
   const closeTraffic = next && next.progress - state.distance < (state.speed + next.speed) * .75 + trafficProfile(next.kind).depth;
   if (crossing && !closeTraffic) {
-    const away = state.distance < crossing.progress;
-    run.dodge(((crossing.side < 0) === away ? 1 : 0) - state.lane); return;
+    const pass = crossing.passes.find(pass => pass.progress + 2 > state.distance);
+    if (pass) {
+      run.dodge((1 - pass.targetLane) - state.lane); return;
+    }
   }
   if (next) run.dodge(next.safeLane - state.lane);
 }
@@ -86,12 +88,13 @@ test('two-lane tram and cross-scooter traffic leaves a complete safe route acros
   }
 });
 
-test('both runners leave a safe path while braking, boosting and changing speed during approaches', () => {
+test('both runners leave a safe path at full brake, boost and changing pace between crossings', () => {
   for (const definition of [baanaMap, aleksanterinkatuMap]) for (const fps of [15, 60]) for (const seed of [1, 42, 17, 113]) for (const mode of [-1, 1, 'vary']) {
     const run = createRunnerRun({ ...definition.runner, random: seeded(seed) });
     let hits = 0;
     while (!run.state.finished) {
-      run.setThrottle(mode === 'vary' ? Math.sin(run.state.elapsed * 1.7) : mode);
+      const committedCrossing = run.state.crossings.some(c => c.phase === 'warning' || c.phase === 'crossing');
+      if (mode !== 'vary' || !committedCrossing) run.setThrottle(mode === 'vary' ? Math.sin(run.state.elapsed * 1.7) : mode);
       steer(run); hits += run.update(1 / fps).hits;
     }
     assert.equal(hits, 0, `${definition.id}, ${fps} FPS, seed ${seed}, throttle ${mode}`);
@@ -147,6 +150,35 @@ test('facades frame real cross-street openings; traffic geometry and material co
   assert.equal(pool.length, TRAFFIC_CAPACITY);
   assert.ok(pool.every(node => node.children.some(variant => variant.name === 'tram tram')));
   map.reset(); assert.ok(pool.every(node => !node.visible));
+  map.dispose();
+});
+
+
+test('crossing lane markers match both randomized gates, advance priority and reset without new meshes', () => {
+  const map = aleksanterinkatuMap.create();
+  const square = map.root.getObjectByName('Aleksanterinkatu street').children.find(n => n.name === 'Aleksi crossing square');
+  const markers = square.children.filter(n => n.name === 'Scooter crossing lane marker');
+  assert.equal(markers.length, 2);
+  for (const seed of [42, 99991]) {
+    const run = createRunnerRun({ ...aleksanterinkatuMap.runner, random: seeded(seed) }), state = run.state, crossing = state.crossings[0];
+    while (crossing.phase !== 'warning') run.update(1 / 60);
+    map.updateRunner(state);
+    for (const [i, marker] of markers.entries()) {
+      assert.ok(marker.visible);
+      assert.equal(marker.position.x, TRAM_LANES[crossing.passes[i].targetLane]);
+      assert.equal(marker.position.z, crossing.progress - crossing.passes[i].progress);
+      assert.equal(marker.scale.x, -crossing.side);
+    }
+    assert.ok(markers[0].children[0].material.opacity > markers[1].children[0].material.opacity);
+    const first = crossing.passes[0];
+    state.elapsed = first.launchAt + Math.abs(crossing.side * 14 - TRAM_LANES[first.targetLane]) / first.speed + .3;
+    map.updateRunner(state);
+    assert.equal(markers[0].visible, false);
+    assert.ok(markers[1].visible);
+    assert.ok(markers[1].children[0].material.opacity > .4);
+    run.reset(); map.updateRunner(state);
+    assert.ok(markers.every(n => !n.visible));
+  }
   map.dispose();
 });
 
