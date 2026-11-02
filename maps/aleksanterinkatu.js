@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { createMap } from '../world/map.js';
-import { addTree } from './vegetation.js';
 import { createSceneryModel as model } from './scenery-model.js';
 import { createRunnerTraffic, createRunnerFinish } from '../runner/track-renderer.js';
 import { TRAM_LANES, TRAFFIC_CAPACITY } from '../runner/course.js';
@@ -52,7 +51,8 @@ function junction(progress, index, paving) {
     for (const z of [-12, 12]) {
       m.box('#999783', side * 13, .45, z, 2.4, .9, 2.4);
       m.box('#7d9168', side * 13, .94, z, 2.2, .1, 2.2);
-      addTree(m, { x: side * 13, y: .9, z, height: 5.65, radius: 1.55, variant: index + (side > 0 ? 1 : 0) });
+      m.geometry('#68705a', new THREE.CylinderGeometry(.12, .2, 3.7, 8).translate(side * 13, 2.75, z));
+      m.geometry('#7e9562', new THREE.IcosahedronGeometry(1.7, 1).scale(.9, 1.2, .9).translate(side * 13, 4.9, z));
       m.box('#826b4d', side * 10, .65, z + 2, 2.3, .15, .7);
       m.box('#826b4d', side * 10, 1, z + 2.3, 2.3, .6, .1);
     }

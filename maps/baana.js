@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { createMap } from '../world/map.js';
-import { addTree } from './vegetation.js';
 import { createSceneryModel } from './scenery-model.js';
 import { createRunnerTraffic, createRunnerFinish } from '../runner/track-renderer.js';
 import { BAANA_LENGTH } from '../runner/course.js';
@@ -41,24 +40,14 @@ function buildBaana(root) {
       for (const y of [6.9, 7.35]) box('#627771', side * 6.85, y, 0, .04, .04, 32);
       for (let z = -15; z < 16; z += 3) box('#627771', side * 6.85, 6.98, z, .065, .95, .065);
       for (const z of [-10, 8]) {
-        addTree(scenery, { x: side * 11, y: 6.5, z, height: 5.2, radius: 1.5, variant: section + (side > 0 ? 1 : 0) });
+        scenery.geometry('#73634f', new THREE.CylinderGeometry(.12, .2, 2.8, 7).translate(side * 11, 7.9, z));
+        scenery.geometry('#819769', new THREE.IcosahedronGeometry(1.6, 1).scale(1, 1.3, 1).translate(side * 11, 10.2, z));
       }
       // Warm city facades above the trench, never on the running surface.
       const cityHeight = 4 + section % 3;
       box(side > 0 ? '#c2b394' : '#b8a08d', side * 17, 6.5 + cityHeight / 2, 0, 7, cityHeight, 24);
       box('#64756d', side * 17, 6.65 + cityHeight, 0, 7.3, .3, 24.3);
-      for (let z = -10; z <= 10; z += 2) for (let y = 7.4; y < 6 + cityHeight; y += 1.5) {
-        box('#d8ccb0', side * 13.46, y, z, .08, 1.18, 1.36);
-        box((section + Math.round(z)) % 3 ? '#4c7076' : '#9caaa0', side * 13.4, y, z, .05, 1, 1.15);
-        box('#d8ccb0', side * 13.36, y + .12, z, .035, .045, 1.15);
-        box('#e2d4b6', side * 13.35, y - .6, z, .3, .12, 1.45);
-      }
-      for (const z of [-11.6, 11.6]) box('#586f65', side * 13.35, 6.5 + cityHeight / 2, z, .08, cityHeight, .08);
-      box('#8b9d8d', side * 13.35, 6.5 + cityHeight + .18, 0, .14, .09, 24.3);
-      for (const z of [-7, 7]) {
-        box('#a08c75', side * 17, 6.5 + cityHeight + .55, z, .7, .8, .7);
-        box('#536b65', side * 17, 6.5 + cityHeight + 1, z, .85, .12, .85);
-      }
+      for (let z = -10; z <= 10; z += 2) for (let y = 7.4; y < 6 + cityHeight; y += 1.5) box('#4c7076', side * 13.46, y, z, .06, 1, 1.15);
     }
     for (const x of [-5.6, 5.6]) {
       scenery.geometry('#435f59', new THREE.CylinderGeometry(.05, .08, 3.8, 7).translate(x, 1.9, 0));

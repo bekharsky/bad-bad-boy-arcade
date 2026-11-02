@@ -1,8 +1,6 @@
 import * as THREE from 'three';
-import { registerBuilding } from '../world/building-visibility.js';
 import { createMap } from '../world/map.js';
 import { overlaps } from '../world/navigation.js';
-import { addTree } from './vegetation.js';
 import { createSceneryModel } from './scenery-model.js';
 import { createTram } from './tram.js';
 import { createKamppiCentre, createKamppiChapel, createEntrepreneursMonument, createKasarmi, createLasipalatsi, createLasipalatsiClockTower, createAmosRexMound, createKamppiCityBlock } from './kamppi-landmarks.js';
@@ -27,8 +25,13 @@ function buildKamppi(root) {
   const street = createSceneryModel('Narinkkatori street furniture');
   const obstacle = (x, z, w, d, height) => colliders.push({ minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2, height });
   function addBuilding(group) {
-    root.add(group);
-    buildings.push(registerBuilding(group));
+    root.add(group); group.updateMatrixWorld(true);
+    const meshes = [], materials = [];
+    group.traverse(node => {
+      if (!node.isMesh) return;
+      meshes.push(node); materials.push(...(Array.isArray(node.material) ? node.material : [node.material]));
+    });
+    buildings.push({ group, meshes, materials, opacity: 1, hiddenUntil: 0, bounds: new THREE.Box3().setFromObject(group).expandByScalar(.06) });
   }
   function surface(name, w, d, x, z, color, y, texture = null) {
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshStandardMaterial({ color, map: texture, roughness: .95 }));
@@ -155,7 +158,9 @@ function buildKamppi(root) {
     street.box('#aa7c56', x, .76, z, width + .07, .07, depth + .07);
     street.box('#4f5f43', x, .78, z, width - .2, .08, depth - .2);
     if (tree) {
-      addTree(street, { x, y: .82, z, height: 4.65, radius: 1.12, variant: Math.round(z + x) });
+      street.geometry('#756047', new THREE.CylinderGeometry(.12, .18, 2.7, 8).translate(x, 2.1, z));
+      street.geometry('#829466', new THREE.IcosahedronGeometry(1.25, 1).scale(.85, 1.3, .85).translate(x, 4, z));
+      street.geometry('#98a674', new THREE.IcosahedronGeometry(.95, 1).translate(x + .38, 4.35, z + .14));
     }
     obstacle(x, z, width + .4, depth + .4, tree ? 5.5 : .85);
   }

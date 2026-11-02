@@ -1,8 +1,6 @@
 import * as THREE from 'three';
-import { registerBuilding } from '../world/building-visibility.js';
 import { createMap } from '../world/map.js';
 import { overlaps } from '../world/navigation.js';
-import { addFacadeDetails } from './facade-details.js';
 import { createSceneryModel } from './scenery-model.js';
 import { createTram } from './tram.js';
 import { createCathedral, createCathedralSteps, createAlexanderMonument } from './senate-landmarks.js';
@@ -30,7 +28,14 @@ function buildSenateSquare(root) {
   const obstacle = (x, z, w, d, height) => colliders.push({ minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2, height });
   function addBuilding(group) {
     root.add(group);
-    buildings.push(registerBuilding(group));
+    group.updateMatrixWorld(true);
+    const meshes = [], materials = [];
+    group.traverse(node => {
+      if (!node.isMesh) return;
+      meshes.push(node);
+      materials.push(...(Array.isArray(node.material) ? node.material : [node.material]));
+    });
+    buildings.push({ group, meshes, materials, opacity: 1, hiddenUntil: 0, bounds: new THREE.Box3().setFromObject(group).expandByScalar(.06) });
   }
   function surface(name, w, d, x, z, color, y, map = null) {
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshStandardMaterial({ color, map, roughness: .94 }));
@@ -118,8 +123,7 @@ function buildSenateSquare(root) {
       }
       for (const px of [-width * .27, width * .27]) box('#7e6a58', px, height + .75, 0, .5, .9, .65);
     }
-    addFacadeDetails(building, { width, depth, height, storey: 1.65, flowers: !grand, balcony: !grand, variant: Math.round(x) });
-    const group = building.finish({ vertexColors: true, roughness: .85 });
+    const group = building.finish();
     group.position.set(x, 0, z); group.rotation.y = turn;
     addBuilding(group);
     const turned = Math.abs(Math.sin(turn)) > .5;
