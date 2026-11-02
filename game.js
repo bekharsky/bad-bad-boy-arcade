@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createHero, animateHero, HERO_BASE_HEIGHT } from './hero.js';
 import { maps, mapOrder } from './maps/index.js';
+import { createArenaCombat } from './arena-combat.js';
+import { createFrameClock } from './world/frame-clock.js';
 import { createMapManager } from './world/map-manager.js';
 import { createGameCamera } from './world/game-camera.js';
 import { createMapTransition } from './world/map-transition.js';
@@ -179,6 +181,14 @@ const streamOptions = { scale: HERO_HEIGHT / 2.25, refraction: !window.matchMedi
 const stream = createSpraySystem(scene, world, hitEnemy, streamOptions);
 
 const enemies = [];
+const arenaCombat = createArenaCombat({
+  world, player, enemies, animateEnemy,
+  onBite(enemy) {
+    updateHealth(); showBite(enemy); blip(115, .12);
+    if (player.hp <= 0) { endGame(); return false; }
+    return true;
+  },
+});
 const waves = createWaveDirector({
   campaign,
   onWave: spawnWave,
@@ -218,7 +228,7 @@ let playing = false;
 let gameTime = 0;
 let score = 0;
 let audioContext = null;
-let frameTime = 0;
+const frameClock = createFrameClock();
 let runnerRun = createRunnerRun();
 let runnerBaseScore = 0;
 const isRunner = () => world.mode === 'runner';
@@ -570,46 +580,7 @@ function update(dt) {
     player.fireTimer = 0.1;
   }
 
-  world.routeTo(player.x, player.z);
-  for (const enemy of enemies) {
-    if (!enemy.alive) continue;
-    enemy.attack -= dt;
-    enemy.hit = Math.max(0, enemy.hit - dt);
-    const vx = player.x - enemy.x;
-    const vz = player.z - enemy.z;
-    const dist = Math.hypot(vx, vz) || 0.001;
-    const attacking = dist <= enemy.size + player.radius + 0.06 && world.lineClear(enemy.x, enemy.z, player.x, player.z, 0.1);
-    enemy.root.rotation.y = Math.atan2(vx, vz);
-    if (!attacking) {
-      const direction = world.chase(enemy.x, enemy.z, player.x, player.z);
-      // Soft separation keeps a pack from collapsing into one blob.
-      for (const other of enemies) {
-        if (other === enemy || !other.alive) continue;
-        const sx = enemy.x - other.x, sz = enemy.z - other.z;
-        const distance = Math.hypot(sx, sz);
-        const spacing = (enemy.size + other.size) * 0.88;
-        if (distance > 0.001 && distance < spacing) {
-          direction.x += sx / distance * (spacing - distance) * 1.8;
-          direction.z += sz / distance * (spacing - distance) * 1.8;
-        }
-      }
-      const step = Math.hypot(direction.x, direction.z);
-      if (step > 0.01) {
-        world.move(enemy, direction.x / step * enemy.speed * dt, direction.z / step * enemy.speed * dt, enemy.size);
-        enemy.root.rotation.y = Math.atan2(direction.x, direction.z);
-      }
-      enemy.root.position.set(enemy.x, 0, enemy.z);
-    } else if (enemy.attack <= 0 && player.invulnerable <= 0) {
-      player.hp--;
-      player.invulnerable = 0.85;
-      enemy.attack = 1.2;
-      updateHealth();
-      showBite(enemy);
-      blip(115, 0.12);
-      if (player.hp <= 0) { endGame(); return; }
-    }
-    animateEnemy(enemy, dt, gameTime, attacking);
-  }
+  if (!arenaCombat.update(dt, gameTime)) return;
 
   player.invulnerable = Math.max(0, player.invulnerable - dt);
   player.model.material.opacity = player.invulnerable > 0 && Math.floor(gameTime * 18) % 2 === 0 ? 0.45 : 1;
@@ -831,10 +802,11 @@ function resize() {
 
 function animate(now) {
   requestAnimationFrame(animate);
-  if (document.hidden) { frameTime = 0; return; }
-  const dt = Math.min(0.05, frameTime ? (now - frameTime) / 1000 : 0);
-  frameTime = now;
-  update(dt);
+  if (document.hidden) { frameClock.reset(); return; }
+  const dt = frameClock.advance(now, step => {
+    update(step);
+    return !controlsDialog.open;
+  });
   if (player.model) world.updateVisibility(camera, player.root, HERO_HEIGHT, dt);
   if (mapTransition.active) {
     transitionRenderer.render(scene, camera, mapTransition.progress, reducedMotion.matches);
@@ -915,7 +887,7 @@ function openSettings() {
 }
 settingsButton.addEventListener('click', openSettings);
 controlsDialog.addEventListener('close', () => {
-  frameTime = 0;
+  frameClock.reset();
   resetInput();
   (playing ? canvas : settingsButton).focus({ preventScroll: true });
   syncMouseAim();
