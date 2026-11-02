@@ -380,7 +380,8 @@ function applyWave(plan) {
     updateHealth();
     world.reset();
     placePlayerAtSpawn();
-    if (!isRunner()) { medkits.reset(player); batteries.reset(player); }
+    medkits.reset(player);
+    if (!isRunner()) batteries.reset(player);
   }
   syncLevelUI();
   if (isRunner()) {
@@ -634,6 +635,7 @@ function updateRunner(dt) {
     burst(player.x, HERO_HEIGHT * .4, 0, 0xe85e55, 16, null, 2);
     if (player.hp === 0) { endGame(); return; }
   }
+  medkits.update(dt, player, collectMedkit, state);
   player.invulnerable = state.invulnerable;
   player.model.material.opacity = state.invulnerable > 0 && Math.floor(state.elapsed * 18) % 2 === 0 ? .4 : 1;
   player.model.material.transparent = state.invulnerable > 0;

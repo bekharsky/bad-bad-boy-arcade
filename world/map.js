@@ -27,6 +27,9 @@ export function createMap(definition, build) {
       root,
       pickupCapacity(kind) { return definition.pickups?.[kind]?.length ?? 0; },
       pickupPoints(kind, radius) {
+        // Runner anchors use absolute route coordinates; navigation bounds
+        // describe the local moving frame and would reject distant anchors.
+        if (definition.mode === 'runner') return (definition.pickups?.[kind] ?? []).map(point => ({ ...point }));
         return (definition.pickups?.[kind] ?? []).map(point => navigation.pickupPoint(point, radius)).filter(Boolean);
       },
       updateVisibility: visibility.update,

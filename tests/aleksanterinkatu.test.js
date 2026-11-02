@@ -16,6 +16,7 @@ const { senateSquareMap } = await import('../maps/senate-square.js');
 const { maps, mapOrder } = await import('../maps/index.js');
 const { createMapManager } = await import('../world/map-manager.js');
 const { createCampaign, createWaveDirector } = await import('../waves.js');
+const { createMedkits } = await import('../medkits.js');
 const { createRunnerRun, TRAFFIC_CAPACITY, TRAM_LANES, trafficProfile } = await import('../runner/course.js');
 const seeded = seed => () => ((seed = seed * 16807 % 2147483647) - 1) / 2147483646;
 
@@ -248,7 +249,7 @@ test('facade reservations split blocks without closing cross streets or the Sena
   }
 });
 
-test('cross streets own one road surface and their warning arrows pulse without blinking out', () => {
+test('cross streets own one road surface and warnings only appear on the rails', () => {
   const map = aleksanterinkatuMap.create(); map.root.updateMatrixWorld(true);
   for (const progress of ALEKSI_CROSSINGS) {
     const ray = new THREE.Raycaster(new THREE.Vector3(1.8, 1, -progress - .8), new THREE.Vector3(0, -1, 0));
@@ -256,12 +257,50 @@ test('cross streets own one road surface and their warning arrows pulse without 
     assert.equal(surfaces.length, 1, 'There is no second coplanar road at the junction');
     assert.ok(aleksiRoadSpans(-60, 642).every(([a, b]) => b <= progress - 6 || a >= progress + 6));
   }
-  for (const elapsed of [0, .14, .28, .42, .56, .7]) {
-    map.updateRunner({ distance: 120, elapsed, traffic: [], crossings: [{ phase: 'warning', side: -1 }] });
-    const square = map.root.getObjectByName('Aleksi crossing square');
-    const arrows = square.children.filter(node => node.name === 'Side-street scooter warning');
-    assert.equal(arrows[0].visible, true); assert.equal(arrows[1].visible, false);
-    assert.ok(arrows[0].children[0].material.opacity >= .5);
-  }
+  assert.equal(map.root.getObjectByName('Side-street scooter warning'), undefined);
+  map.dispose();
+});
+
+
+test('Aleksi has one medkit after the second crossing, with moving scenery and one capped heal per run', () => {
+  const scene = new THREE.Scene(), world = createMapManager(scene, [aleksanterinkatuMap, baanaMap, senateSquareMap], .736);
+  world.activate('aleksanterinkatu');
+  assert.deepEqual(world.pickupPoints('medkit', .86), [{ x: TRAM_LANES[0], z: -300 }]);
+  const player = { x: TRAM_LANES[0], z: 0, radius: .736, hp: 5, maxHp: 5 };
+  const medkits = createMedkits(scene, world), meshes = scene.children.filter(n => n.isInstancedMesh);
+  assert.equal(meshes.length, 3);
+  const matrix = new THREE.Matrix4(); let healed = 0;
+  const collect = amount => { healed += amount; player.hp += amount; };
+  const update = distance => medkits.update(.2, player, collect, { distance });
+  medkits.reset(player); update(295);
+  meshes[0].getMatrixAt(0, matrix);
+  assert.ok(Math.abs(matrix.elements[14] + 5) < .0001, 'The kit follows the scrolling route');
+  assert.ok(meshes.every(n => n.count === 1));
+  update(300);
+  assert.equal(healed, 0, 'Full health does not consume the kit');
+  player.hp = 2; update(300);
+  assert.equal(healed, 2); assert.equal(player.hp, 4);
+  assert.ok(meshes.every(n => n.count === 0));
+  update(301); assert.equal(healed, 2, 'No second heal');
+  medkits.reset(player); update(295); update(300);
+  assert.equal(player.hp, 5); assert.equal(healed, 3, 'Healing is capped at maximum health');
+  medkits.clear(); assert.ok(meshes.every(n => n.count === 0));
+  world.activate('baana'); medkits.reset(player);
+  assert.ok(meshes.every(n => n.count === 0), 'A map switch removes the old runner pickup');
+  world.dispose();
+});
+
+test('boosted pickup sweeps do not miss the kit, collect from the other rail or heal retroactively', () => {
+  const map = aleksanterinkatuMap.create(), scene = new THREE.Scene(), medkits = createMedkits(scene, map);
+  const player = { x: TRAM_LANES[0], z: 0, radius: .736, hp: 3, maxHp: 5 };
+  let healed = 0; const collect = amount => { healed += amount; player.hp += amount; };
+  const update = distance => medkits.update(.2, player, collect, { distance });
+  medkits.reset(player); update(297); update(303);
+  assert.equal(healed, 2, 'A fast frame crossing the whole pickup still heals');
+  player.x = TRAM_LANES[1]; player.hp = 3; medkits.reset(player); update(297); update(303);
+  assert.equal(healed, 2, 'The other rail cannot collect it');
+  player.x = TRAM_LANES[0]; player.hp = 5; medkits.reset(player); update(297); update(303);
+  player.hp = 3; update(306);
+  assert.equal(healed, 2, 'Damage after passing the kit cannot collect it retroactively');
   map.dispose();
 });

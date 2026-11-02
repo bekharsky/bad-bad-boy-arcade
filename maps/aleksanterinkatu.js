@@ -27,6 +27,7 @@ export const aleksanterinkatuMap = {
   id: 'aleksanterinkatu', name: 'Aleksanterinkatu', mode: 'runner',
   runner: { length: ALEKSI_LENGTH, variety: true, lanes: TRAM_LANES, tramChance: .42, tramRoute: aleksiTramRoute, roadworkKinds: [], crossingPoints: ALEKSI_CROSSINGS, startSpeed: 10.5, speedLimit: 18, acceleration: .12 },
   spawn: { x: TRAM_LANES[0], z: 0, heading: Math.PI },
+  pickups: { medkit: [{ x: TRAM_LANES[0], z: -300 }] },
   bounds: { minX: -5.3, maxX: 5.3, minZ: -150, maxZ: 35 },
   environment: { background: new THREE.Color('#9ebbc1'), fog: new THREE.Fog('#9ebbc1', 65, 165) },
   create() { return createMap(aleksanterinkatuMap, buildAleksi); },
@@ -61,18 +62,6 @@ function junction(progress, index, paving) {
     }
   }
   const root = m.finish({ vertexColors: true }); root.position.z = -progress;
-  const arrows = [];
-  for (const side of [-1, 1]) {
-    const arrow = model('Side-street scooter warning');
-    for (let n = 0; n < 3; n++) {
-      const x = side * (7.3 + n * .7);
-      rod(arrow, '#ffd35e', [x + side * .35, .1, -.35], [x - side * .35, .1, 0], .065);
-      rod(arrow, '#ffd35e', [x + side * .35, .1, .35], [x - side * .35, .1, 0], .065);
-    }
-    const object = arrow.finish({ vertexColors: true });
-    object.children[0].material.transparent = true; object.children[0].material.depthWrite = false;
-    root.add(object); object.visible = false; arrows.push(object);
-  }
   const targets = [];
   for (let index = 0; index < 2; index++) {
     const hint = model('Scooter crossing lane marker');
@@ -83,7 +72,7 @@ function junction(progress, index, paving) {
     object.children[0].material.emissive.set('#ffd35e'); object.children[0].material.emissiveIntensity = .6;
     object.visible = false; root.add(object); targets.push(object);
   }
-  return { root, arrows, targets };
+  return { root, targets };
 }
 
 function buildAleksi(root) {
@@ -181,11 +170,6 @@ function buildAleksi(root) {
     }
     for (let i = 0; i < squares.length; i++) {
       const event = state.crossings?.[i];
-      for (let side = 0; side < 2; side++) {
-        const arrow = squares[i].arrows[side];
-        arrow.visible = !!event && (event.phase === 'warning' || event.phase === 'crossing') && (event.side < 0 ? side === 0 : side === 1);
-        arrow.children[0].material.opacity = .75 + Math.sin(state.elapsed * 5) * .25;
-      }
       for (const [index, marker] of squares[i].targets.entries()) {
         const pass = event?.passes?.[index];
         const active = event && (event.phase === 'warning' || event.phase === 'crossing');
