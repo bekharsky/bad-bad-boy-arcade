@@ -112,7 +112,9 @@ Four Battery energy drinks are hidden behind the outer houses instead of droppin
 - `bootstrap.js`: startup, timeout handling, and visible loading errors.
 - `server.py`: local server with fresh application modules.
 - `vendor/`: pinned Three.js modules and local fonts with their licences.
-- `game.js`: movement, waves, damage, and input.
+- `game.js`: game coordination, mode switching, menus, player animation and HUD.
+- `arena-combat.js`: arena pursuit, pack separation, bite timing and fatal-hit cancellation. Uses the active map's stable navigation API.
+- `world/frame-clock.js`: fixed 60 Hz simulation, up to 12 steps per rendered frame. Catch-up is bounded to 200 ms; closing settings and returning from a hidden tab discard accumulated time. Movement and wave time agree at 10/30/60/120 FPS.
 - `touch-controls.js`: visible joystick, stable gesture origins, and independent multitouch spray control.
 - `gesture-guard.js`: pinch-zoom and Safari gesture suppression without consuming gameplay pointer events.
 - `movement.js`: Direct and Tank movement, shared keyboard layouts, analog speed, and collision handling.
@@ -133,11 +135,13 @@ Four Battery energy drinks are hidden behind the outer houses instead of droppin
 - `maps/ferry.js`: shared procedural ferry, owned separately by each map.
 - `runner/course.js`, `runner/encounters.js`, `runner/runner-input.js`, `runner/track-renderer.js`, and `runner/traffic-models.js`: configurable runner simulation, lane controls, bounded traffic rendering and shared finish line. `runner/baana-run.js` retains the original Baana import API.
 - `maps/tram.js` and `maps/scenery-model.js`: shared animated arena tram and merged scenery geometry. The harbor, Kamppi and Senate Square use this tram; Aleksanterinkatu uses the longer green-and-cream model in `runner/traffic-models.js`.
+- `maps/facade-details.js`: shared facade relief, gutters, downpipes, flower boxes, balcony rails, chimney caps and pitched roofs. Decorations join each building's own colour batch and fade together with its walls.
+- `maps/vegetation.js`: deterministic branching trees with asymmetric crowns, green/gold palettes and occasional coral blossoms. All districts with trees use this builder. Leaf vertices are welded without texture seams; trees join existing scenery batches.
 - `runner/tram-route.js`: shared quarter-turn route sampling and articulated car dimensions for runner movement, rendering and collision.
 - `world/map.js`: map instance creation, reset, pickup placement, and resource ownership.
 - `world/map-manager.js`: active map replacement and the stable spatial query API used by gameplay.
 - `world/navigation.js`: collision, movement, line of sight, and shared enemy routing.
-- `world/building-visibility.js`: camera occlusion and building fading.
+- `world/building-visibility.js`: shared building registration, camera occlusion and building fading; nested facade parts and their unique materials are registered together.
 - `world/map-transition.js` and `world/transition-renderer.js`: simulation-time scene changes and the temporary GPU pixelation/fade pass.
 - `world/game-camera.js`: shared camera scale, viewport lens and follow behavior for every district.
 - `world/dispose.js`: disposal of map-owned GPU resources.

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { addFacadeDetails } from './facade-details.js';
 import { createSceneryModel } from './scenery-model.js';
 
 // Original procedural scenery, guided by the Narinkkatori photo references in README.
@@ -297,14 +297,16 @@ export function createKamppiCityBlock({ name, x, z, width, depth, height, color,
         const px = (column - (columns - 1) / 2) * 1.7;
         if (!glass) wall.box('#d7d1b8', px, y, front + .04, 1.17, 1.22, .1);
         wall.box(glazing[(row + column * 3) % glazing.length], px, y, front + .11, glass ? 1.6 : .94, glass ? 1.36 : .98, .05);
+        if (!glass) {
+          wall.box('#cbc8af', px, y + .12, front + .16, .95, .04, .03);
+          wall.box('#e0d6b9', px, y - .64, front + .15, 1.25, .09, .22);
+        }
         wall.box(glass ? '#abbab4' : '#cbc8af', px, y, front + .15, .04, glass ? 1.4 : 1, .025);
       }
       if (glass) wall.box('#485e61', 0, y + .73, front + .15, length, .09, .1);
     }
     for (const mesh of wall.finish({ vertexColors: true }).children) {
-      // Keep the window colours while batching all four elevations into one mesh.
-      const geometry = mesh.geometry.clone().rotateY(rotation);
-      model.group.add(new THREE.Mesh(geometry, mesh.material.clone()));
+      model.geometry(null, mesh.geometry.clone().rotateY(rotation));
       mesh.geometry.dispose(); mesh.material.dispose();
     }
   }
@@ -320,12 +322,8 @@ export function createKamppiCityBlock({ name, x, z, width, depth, height, color,
   } else {
     for (const px of [-width / 2 + .35, width / 2 - .35]) box('#c5c2a8', px, height / 2, depth / 2 + .16, .17, height - .7, .18);
   }
-  const group = model.finish({ vertexColors: true });
-  const combined = mergeGeometries(group.children.map(mesh => mesh.geometry));
-  for (const mesh of group.children) { mesh.geometry.dispose(); mesh.material.dispose(); }
-  group.clear();
-  const mesh = new THREE.Mesh(combined, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .75 }));
-  mesh.castShadow = mesh.receiveShadow = true; group.add(mesh);
+  if (!glass) addFacadeDetails(model, { width, depth, height, variant: Math.round(x + z), flowers: height < 12, balcony: width < 20 });
+  const group = model.finish({ vertexColors: true, roughness: .75 });
   group.position.set(x, 0, z); group.rotation.y = turn;
   return group;
 }

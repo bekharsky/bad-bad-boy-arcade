@@ -1,5 +1,18 @@
 import * as THREE from 'three';
 
+// Register only after attaching all facade details. Each building must own its
+// materials so fading it cannot change a neighbouring house.
+export function registerBuilding(group) {
+  group.updateWorldMatrix(true, true);
+  const meshes = [], materials = new Set();
+  group.traverse(node => {
+    if (!node.isMesh) return;
+    meshes.push(node);
+    for (const material of Array.isArray(node.material) ? node.material : [node.material]) materials.add(material);
+  });
+  return { group, meshes, materials: [...materials], opacity: 1, hiddenUntil: 0, bounds: new THREE.Box3().setFromObject(group).expandByScalar(.06) };
+}
+
 export function createBuildingVisibility(buildings) {
   const sightRay = new THREE.Ray();
   const intersection = new THREE.Vector3();
