@@ -14,27 +14,29 @@ export function registerBuilding(group) {
 }
 
 export function createBuildingVisibility(buildings) {
-  const sightRay = new THREE.Ray();
+  const samples = [[0, 0.12], [0, 0.5], [0, 0.9], [-0.19, 0.6], [0.19, 0.6]];
+  const sightRays = samples.map(() => new THREE.Ray());
+  const sightDistances = samples.map(() => 0);
   const intersection = new THREE.Vector3();
   const cameraRight = new THREE.Vector3();
   const heroPosition = new THREE.Vector3();
-  const sightTargets = Array.from({ length: 5 }, () => new THREE.Vector3());
+  const sightTargets = samples.map(() => new THREE.Vector3());
   let visibilityTime = 0;
   function updateVisibility(camera, hero, height, dt) {
     visibilityTime += dt;
     camera.updateMatrixWorld();
     hero.getWorldPosition(heroPosition);
     cameraRight.setFromMatrixColumn(camera.matrixWorld, 0);
-    const samples = [[0, 0.12], [0, 0.5], [0, 0.9], [-0.19, 0.6], [0.19, 0.6]];
     samples.forEach(([side, y], i) => {
       sightTargets[i].copy(heroPosition).addScaledVector(cameraRight, side * height);
       sightTargets[i].y += y * height;
+      sightRays[i].origin.copy(camera.position);
+      sightRays[i].direction.copy(sightTargets[i]).sub(camera.position).normalize();
+      sightDistances[i] = sightTargets[i].distanceToSquared(camera.position) - 0.01;
     });
     for (const house of buildings) {
-      const occluded = sightTargets.some(target => {
-        sightRay.origin.copy(camera.position);
-        sightRay.direction.copy(target).sub(camera.position).normalize();
-        return sightRay.intersectBox(house.bounds, intersection) !== null && intersection.distanceToSquared(camera.position) < target.distanceToSquared(camera.position) - 0.01;
+      const occluded = sightRays.some((ray, i) => {
+        return ray.intersectBox(house.bounds, intersection) !== null && intersection.distanceToSquared(camera.position) < sightDistances[i];
       });
       if (occluded) house.hiddenUntil = visibilityTime + 0.15;
       const target = occluded || visibilityTime < house.hiddenUntil ? 0.12 : 1;
