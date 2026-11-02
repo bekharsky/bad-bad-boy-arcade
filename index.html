@@ -5,20 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#12151f" />
     <title>Golden Blast Helsinki — Bad Bad Boy Arcade</title>
-    <link rel="stylesheet" href="./style.css?v=20261102-start-up1" />
+    <link rel="stylesheet" href="./style.css?v=20261102-runner-controls1" />
     <script type="importmap">
       {
         "imports": {
           "three": "./vendor/three-0.180.0/build/three.module.min.js",
           "three/addons/": "./vendor/three-0.180.0/examples/jsm/",
-          "game": "./game.js?v=20261102-release1",
-          "./seagulls.js": "./seagulls.js?v=20261102-gull-entry1",
-          "./gull-flight.js": "./gull-flight.js?v=20261102-gull-entry1",
-          "./spray-aim.js": "./spray-aim.js?v=20261102-gulls1",
-          "./spray-system.js": "./spray-system.js?v=20261102-gulls1",
+          "game": "./game.js?v=20261102-no-district-title1",
+          "./spray-system.js": "./spray-system.js?v=20261029-cleanup1",
           "./burst-effects.js": "./burst-effects.js?v=20261029-cleanup1",
           "./gesture-guard.js": "./gesture-guard.js?v=20261027-mobile1",
-          "./waves.js": "./waves.js?v=20261102-geese1",
+          "./waves.js": "./waves.js?v=20261028-three-waves1",
           "./batteries.js": "./batteries.js?v=20261028-transitions1",
           "./maps/aleksanterinkatu.js": "./maps/aleksanterinkatu.js?v=20261102-runner-medkit1",
           "./maps/aleksi-paving.js": "./maps/aleksi-paving.js?v=20261101-market1",
@@ -34,7 +31,7 @@
           "./maps/baana.js": "./maps/baana.js?v=20261101-variety1",
           "./runner/baana-run.js": "./runner/baana-run.js?v=20261101-scooter-challenge1",
           "./runner/traffic-models.js": "./runner/traffic-models.js?v=20261101-tram-turn1",
-          "./touch-controls.js": "./touch-controls.js?v=20261102-gulls1",
+          "./touch-controls.js": "./touch-controls.js?v=20261101-runner2",
           "./runner/runner-input.js": "./runner/runner-input.js?v=20261101-runner2",
           "./maps/kamppi-square.js": "./maps/kamppi-square.js?v=20261028-kamppi4",
           "./maps/kamppi-landmarks.js": "./maps/kamppi-landmarks.js?v=20261028-kamppi4",
@@ -48,7 +45,7 @@
           "./world/map.js": "./world/map.js?v=20261102-runner-medkit1",
           "./world/map-transition.js": "./world/map-transition.js?v=20261028-transitions1",
           "./world/transition-renderer.js": "./world/transition-renderer.js?v=20261102-no-district-title1",
-          "./world/game-camera.js": "./world/game-camera.js?v=20261102-mobile-framing1",
+          "./world/game-camera.js": "./world/game-camera.js?v=20261101-runner-pace1",
           "./world/map-manager.js": "./world/map-manager.js?v=20261030-aleksi1",
           "./world/dispose.js": "./world/dispose.js?v=20261028-transitions1",
           "./world/building-visibility.js": "./world/building-visibility.js?v=20261028-transitions1",
@@ -58,9 +55,8 @@
           "./mouse-aim.js": "./mouse-aim.js?v=20261027-ground-aim1",
           "./aim-assist.js": "./aim-assist.js?v=20261026-assist1",
           "./hero.js": "./hero.js?v=20261025-medkits1",
-          "./enemies.js": "./enemies.js?v=20261102-release1",
-          "./goose.js": "./goose.js?v=20261102-geese1",
-          "./liquid.js": "./liquid.js?v=20261102-gulls1",
+          "./enemies.js": "./enemies.js?v=20261028-transitions1",
+          "./liquid.js": "./liquid.js?v=20261029-cleanup1",
           "./bites.js": "./bites.js?v=20261025-medkits1",
           "./medkits.js": "./medkits.js?v=20261102-runner-medkit1"
         }
@@ -102,15 +98,10 @@
               <div class="start-control-keys"><kbd class="start-space-key">SPACE</kbd></div>
               <span class="start-control-label">FIRE</span>
             </div>
-            <div class="start-control">
-              <div class="start-control-keys"><kbd>E</kbd></div>
-              <span class="start-control-label">UP</span>
-            </div>
           </div>
           <div class="runner-start-hint" role="group" aria-label="Runner controls">
             <div class="runner-control"><kbd aria-label="Left and right to dodge, up and down for speed">←→↑↓</kbd><span>DODGE / SPEED</span></div>
             <div class="runner-control runner-keyboard"><kbd>SPACE</kbd><span>SPRAY</span></div>
-            <div class="runner-control runner-keyboard"><kbd>E</kbd><span>UP</span></div>
           </div>
           <button id="open-settings" class="settings-button" type="button" aria-label="Controls" aria-haspopup="dialog" aria-controls="controls-dialog">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 3-.5 2.1-1.6.9-2.1-.6-2 3.4 1.6 1.5v1.9l-1.6 1.5 2 3.4 2.1-.6 1.6.9L9 20h4l.5-2.1 1.6-.9 2.1.6 2-3.4-1.6-1.5v-1.9l1.6-1.5-2-3.4-2.1.6-1.6-.9L13 3Z"/><circle cx="11" cy="11.5" r="3"/></svg>
@@ -148,7 +139,6 @@
           <div id="joystick" class="joystick" aria-hidden="true" hidden><div id="joystick-thumb" class="joystick-thumb"></div></div>
         </div>
         <button id="mobile-fire" class="fire-button touch-control" type="button" aria-label="Fire spray">
-          <span class="spray-up-cue" aria-hidden="true">⌃</span>
           <svg class="spray-gauge" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
             <circle class="spray-gauge-track" cx="50" cy="50" r="46" />
             <circle id="spray-gauge-fill" class="spray-gauge-fill" cx="50" cy="50" r="46" pathLength="100" data-spray-gauge-fill />

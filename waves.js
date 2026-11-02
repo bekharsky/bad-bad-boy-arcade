@@ -1,6 +1,6 @@
 import { createEnemyPressure } from './enemy-pressure.js';
 
-export const ENEMY_HEALTH = Object.freeze({ goose: 2, slug: 1 });
+export const ENEMY_HEALTH = Object.freeze({ snail: 2, slug: 1 });
 
 export function waveStats(number) {
   if (!Number.isSafeInteger(number) || number < 1) throw new Error('Wave number must be a positive integer');

@@ -136,7 +136,7 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 900 clamp(52px, 8vw, 78px
 .toast.visible { transform: translate(-50%, 0); opacity: 1; }
 .mobile-controls { display: none; }
 .runner-start-hint { display: none; }
-.runner-mode .runner-start-hint { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 12px; margin-top: 20px; color: var(--muted); font-size: 11px; letter-spacing: .08em; }
+.runner-mode .runner-start-hint { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 20px; color: var(--muted); font-size: 11px; letter-spacing: .08em; }
 .runner-control { display: grid; justify-items: center; gap: 8px; white-space: nowrap; }
 .runner-start-hint kbd { padding: 4px 8px; border: 1px solid #ffffff40; border-radius: 5px; font: 700 20px/1 sans-serif; }
 .runner-mode .start-controls, .runner-mode .control-setting, .runner-mode .assist-setting:has([data-aim-assist]), .runner-mode .assist-setting:has([data-mouse-aim]) { display: none !important; }
@@ -145,7 +145,7 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 900 clamp(52px, 8vw, 78px
 .runner-progress span { display: block; height: 100%; background: var(--gold); transform-origin: left; transform: scaleX(0); }
 #start-screen .card { position: relative; width: min(360px, 100%); margin: 0; padding: 32px; }
 #start-screen h1 { margin: 24px 0 32px; font-size: clamp(48px, 13vw, 72px); line-height: .9; }
-.start-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 12px; margin-top: 22px; }
+.start-controls { display: grid; grid-template-columns: 1.3fr 1fr; gap: 12px; margin-top: 22px; }
 .start-control { display: grid; justify-items: center; gap: 9px; }
 .start-control-keys { display: flex; align-items: center; justify-content: center; gap: 5px; }
 .start-controls kbd { display: inline-flex; align-items: center; justify-content: center; min-height: 28px; padding: 0 6px; border: 1px solid #ffffff26; border-bottom-width: 3px; border-radius: 5px; color: #e3e0e9; background: linear-gradient(#ffffff0b, #ffffff04); font: 600 11px/1 Inter, sans-serif; white-space: nowrap; }
@@ -177,12 +177,6 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 900 clamp(52px, 8vw, 78px
 .touch-control { display: grid; place-items: center; width: var(--fire-size); height: var(--fire-size); padding: 0; border: 2px solid #fff0aab3; border-radius: 50%; color: #403516; background: linear-gradient(145deg, #ffe994, #ffc33e); box-shadow: 0 6px 22px #0005, inset 0 -5px 0 #ad7f2226; }
 .fire-button { position: absolute; right: max(var(--control-side), calc(env(safe-area-inset-right) + 12px)); bottom: calc(var(--control-bottom) + (var(--stick-size) - var(--fire-size)) / 2); pointer-events: auto; touch-action: none; }
 .fire-button .spray-icon { width: 46px; height: 46px; pointer-events: none; }
-.fire-button .spray-icon { transform: translateY(var(--spray-lift, 0px)); }
-.spray-up-cue { position: absolute; top: -34px; left: 0; right: 0; color: #fff0beaa; font: 26px/1 sans-serif; pointer-events: none; }
-.fire-button.aiming-up { border-color: #e7f5ff; background: #dcefff; }
-.fire-button.aiming-up .spray-up-cue { color: #e7f5ff; }
-.desktop-spray[data-airborne="true"]::after { content: '↑'; position: absolute; top: -17px; left: 0; right: 0; text-align: center; color: #e7f5ff; font: 18px/1 sans-serif; }
-.desktop-spray[data-airborne="true"] .spray-gauge-fill { stroke: #c5e9ff; }
 .fire-button.pressed { background: #fff0ab; box-shadow: 0 0 28px #ffd34e66, inset 0 2px 8px #a5762455; transform: scale(.94); }
 
 .fire-button .spray-gauge { position: absolute; inset: -11px; width: calc(100% + 22px); height: calc(100% + 22px); overflow: visible; transform: rotate(-90deg); pointer-events: none; }
@@ -203,14 +197,6 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 900 clamp(52px, 8vw, 78px
 
 @media (pointer: coarse) {
   .start-controls, .controls-card .control-setting { display: none; }
-}
-
-@media (max-width: 380px) {
-  .start-controls, .runner-mode .runner-start-hint { gap: 8px; }
-  .start-controls kbd { padding: 0 4px; font-size: 10px; }
-  .start-controls .start-space-key { min-width: 60px; }
-  .runner-mode .runner-start-hint { font-size: 10px; }
-  .runner-start-hint kbd { padding: 4px 6px; font-size: 18px; }
 }
 
 @media (max-height: 560px) and (min-width: 681px) {

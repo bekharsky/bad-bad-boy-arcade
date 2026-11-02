@@ -2,14 +2,12 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import { enemyHealth } from './waves.js';
-import { createGooseModel, gooseRig, animateGoose } from './goose.js';
 
 const templates = new Map();
 
 export async function loadEnemyModels() {
-  if (!templates.has('goose')) templates.set('goose', { scene: createGooseModel(), animations: [] });
   const loader = new GLTFLoader();
-  await Promise.all(['slug'].map(async kind => {
+  await Promise.all(['snail', 'slug'].map(async kind => {
     const gltf = await loader.loadAsync(`./assets/enemies/${kind}.glb`);
     templates.set(kind, gltf);
   }));
@@ -17,7 +15,6 @@ export async function loadEnemyModels() {
 
 export function createEnemy(kind, level) {
   const source = templates.get(kind);
-  if (!source) throw new Error(`Enemy model not loaded: ${kind}`);
   const model = clone(source.scene);
   const root = new THREE.Group();
   const body = new THREE.Group();
@@ -40,11 +37,11 @@ export function createEnemy(kind, level) {
   model.updateMatrixWorld(true);
   const bounds = new THREE.Box3().setFromObject(model);
   const size = bounds.getSize(new THREE.Vector3());
-  const scale = (kind === 'goose' ? 1.5 : 1.35) / Math.max(size.x, size.z);
+  const scale = 1.35 / Math.max(size.x, size.z);
   body.scale.setScalar(scale);
   const centre = bounds.getCenter(new THREE.Vector3());
   model.position.sub(new THREE.Vector3(centre.x, bounds.min.y, centre.z));
-  const radius = kind === 'goose' ? .47 : .52;
+  const radius = 0.52;
   const mixer = source.animations.length ? new THREE.AnimationMixer(model) : null;
   const actions = {};
   if (mixer) {
@@ -54,8 +51,7 @@ export function createEnemy(kind, level) {
   }
   return {
     root, body, model, kind, mixer, actions, state: 'walk', materials: [...materials.values()],
-    goose: kind === 'goose' ? gooseRig(model) : null, gait: Math.random() * Math.PI * 2,
-    size: radius, hitHeight: kind === 'goose' ? .6 * scale : size.y * scale * .52, baseScale: scale,
+    size: radius, hitHeight: size.y * scale * 0.52, baseScale: scale,
     hp: enemyHealth(kind, level),
     speed: 0.5 + Math.random() * 0.15 + Math.min(level, 12) * 0.035,
     hit: 0, attack: Math.random() * 0.5, alive: true, wobble: Math.random() * Math.PI * 2,
@@ -63,8 +59,7 @@ export function createEnemy(kind, level) {
 }
 
 export function animateEnemy(enemy, dt, time, attacking) {
-  if (enemy.goose) animateGoose(enemy, dt, attacking);
-  else if (enemy.mixer) {
+  if (enemy.mixer) {
     const state = attacking ? 'attack' : 'walk';
     if (state !== enemy.state) {
       enemy.actions[enemy.state].fadeOut(0.15);
@@ -73,7 +68,7 @@ export function animateEnemy(enemy, dt, time, attacking) {
     }
     enemy.mixer.update(dt * (attacking ? 1 : enemy.speed));
   } else {
-    // The slug has no animation clips; its subtle pulse suggests crawling.
+    // Neither model has animations; a subtle foot pulse suggests crawling.
     enemy.body.scale.z = enemy.baseScale * (1 + Math.sin(time * 5 + enemy.wobble) * 0.025);
     enemy.body.rotation.z = Math.sin(time * 3 + enemy.wobble) * 0.025;
   }

@@ -4,7 +4,7 @@ import { createTouchControls } from '../touch-controls.js';
 
 class Element extends EventTarget {
   hidden = false;
-  style = { setProperty(name, value) { this[name] = value; } };
+  style = {};
   classes = new Set();
   captures = new Set();
   classList = {
@@ -126,7 +126,7 @@ test('release, cancellation, and lost capture clear movement and firing', () => 
     pointer(fireButton, 'pointerdown', 2);
     pointer(zone, event);
     pointer(fireButton, event, 2);
-    assert.deepEqual(controls.input, { x: 0, z: 0, firing: false, airborne: false });
+    assert.deepEqual(controls.input, { x: 0, z: 0, firing: false });
     assert.equal(stick.hidden, true);
     assert.equal(zone.captures.size, 0);
     assert.equal(fireButton.captures.size, 0);
@@ -143,7 +143,7 @@ test('blur, resize, and backgrounding reset both controls', () => {
       document.hidden = true;
       document.dispatchEvent(new Event(event));
     } else window.dispatchEvent(new Event(event));
-    assert.deepEqual(controls.input, { x: 0, z: 0, firing: false, airborne: false });
+    assert.deepEqual(controls.input, { x: 0, z: 0, firing: false });
   }
 });
 
@@ -154,7 +154,7 @@ test('disabled controls ignore input and a new round starts cleanly', () => {
   controls.setEnabled(false);
   pointer(zone, 'pointerdown', 3);
   pointer(fireButton, 'pointerdown', 4);
-  assert.deepEqual(controls.input, { x: 0, z: 0, firing: false, airborne: false });
+  assert.deepEqual(controls.input, { x: 0, z: 0, firing: false });
   assert.equal(stick.hidden, true);
   assert.equal(bursts(), 1);
   controls.setEnabled(true);
@@ -167,7 +167,7 @@ test('vertical speed and diagonal lane input preserve independent spray and rele
   const { controls, zone, thumb, fireButton } = setup();
   pointer(zone, 'pointerdown');
   pointer(zone, 'pointermove', 1, 100, 400);
-  assert.deepEqual(controls.input, { x: 0, z: 1, firing: false, airborne: false });
+  assert.deepEqual(controls.input, { x: 0, z: 1, firing: false });
   pointer(zone, 'pointermove', 1, 144, 200);
   assert.equal(controls.input.x, 1); assert.equal(controls.input.z, 0);
   assert.equal(thumb.style.transform, 'translate(44px, 0px)');
@@ -175,32 +175,8 @@ test('vertical speed and diagonal lane input preserve independent spray and rele
   pointer(zone, 'pointermove', 1, 56, 156);
   assert.ok(controls.input.x < -.7 && controls.input.z < -.7);
   assert.equal(controls.input.firing, true);
-  pointer(zone, 'pointerup'); assert.deepEqual(controls.input, { x: 0, z: 0, firing: true, airborne: false });
+  pointer(zone, 'pointerup'); assert.deepEqual(controls.input, { x: 0, z: 0, firing: true });
   pointer(zone, 'pointerdown', 3);
   pointer(zone, 'pointermove', 3, 100, 156);
   assert.equal(controls.input.z, -1);
-});
-
-test('spray drag raises the stream without restarting a burst or stealing the movement pointer', () => {
-  const { controls, zone, fireButton, bursts } = setup();
-  pointer(zone, 'pointerdown'); pointer(zone, 'pointermove', 1, 144, 200);
-  pointer(fireButton, 'pointerdown', 2, 300, 300);
-  pointer(fireButton, 'pointermove', 3, 300, 200);
-  assert.equal(controls.input.airborne, false);
-  pointer(fireButton, 'pointermove', 2, 300, 270);
-  assert.equal(controls.input.airborne, true); assert.equal(controls.input.firing, true);
-  assert.equal(controls.input.x, 1); assert.equal(bursts(), 1);
-  pointer(fireButton, 'pointermove', 2, 300, 280);
-  assert.equal(controls.input.airborne, true, 'Small jitter does not toggle height');
-  pointer(fireButton, 'pointermove', 2, 300, 290);
-  assert.equal(controls.input.airborne, false); assert.equal(bursts(), 1);
-  pointer(fireButton, 'pointermove', 2, 300, 230);
-  pointer(fireButton, 'pointercancel', 2);
-  assert.equal(controls.input.airborne, false); assert.equal(controls.input.firing, false);
-  assert.equal(fireButton.style['--spray-lift'], '0px'); assert.equal(controls.input.x, 1);
-  pointer(fireButton, 'pointerdown', 4, 300, 300);
-  pointer(fireButton, 'pointermove', 4, 300, 230);
-  controls.setEnabled(false);
-  assert.equal(controls.input.airborne, false);
-  assert.equal(fireButton.classes.has('aiming-up'), false);
 });

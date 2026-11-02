@@ -2,11 +2,10 @@
 export function createTouchControls({ zone, stick, thumb, home, fireButton, onFireStart, onInput = () => {} }) {
   const radius = 44;
   const deadzone = 0.1;
-  const input = { x: 0, z: 0, firing: false, airborne: false };
+  const input = { x: 0, z: 0, firing: false };
   let enabled = false;
   let movePointer = null, firePointer = null;
   let originX = 0, originY = 0;
-  let fireOriginY = 0;
 
   function resetMove() {
     const pointer = movePointer;
@@ -22,10 +21,7 @@ export function createTouchControls({ zone, stick, thumb, home, fireButton, onFi
     const pointer = firePointer;
     firePointer = null;
     input.firing = false;
-    input.airborne = false;
-    fireButton.style.setProperty('--spray-lift', '0px');
     fireButton.classList.remove('pressed');
-    fireButton.classList.remove('aiming-up');
     if (pointer !== null && fireButton.hasPointerCapture(pointer)) fireButton.releasePointerCapture(pointer);
   }
 
@@ -87,21 +83,11 @@ export function createTouchControls({ zone, stick, thumb, home, fireButton, onFi
     if (!enabled || firePointer !== null || event.button !== 0) return;
     event.preventDefault();
     firePointer = event.pointerId;
-    fireOriginY = event.clientY;
     fireButton.setPointerCapture(firePointer);
     input.firing = true;
     fireButton.classList.add('pressed');
     onInput();
     onFireStart();
-  });
-  fireButton.addEventListener('pointermove', event => {
-    if (event.pointerId !== firePointer) return;
-    event.preventDefault();
-    const lift = Math.max(0, Math.min(radius, fireOriginY - event.clientY));
-    // Hysteresis keeps an uninterrupted burst steady around the boundary.
-    input.airborne = lift >= (input.airborne ? 14 : 24);
-    fireButton.style.setProperty('--spray-lift', `${-lift}px`);
-    fireButton.classList.toggle('aiming-up', input.airborne);
   });
   for (const element of [zone, fireButton]) {
     element.addEventListener('contextmenu', event => event.preventDefault());
