@@ -6,17 +6,18 @@ A browser arcade game starring Helsinki's Bad Bad Boy sculpture. The textured ch
 
 [Play Golden Blast](https://bekharsky.github.io/bad-bad-boy-arcade/)
 
-GitHub Pages publishes the repository root from the `bekharsky/arcade` branch. Pushing updates to this branch updates the live game. The `.nojekyll` file serves the game and its bundled assets directly without Jekyll processing.
+`main` contains the source code. GitHub Pages serves the root of `bekharsky/arcade`, which contains only the Vite build (`dist`), including `.nojekyll`. After merging a source PR into `main`, publish that exact revision with `npm run publish:arcade`. The publish script builds, checks that local `main` matches `origin/main`, and commits the build to the deployment branch.
 
 ## Run locally
 
-Start a local server from the repository root:
+Install dependencies and start the Vite development server:
 
 ```bash
-python3 server.py
+npm ci
+npm start
 ```
 
-Open [http://localhost:8000/](http://localhost:8000/). No build step or package installation is needed. Three.js and the fonts are included in `vendor/`, so gameplay does not depend on a CDN or an internet connection. You can also start the server with `npm start`. The server always serves fresh application modules to prevent stale code from different versions being mixed.
+Open the URL shown by Vite (normally [http://127.0.0.1:5173/](http://127.0.0.1:5173/)). Run `npm test` for the game tests, `npm run build` to create `dist`, and `npm run preview` to inspect the production build. Three.js comes from the pinned npm dependency; fonts remain local.
 
 Keyboard movement defaults to **Tank controls**: up/down move forward/backward relative to the character, and left/right turn. An explicitly selected mode is remembered for future visits.
 
@@ -110,9 +111,12 @@ Four Battery energy drinks are hidden behind the outer houses instead of droppin
 
 - `index.html` and `style.css`: game interface and controls.
 - `bootstrap.js`: startup, timeout handling, and visible loading errors.
-- `server.py`: local server with fresh application modules.
-- `vendor/`: pinned Three.js modules and local fonts with their licences.
-- `game.js`: game coordination, mode switching, menus, player animation and HUD.
+- `vite.config.js`: multi-page production build for the game and credits, with relative asset paths.
+- `scripts/publish-arcade.sh`: checks the source revision and publishes only `dist` to `bekharsky/arcade`.
+- `vendor/`: local font files and licences; the original Three.js modules remain for the existing Node tests.
+- `game.js`: shared game coordination, menus, arena mode, and HUD.
+- `models/hero-loader.js`: streamed GLB validation, progress, and parsing; Vite tracks the model as a build asset.
+- `runner/session.js`: runner state, simulation, player animation, and mode-specific scoring.
 - `arena-combat.js`: arena pursuit, pack separation, bite timing and fatal-hit cancellation. Uses the active map's stable navigation API.
 - `world/frame-clock.js`: fixed 60 Hz simulation, up to 12 steps per rendered frame. Catch-up is bounded to 200 ms; closing settings and returning from a hidden tab discard accumulated time. Movement and wave time agree at 10/30/60/120 FPS.
 - `touch-controls.js`: visible joystick, stable gesture origins, and independent multitouch spray control.

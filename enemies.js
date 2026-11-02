@@ -5,14 +5,13 @@ import { enemyHealth } from './waves.js';
 import { createGooseModel, gooseRig, animateGoose } from './goose.js';
 
 const templates = new Map();
+const SLUG_MODEL_URL = new URL('./assets/enemies/slug.glb', import.meta.url).href;
 
 export async function loadEnemyModels() {
   if (!templates.has('goose')) templates.set('goose', { scene: createGooseModel(), animations: [] });
   const loader = new GLTFLoader();
-  await Promise.all(['slug'].map(async kind => {
-    const gltf = await loader.loadAsync(`./assets/enemies/${kind}.glb`);
-    templates.set(kind, gltf);
-  }));
+  const slug = await loader.loadAsync(SLUG_MODEL_URL);
+  templates.set('slug', slug);
 }
 
 export function createEnemy(kind, level) {
