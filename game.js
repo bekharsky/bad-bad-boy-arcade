@@ -648,10 +648,6 @@ function updateRunner(dt) {
   const firing = keys.has('Space') || keys.has('Fire') || touchControls.input.firing || player.tapTimer > 0;
   player.tapTimer = Math.max(0, player.tapTimer - dt);
   world.updateRunner(state);
-  score = runnerBaseScore + Math.floor(state.distance) * 2 + state.bonus;
-  scoreLabel.textContent = String(score).padStart(4, '0');
-  runnerProgress.firstElementChild.style.transform = `scaleX(${state.distance / runnerRun.length})`;
-  runnerProgress.setAttribute('aria-valuenow', String(Math.round(state.distance / runnerRun.length * 100)));
   if (result.hits) {
     player.hp = Math.max(0, player.hp - result.hits); updateHealth(); blip(110, .12);
     burst(player.x, HERO_HEIGHT * .4, 0, 0xe85e55, 16, null, 2);
@@ -661,6 +657,11 @@ function updateRunner(dt) {
   if (!playing) return;
   const spray = updateSpray(dt, firing, state.traffic);
   updateSprayGauge(spray);
+  // Settle after spray damage so a hit on the finishing frame carries into
+  // the next district along with the distance and obstacle bonuses.
+  syncRunnerScore();
+  runnerProgress.firstElementChild.style.transform = `scaleX(${state.distance / runnerRun.length})`;
+  runnerProgress.setAttribute('aria-valuenow', String(Math.round(state.distance / runnerRun.length * 100)));
   medkits.update(dt, player, collectMedkit, state);
   player.invulnerable = state.invulnerable;
   player.model.material.opacity = state.invulnerable > 0 && Math.floor(state.elapsed * 18) % 2 === 0 ? .4 : 1;
@@ -671,6 +672,12 @@ function updateRunner(dt) {
     score += 500; scoreLabel.textContent = String(score).padStart(4, '0');
     waves.completeMap();
   }
+}
+
+function syncRunnerScore() {
+  const state = runnerRun.state;
+  score = runnerBaseScore + Math.floor(state.distance) * 2 + state.bonus;
+  scoreLabel.textContent = String(score).padStart(4, '0');
 }
 
 function updateSpray(dt, firing, groundTargets, powered = false) {
@@ -794,6 +801,7 @@ function clearArena() {
 }
 
 function endGame() {
+  if (isRunner()) syncRunnerScore();
   playing = false;
   desktopSpray.hidden = true;
   syncMouseAim();
