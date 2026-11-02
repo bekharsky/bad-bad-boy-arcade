@@ -328,7 +328,7 @@ async function loadHero() {
 
 async function loadModels() {
   try {
-    status.textContent = 'Loading the hero, snails, and Spanish slugs…';
+    status.textContent = 'Loading the hero, barnacle geese, and Spanish slugs…';
     const [gltf] = await Promise.all([
       loadHero(),
       loadEnemyModels(),
@@ -365,7 +365,7 @@ function spawnEnemies(count, level) {
   world.routeTo(player.x, player.z);
   for (let i = 0; i < count; i++) {
     const point = world.spawnPoint(player, i, count);
-    if (point) makeEnemy(point.x, point.z, level, i % 3 === 0 ? 'slug' : 'snail');
+    if (point) makeEnemy(point.x, point.z, level, i % 3 === 0 ? 'slug' : 'goose');
   }
 }
 
@@ -427,18 +427,26 @@ function burst(x, y, z, color, count = 8, forward = null, scale = 1) {
 }
 
 function showBite(enemy) {
-  const attacker = new THREE.Vector3(enemy.x, THREE.MathUtils.clamp(enemy.hitHeight, .18, .48), enemy.z);
+  const attacker = enemy.goose
+    ? enemy.goose.beak.getWorldPosition(new THREE.Vector3())
+    : new THREE.Vector3(enemy.x, THREE.MathUtils.clamp(enemy.hitHeight, .18, .48), enemy.z);
   const contact = new THREE.Vector3();
   let nearest = Infinity;
-  // Use the animated shin closest to the attacker, including during a stride.
+  // Use the nearest animated leg segment. A goose can nip above the shin;
+  // the low slug still bites around the ankle.
   for (const leg of player.rig.legs) {
     const ankle = leg.ankle.getWorldPosition(new THREE.Vector3());
     const knee = leg.knee.getWorldPosition(new THREE.Vector3());
-    const height = knee.y - ankle.y;
-    const t = Math.abs(height) > .001 ? THREE.MathUtils.clamp((attacker.y - ankle.y) / height, 0, 1) : 0;
-    const point = ankle.lerp(knee, t);
-    const distance = point.distanceToSquared(attacker);
-    if (distance < nearest) { nearest = distance; contact.copy(point); }
+    const joints = [ankle, knee];
+    if (enemy.goose) joints.push(leg.hip.getWorldPosition(new THREE.Vector3()));
+    for (let i = 1; i < joints.length; i++) {
+      const start = joints[i - 1], end = joints[i], segment = end.clone().sub(start);
+      const lengthSq = segment.lengthSq();
+      const t = lengthSq ? THREE.MathUtils.clamp(attacker.clone().sub(start).dot(segment) / lengthSq, 0, 1) : 0;
+      const point = start.clone().addScaledVector(segment, t);
+      const distance = point.distanceToSquared(attacker);
+      if (distance < nearest) { nearest = distance; contact.copy(point); }
+    }
   }
   const outward = new THREE.Vector3(attacker.x - contact.x, 0, attacker.z - contact.z);
   if (outward.lengthSq() < .0001) outward.set(-player.dx, 0, -player.dz);
