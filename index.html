@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#12151f" />
     <title>Golden Blast Helsinki — Bad Bad Boy Arcade</title>
-    <link rel="stylesheet" href="./style.css?v=20261102-gulls1" />
+    <link rel="stylesheet" href="./style.css?v=20261102-start-up1" />
     <script type="importmap">
       {
         "imports": {
@@ -102,10 +102,15 @@
               <div class="start-control-keys"><kbd class="start-space-key">SPACE</kbd></div>
               <span class="start-control-label">FIRE</span>
             </div>
+            <div class="start-control">
+              <div class="start-control-keys"><kbd>E</kbd></div>
+              <span class="start-control-label">UP</span>
+            </div>
           </div>
           <div class="runner-start-hint" role="group" aria-label="Runner controls">
             <div class="runner-control"><kbd aria-label="Left and right to dodge, up and down for speed">←→↑↓</kbd><span>DODGE / SPEED</span></div>
             <div class="runner-control runner-keyboard"><kbd>SPACE</kbd><span>SPRAY</span></div>
+            <div class="runner-control runner-keyboard"><kbd>E</kbd><span>UP</span></div>
           </div>
           <button id="open-settings" class="settings-button" type="button" aria-label="Controls" aria-haspopup="dialog" aria-controls="controls-dialog">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 3-.5 2.1-1.6.9-2.1-.6-2 3.4 1.6 1.5v1.9l-1.6 1.5 2 3.4 2.1-.6 1.6.9L9 20h4l.5-2.1 1.6-.9 2.1.6 2-3.4-1.6-1.5v-1.9l1.6-1.5-2-3.4-2.1.6-1.6-.9L13 3Z"/><circle cx="11" cy="11.5" r="3"/></svg>
@@ -132,7 +137,6 @@
         <label class="assist-setting"><input type="checkbox" data-aim-assist checked /><span class="assist-switch" aria-hidden="true"></span><span class="assist-copy"><strong>Aim assist</strong><span>Direct only</span></span></label>
         <label class="assist-setting" hidden><input type="checkbox" data-mouse-aim checked /><span class="assist-switch" aria-hidden="true"></span><span class="assist-copy"><strong>Mouse aim</strong></span></label>
         <label class="assist-setting"><input id="sound-setting" type="checkbox" /><span class="assist-switch" aria-hidden="true"></span><span class="assist-copy"><strong>Sound</strong></span></label>
-        <p class="air-controls"><span class="air-keyboard"><kbd>E</kbd> + spray · aim up</span><span class="air-touch">Drag SPRAY up · aim at gulls</span></p>
         <form method="dialog"><button id="settings-done" class="primary-button" type="submit">DONE</button></form>
         <section class="debug-maps" data-debug-maps aria-label="Maps" hidden></section>
         <a class="credits-link" href="./credits.html" target="_blank" rel="noopener">Models & credits ↗</a>
