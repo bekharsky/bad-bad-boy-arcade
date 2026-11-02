@@ -55,12 +55,17 @@ export function createSeagulls(scene, world, callbacks = {}) {
   });
   let time = 0;
 
-  function render() {
+  function render(dt = 0) {
     for (const state of flight.birds) {
       const model = models[state.id];
-      model.bird.visible = state.phase !== 'flee' || state.age < 1.4;
+      model.bird.visible = state.phase !== 'waiting' && state.phase !== 'away';
       model.bird.position.set(state.x, state.hitHeight, state.z);
-      model.bird.rotation.set(-Math.atan2(state.vy, Math.hypot(state.vx, state.vz) || 1) * .6, Math.atan2(state.vx, state.vz), 0);
+      const speed = Math.hypot(state.vx, state.vz);
+      if (speed > .01) {
+        const yaw = Math.atan2(state.vx, state.vz), turn = yaw - model.bird.rotation.y;
+        model.bird.rotation.y += Math.atan2(Math.sin(turn), Math.cos(turn)) * (1 - Math.exp(-10 * dt));
+      }
+      model.bird.rotation.x = THREE.MathUtils.damp(model.bird.rotation.x, -Math.atan2(state.vy, speed || 1) * .6, 10, dt);
       const flap = state.phase === 'dive' ? -.6 : Math.sin(time * (!state.alive ? 15 : 8) + state.id * 2) * .3;
       for (const pivot of model.wings) pivot.rotation.z = flap * pivot.scale.x;
       model.shadow.visible = model.bird.visible && state.hitHeight < 10 && world.canStandAt(state.x, state.z, .1);
@@ -81,7 +86,7 @@ export function createSeagulls(scene, world, callbacks = {}) {
     birds: flight.birds,
     reset(player, runner) { time = 0; flight.reset(player, runner); root.visible = true; render(); },
     clear() { root.visible = false; },
-    update(dt, player, options) { time += dt; flight.update(dt, player, options); render(); },
+    update(dt, player, options) { time += dt; flight.update(dt, player, options); render(dt); },
     repel: flight.repel,
     dispose() { disposeObject(root); },
   };

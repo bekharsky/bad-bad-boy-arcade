@@ -42,13 +42,13 @@ test('locked warnings allow sidesteps, runner lane changes, and braking to avoid
     const { flight, player, impacts, advance } = setup(value, runner);
     while (!flight.birds.some(b => b.target)) advance(1 / 120);
     const attacking = flight.birds.find(b => b.target), x = attacking.target.x;
-    player.x += 4.4; advance(2.2);
+    player.x += 4.4; advance(3);
     assert.equal(impacts.length, 1); assert.equal(impacts[0].hit, false);
     assert.equal(impacts[0].x, x, 'The bird cannot chase a dodge');
   }
   const { flight, impacts, advance } = setup(.9, true);
   while (!flight.birds.some(b => b.target)) advance(1 / 120);
-  advance(2.2, { scroll: 7 });
+  advance(3, { scroll: 7 });
   assert.equal(impacts[0].hit, false);
 });
 
@@ -69,7 +69,7 @@ test('released droppings survive repelling the bird; reset clears every pending 
   assert.equal(flight.repel(bird), true); assert.ok(bird.drop);
   advance(1); assert.equal(impacts.length, 1); assert.equal(impacts[0].hit, true);
   flight.reset(player, true);
-  assert.ok(flight.birds.every(b => b.alive && b.phase === 'orbit' && !b.drop && !b.target));
+  assert.ok(flight.birds.every(b => !b.alive && b.phase === 'waiting' && !b.drop && !b.target));
   advance(5); assert.equal(impacts.length, 1);
 });
 
@@ -137,7 +137,7 @@ test('air spray can repel moving birds in both arena and runner frames', () => {
     const spray = createSpraySystem(new THREE.Scene(), { lineClear3D: () => true }, bird => {
       if (flight.repel(bird)) repelled.add(bird.id);
     }, { refraction: false });
-    for (let frame = 0; frame < 10 * 60; frame++) {
+    for (let frame = 0; frame < 18 * 60; frame++) {
       flight.update(1 / 60, player, { scroll: runner ? 15 : 0 });
       spray.update(1 / 60, true, emitter, aim(player, flight.birds, true), flight.birds);
     }
@@ -156,10 +156,75 @@ test('ambient attacks work with the real navigation and scenery on every campaig
         canStandAt: (...args) => world.canStandAt(...args),
         lineClear3D: (...args) => world.lineClear3D(...args), onImpact: event => impacts.push(event) });
       flight.reset(player, definition.mode === 'runner');
-      for (let frame = 0; frame < 12 * 60; frame++) flight.update(1 / 60, player);
+      for (let frame = 0; frame < 16 * 60; frame++) flight.update(1 / 60, player);
       assert.ok(impacts.some(event => event.hit), `${definition.id}: a bird can reach the player in the open`);
     } finally { world.dispose(); }
   }
+});
+
+test('birds arrive separately from the distance and settle before their first attack', () => {
+  const { flight, impacts, advance } = setup(.1);
+  assert.ok(flight.birds.every(b => !b.alive && b.phase === 'waiting'));
+  advance(2); assert.ok(flight.birds.every(b => b.phase === 'waiting'));
+  advance(.2);
+  assert.equal(flight.birds[0].phase, 'approach');
+  assert.ok(flight.birds[0].z < -80, 'The first visible position is distant, not beside the hero');
+  assert.equal(flight.birds[1].phase, 'waiting');
+  advance(4.5);
+  assert.equal(flight.birds[0].phase, 'orbit');
+  assert.equal(flight.birds[1].phase, 'waiting');
+  assert.ok(flight.birds.every(b => !b.target));
+  advance(1.5);
+  assert.ok(flight.birds.every(b => !b.target));
+  assert.equal(flight.birds[1].phase, 'approach');
+  assert.equal(impacts.length, 0);
+});
+
+test('visible flight stays continuous through facade avoidance, retreat and re-entry', () => {
+  for (const runner of [false, true]) {
+    let wall = false;
+    const { flight, player, advance } = setup(.1, runner, { lineClear3D: () => !wall });
+    advance(13, { attacks: false });
+    const bird = flight.birds[0];
+    assert.equal(bird.phase, 'orbit');
+    let repelled = false, sawAway = false, sawReturn = false;
+    const hidden = phase => phase === 'waiting' || phase === 'away';
+    for (let frame = 0; frame < 20 * 60; frame++) {
+      wall = frame >= 30 && frame < 90;
+      if (frame === 120) { repelled = flight.repel(bird); assert.equal(repelled, true); }
+      const from = { x: bird.x, y: bird.hitHeight, z: bird.z, phase: bird.phase };
+      flight.update(1 / 60, player, { scroll: runner ? 15 : 0, attacks: false });
+      if (!hidden(from.phase) && !hidden(bird.phase)) {
+        assert.ok(Math.hypot(bird.x - from.x, bird.hitHeight - from.y, bird.z - from.z) < 1.2, `${from.phase} → ${bird.phase} cannot teleport`);
+      }
+      if (bird.phase === 'away') sawAway = true;
+      if (sawAway && bird.phase === 'approach' && !sawReturn) {
+        sawReturn = true; assert.ok(bird.z < -80, 'Return begins with a distant approach');
+      }
+    }
+    assert.ok(sawAway && sawReturn && bird.alive);
+  }
+});
+
+test('retreat is rendered until the bird flies out of the frame instead of a timed visibility cut', async () => {
+  const { createGameCamera } = await import('../world/game-camera.js');
+  const scene = new THREE.Scene(), player = { x: 0, z: 0, radius: .74 };
+  const gulls = createSeagulls(scene, { canStandAt: () => true, lineClear3D: () => true }, { random: () => .1 });
+  gulls.reset(player, false);
+  const models = scene.children[0].children.filter(node => node.isGroup);
+  assert.ok(models.every(model => !model.visible));
+  for (let i = 0; i < 13 * 60; i++) gulls.update(1 / 60, player, { attacks: false });
+  const bird = gulls.birds[0]; gulls.repel(bird);
+  for (let i = 0; i < 1.5 * 60; i++) gulls.update(1 / 60, player, { attacks: false });
+  assert.equal(models[0].visible, true, 'The old 1.4-second visibility cut is gone');
+  for (let i = 0; i < 1.6 * 60; i++) gulls.update(1 / 60, player, { attacks: false });
+  assert.equal(bird.phase, 'away'); assert.equal(models[0].visible, false);
+  for (const [width, height, touch] of [[1280, 720, false], [390, 844, true], [844, 390, true]]) {
+    const rig = createGameCamera(); rig.resize(width, height, touch); rig.frame(0, 0, 0, true); rig.camera.updateMatrixWorld(true);
+    const position = new THREE.Vector3(bird.x, bird.hitHeight, bird.z).project(rig.camera);
+    assert.ok(Math.abs(position.x) > 1.1 || Math.abs(position.y) > 1.1, 'Hiding happens outside the visible frame');
+  }
+  gulls.dispose();
 });
 
 test('restarts and map changes reuse bounded bird resources and clear all markers', () => {
