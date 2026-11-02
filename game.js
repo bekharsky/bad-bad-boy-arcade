@@ -21,6 +21,8 @@ import { bindGameInput } from './game-input.js';
 import { preventGameZoom } from './gesture-guard.js';
 import { createRunnerRun } from './runner/course.js';
 import { bindRunnerInput, createLaneSteering, runnerThrottle } from './runner/runner-input.js';
+import { createSeagulls } from './seagulls.js';
+import { aimingUp, createSprayAim } from './spray-aim.js';
 
 const MODEL_URL = './assets/bad-bad-boy.glb?v=20261025-opt1';
 // World metres; the hero keeps the same physical size across every map.
@@ -159,6 +161,7 @@ player.root.position.set(player.x, 0, player.z);
 scene.add(player.root);
 
 function hitEnemy(enemy, direction, impact) {
+  if (enemy.kind === 'gull') { seagulls.repel(enemy); return; }
   if (isRunner()) {
     if (runnerRun.sprayHit(enemy.id, impact)) {
       burst(enemy.x, enemy.hitHeight, enemy.z, 0xffd34e, 20, null, 3);
@@ -196,6 +199,19 @@ const effects = createBurstEffects(scene);
 const biteEffects = createBiteEffects(scene);
 const medkits = createMedkits(scene, world);
 const batteries = createBatteries(scene, world);
+const sprayAim = createSprayAim();
+const sprayTargets = [];
+const seagulls = createSeagulls(scene, world, {
+  onRepel(bird) { burst(bird.x, bird.hitHeight, bird.z, '#f4f1df', 8); blip(620, .05); },
+  onImpact(impact) {
+    if (impact.type === 'drop' || impact.hit) burst(impact.x, impact.y, impact.z, impact.type === 'drop' ? '#eee9cf' : '#e85e55', 12, null, 2);
+    if (!impact.hit || player.invulnerable > 0 || !playing) return;
+    player.hp = Math.max(0, player.hp - 1); player.invulnerable = .9;
+    if (isRunner()) runnerRun.state.invulnerable = Math.max(runnerRun.state.invulnerable, .9);
+    updateHealth(); blip(105, .12);
+    if (player.hp === 0) endGame();
+  },
+});
 // Battery cans are hidden in back courtyards. Exploration powers up the spray.
 const POWER_TIME = 8;
 let playing = false;
@@ -312,7 +328,7 @@ async function loadHero() {
 
 async function loadModels() {
   try {
-    status.textContent = 'Loading the hero, snails, and Spanish slugs…';
+    status.textContent = 'Loading the hero, barnacle geese, and Spanish slugs…';
     const [gltf] = await Promise.all([
       loadHero(),
       loadEnemyModels(),
@@ -349,7 +365,7 @@ function spawnEnemies(count, level) {
   world.routeTo(player.x, player.z);
   for (let i = 0; i < count; i++) {
     const point = world.spawnPoint(player, i, count);
-    if (point) makeEnemy(point.x, point.z, level, i % 3 === 0 ? 'slug' : 'snail');
+    if (point) makeEnemy(point.x, point.z, level, i % 3 === 0 ? 'slug' : 'goose');
   }
 }
 
@@ -376,6 +392,7 @@ function applyWave(plan) {
     updateHealth();
     world.reset();
     placePlayerAtSpawn();
+    seagulls.reset(player, isRunner());
     medkits.reset(player);
     if (!isRunner()) batteries.reset(player);
   }
@@ -410,18 +427,26 @@ function burst(x, y, z, color, count = 8, forward = null, scale = 1) {
 }
 
 function showBite(enemy) {
-  const attacker = new THREE.Vector3(enemy.x, THREE.MathUtils.clamp(enemy.hitHeight, .18, .48), enemy.z);
+  const attacker = enemy.goose
+    ? enemy.goose.beak.getWorldPosition(new THREE.Vector3())
+    : new THREE.Vector3(enemy.x, THREE.MathUtils.clamp(enemy.hitHeight, .18, .48), enemy.z);
   const contact = new THREE.Vector3();
   let nearest = Infinity;
-  // Use the animated shin closest to the attacker, including during a stride.
+  // Use the nearest animated leg segment. A goose can nip above the shin;
+  // the low slug still bites around the ankle.
   for (const leg of player.rig.legs) {
     const ankle = leg.ankle.getWorldPosition(new THREE.Vector3());
     const knee = leg.knee.getWorldPosition(new THREE.Vector3());
-    const height = knee.y - ankle.y;
-    const t = Math.abs(height) > .001 ? THREE.MathUtils.clamp((attacker.y - ankle.y) / height, 0, 1) : 0;
-    const point = ankle.lerp(knee, t);
-    const distance = point.distanceToSquared(attacker);
-    if (distance < nearest) { nearest = distance; contact.copy(point); }
+    const joints = [ankle, knee];
+    if (enemy.goose) joints.push(leg.hip.getWorldPosition(new THREE.Vector3()));
+    for (let i = 1; i < joints.length; i++) {
+      const start = joints[i - 1], end = joints[i], segment = end.clone().sub(start);
+      const lengthSq = segment.lengthSq();
+      const t = lengthSq ? THREE.MathUtils.clamp(attacker.clone().sub(start).dot(segment) / lengthSq, 0, 1) : 0;
+      const point = start.clone().addScaledVector(segment, t);
+      const distance = point.distanceToSquared(attacker);
+      if (distance < nearest) { nearest = distance; contact.copy(point); }
+    }
   }
   const outward = new THREE.Vector3(attacker.x - contact.x, 0, attacker.z - contact.z);
   if (outward.lengthSq() < .0001) outward.set(-player.dx, 0, -player.dz);
@@ -456,7 +481,7 @@ function blip(frequency, duration) {
 function updateMovement(dt, firing) {
   if (keyboardSteering() || touchControls.input.x || touchControls.input.z) mouseAim.resetAim();
   const mode = usingTouchControls ? 'direct' : controlMode;
-  const assisted = mode === 'direct' && aimAssistEnabled && firing && !mouseAim.aiming && !keys.has('ShiftLeft') && !keys.has('ShiftRight');
+  const assisted = mode === 'direct' && aimAssistEnabled && firing && !aimingUp(keys, touchControls.input) && !mouseAim.aiming && !keys.has('ShiftLeft') && !keys.has('ShiftRight');
   if (!assisted) resetAimAssist();
   return movePlayer(player, world, {
     keys, touch: touchControls.input, mode, dt, firing, height: HERO_HEIGHT,
@@ -534,7 +559,9 @@ function update(dt) {
 
   player.tapTimer = Math.max(0, player.tapTimer - dt);
   // Each parcel starts at the hands, then follows its own ballistic trajectory.
-  const spray = stream.update(dt, firing, player.rig.emitter, player, enemies, player.powerTimer > 0);
+  seagulls.update(dt, player);
+  if (!playing) return;
+  const spray = updateSpray(dt, firing, enemies, player.powerTimer > 0);
   player.powerTimer = Math.max(0, player.powerTimer - dt);
   updateSprayGauge(spray);
   player.fireTimer -= dt;
@@ -617,20 +644,24 @@ function updateRunner(dt) {
   player.body.rotation.z = THREE.MathUtils.damp(player.body.rotation.z, (runnerRun.lanes[state.lane] - state.x) * -.055, 12, dt);
   animateHero(player.rig, player.runTime, 1);
   player.root.updateMatrixWorld(true);
+  player.invulnerable = state.invulnerable;
   const firing = keys.has('Space') || keys.has('Fire') || touchControls.input.firing || player.tapTimer > 0;
   player.tapTimer = Math.max(0, player.tapTimer - dt);
-  const spray = stream.update(dt, firing, player.rig.emitter, player, state.traffic);
-  updateSprayGauge(spray);
   world.updateRunner(state);
-  score = runnerBaseScore + Math.floor(state.distance) * 2 + state.bonus;
-  scoreLabel.textContent = String(score).padStart(4, '0');
-  runnerProgress.firstElementChild.style.transform = `scaleX(${state.distance / runnerRun.length})`;
-  runnerProgress.setAttribute('aria-valuenow', String(Math.round(state.distance / runnerRun.length * 100)));
   if (result.hits) {
     player.hp = Math.max(0, player.hp - result.hits); updateHealth(); blip(110, .12);
     burst(player.x, HERO_HEIGHT * .4, 0, 0xe85e55, 16, null, 2);
     if (player.hp === 0) { endGame(); return; }
   }
+  seagulls.update(dt, player, { scroll: state.speed, attacks: !state.finished });
+  if (!playing) return;
+  const spray = updateSpray(dt, firing, state.traffic);
+  updateSprayGauge(spray);
+  // Settle after spray damage so a hit on the finishing frame carries into
+  // the next district along with the distance and obstacle bonuses.
+  syncRunnerScore();
+  runnerProgress.firstElementChild.style.transform = `scaleX(${state.distance / runnerRun.length})`;
+  runnerProgress.setAttribute('aria-valuenow', String(Math.round(state.distance / runnerRun.length * 100)));
   medkits.update(dt, player, collectMedkit, state);
   player.invulnerable = state.invulnerable;
   player.model.material.opacity = state.invulnerable > 0 && Math.floor(state.elapsed * 18) % 2 === 0 ? .4 : 1;
@@ -643,6 +674,19 @@ function updateRunner(dt) {
   }
 }
 
+function syncRunnerScore() {
+  const state = runnerRun.state;
+  score = runnerBaseScore + Math.floor(state.distance) * 2 + state.bonus;
+  scoreLabel.textContent = String(score).padStart(4, '0');
+}
+
+function updateSpray(dt, firing, groundTargets, powered = false) {
+  sprayTargets.length = 0;
+  sprayTargets.push(...groundTargets, ...seagulls.birds);
+  const direction = sprayAim(player, seagulls.birds, aimingUp(keys, touchControls.input));
+  return stream.update(dt, firing, player.rig.emitter, direction, sprayTargets, powered);
+}
+
 function updateSprayGauge(spray) {
   const offset = String(100 * (1 - spray.charge));
   for (const gauge of sprayGauges) gauge.style.strokeDashoffset = offset;
@@ -650,11 +694,12 @@ function updateSprayGauge(spray) {
   if (sprayRange.textContent !== range) sprayRange.textContent = range;
   const pressure = String(Math.round(spray.charge * 100));
   if (desktopSpray.getAttribute('aria-valuenow') !== pressure) desktopSpray.setAttribute('aria-valuenow', pressure);
-  const description = `Range ${range} metres${spray.blocked ? ', blocked' : ''}`;
+  const description = `${spray.airborne ? 'Aiming upwards, range' : 'Range'} ${range} metres${spray.blocked ? ', blocked' : ''}`;
   if (desktopSpray.getAttribute('aria-valuetext') !== description) desktopSpray.setAttribute('aria-valuetext', description);
   desktopSpray.dataset.blocked = String(spray.blocked);
+  desktopSpray.dataset.airborne = String(spray.airborne);
   sprayButton.dataset.blocked = String(spray.blocked);
-  sprayButton.setAttribute('aria-label', spray.blocked ? 'Fire spray, blocked' : `Fire spray, range ${range} metres`);
+  sprayButton.setAttribute('aria-label', spray.airborne ? 'Spraying upwards; drag back to lower' : `Fire spray, range ${range} metres; drag up to aim at birds`);
 }
 
 function updateHealth() {
@@ -744,6 +789,7 @@ function clearArena() {
   clearTimeout(showToast.timer);
   toast.classList.remove('visible');
   stream.clear();
+  seagulls.clear();
   biteEffects.clear();
   medkits.clear();
   player.tapTimer = 0;
@@ -755,6 +801,7 @@ function clearArena() {
 }
 
 function endGame() {
+  if (isRunner()) syncRunnerScore();
   playing = false;
   desktopSpray.hidden = true;
   syncMouseAim();
@@ -762,6 +809,7 @@ function endGame() {
   runnerProgress.hidden = true;
   touchControls.setEnabled(false);
   stream.clear();
+  seagulls.clear();
   player.tapTimer = 0;
   player.moveSpeed = 0;
   player.turnSpeed = 0;
@@ -905,7 +953,7 @@ window.addEventListener('keydown', (event) => {
   if (!mouseAim.locked && event.target instanceof Element && event.target.closest('select, input')) return;
   if (!playing && event.target instanceof Element && event.target.closest('button, a')) return;
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code)) event.preventDefault();
-  if (usingTouchControls && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ShiftLeft', 'ShiftRight'].includes(event.code)) {
+  if (usingTouchControls && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyE', 'ShiftLeft', 'ShiftRight'].includes(event.code)) {
     usingTouchControls = false;
     syncControlMode();
   }
