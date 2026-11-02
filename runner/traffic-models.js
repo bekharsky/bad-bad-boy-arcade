@@ -4,7 +4,30 @@ import { TRAM_CAR_OFFSET } from './tram-route.js';
 
 export const TRAFFIC_PALETTE = { green: '#64c94c', blue: '#51bde0', red: '#e45c5c' };
 
+// These eleven procedural templates contain less than a megabyte of geometry.
+// They never enter a scene or allocate GPU buffers. Each map receives owned
+// copies, so unloading one district cannot dispose another district's model.
+const templateCache = new Map();
+
 export function createTrafficModel(kind, color) {
+  const key = `${kind}:${color}`;
+  if (!templateCache.has(key)) templateCache.set(key, buildTrafficModel(kind, color));
+  const model = templateCache.get(key).clone(true);
+  const geometries = new Map(), materials = new Map();
+  model.traverse(node => {
+    if (!node.isMesh) return;
+    if (!geometries.has(node.geometry)) geometries.set(node.geometry, node.geometry.clone());
+    node.geometry = geometries.get(node.geometry);
+    const ownMaterial = original => {
+      if (!materials.has(original)) materials.set(original, original.clone());
+      return materials.get(original);
+    };
+    node.material = Array.isArray(node.material) ? node.material.map(ownMaterial) : ownMaterial(node.material);
+  });
+  return model;
+}
+
+function buildTrafficModel(kind, color) {
   if (kind === 'tram') return createRunnerTram();
   const model = createSceneryModel(`${color} ${kind}`), { box } = model;
   const paint = TRAFFIC_PALETTE[color];
