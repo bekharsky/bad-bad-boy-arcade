@@ -38,3 +38,12 @@ test('pursuit obeys navigation and a wall prevents a bite even at close range', 
   assert.equal(f.player.hp, 5); assert.equal(f.bites.length, 0);
   assert.equal(f.moves.length, 2);
 });
+
+test('nearby enemies still separate while distant enemies leave steering unchanged', () => {
+  const first = enemy(4), nearby = enemy(4), distant = enemy(9);
+  nearby.z = .4; distant.z = 8;
+  const f = fixture([first, nearby, distant]);
+  f.combat.update(.1, 1);
+  assert.ok(first.z < 0, 'The nearby enemy deflects pursuit');
+  assert.equal(distant.z, 8, 'A distant actor does not add separation');
+});
