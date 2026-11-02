@@ -64,7 +64,6 @@ const settingsDone = document.querySelector('#settings-done');
 const soundSetting = document.querySelector('#sound-setting');
 const waveStatLabel = document.querySelector('#wave-stat-label');
 const runnerProgress = document.querySelector('#runner-progress');
-const transitionLabel = document.querySelector('#map-transition');
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const query = new URLSearchParams(window.location.search);
 const debugMaps = query.get('debug') === 'maps';
@@ -220,7 +219,6 @@ const mapTransition = createMapTransition({ onSwap: applyWave, onFinish: finishM
 
 function finishMapTransition() {
   document.querySelector('.game-shell').classList.remove('map-changing');
-  transitionLabel.hidden = true;
   resetInput();
   touchControls.setEnabled(playing);
   syncMouseAim();
@@ -362,8 +360,6 @@ function spawnWave(plan) {
     syncMouseAim();
     touchControls.setEnabled(false);
     document.querySelector('.game-shell').classList.add('map-changing');
-    transitionLabel.querySelector('strong').textContent = maps.find(map => map.id === plan.mapId).name;
-    transitionLabel.style.opacity = '0'; transitionLabel.hidden = false;
     return;
   }
   applyWave(plan);
@@ -393,7 +389,7 @@ function applyWave(plan) {
   }
   waveLabel.textContent = String(plan.number).padStart(2, '0');
   spawnEnemies(plan.enemyCount, plan.number);
-  if (plan.number > 1) showToast(changedMap ? `WAVE ${plan.number} · ${world.name.toUpperCase()}` : `WAVE ${plan.number}`);
+  if (plan.number > 1) showToast(`WAVE ${plan.number}`);
 }
 
 function removeEnemy(enemy, pop = false) {
@@ -793,8 +789,7 @@ function animate(now) {
   update(dt);
   if (player.model) world.updateVisibility(camera, player.root, HERO_HEIGHT, dt);
   if (mapTransition.active) {
-    const frame = transitionRenderer.render(scene, camera, mapTransition.progress, reducedMotion.matches);
-    transitionLabel.style.opacity = String(frame.title);
+    transitionRenderer.render(scene, camera, mapTransition.progress, reducedMotion.matches);
   } else renderer.render(scene, camera);
   updateHeroHp();
 }
