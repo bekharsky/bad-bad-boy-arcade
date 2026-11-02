@@ -40,11 +40,11 @@ export function createEnemy(kind, level) {
   model.updateMatrixWorld(true);
   const bounds = new THREE.Box3().setFromObject(model);
   const size = bounds.getSize(new THREE.Vector3());
-  const scale = (kind === 'goose' ? 1.65 : 1.35) / Math.max(size.x, size.z);
+  const scale = (kind === 'goose' ? 1.5 : 1.35) / Math.max(size.x, size.z);
   body.scale.setScalar(scale);
   const centre = bounds.getCenter(new THREE.Vector3());
   model.position.sub(new THREE.Vector3(centre.x, bounds.min.y, centre.z));
-  const radius = 0.52;
+  const radius = kind === 'goose' ? .47 : .52;
   const mixer = source.animations.length ? new THREE.AnimationMixer(model) : null;
   const actions = {};
   if (mixer) {

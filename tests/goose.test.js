@@ -33,6 +33,9 @@ test('geese replace the snail model without downloads, sharing one mesh but keep
   assert.notEqual(a[0].skeleton, b[0].skeleton); assert.notEqual(first.goose.neck, second.goose.neck);
   assert.notEqual(a[0].material, b[0].material);
   assert.equal(a[0].geometry.attributes.skinIndex.count, a[0].geometry.attributes.position.count);
+  const bounds = new THREE.Box3().setFromObject(first.root).getSize(new THREE.Vector3());
+  assert.ok(Math.abs(bounds.z - 1.5) < .001, 'The reduced goose size stays consistent across instances');
+  assert.ok(first.size >= bounds.x / 2 && first.size < .5, 'Collision shrinks with the body');
 
   first.gait = 0;
   animateEnemy(first, .1, 1, false);
