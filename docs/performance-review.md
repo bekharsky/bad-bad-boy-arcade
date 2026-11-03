@@ -1,46 +1,15 @@
-# Performance
+# Производительность — 3 ноября 2026
 
-Graphics preparation runs before PLAY becomes available and under cover when
-changing districts. It compiles canvas and linear offscreen shader variants,
-including hidden effects, enemy models and fading buildings. The simulation
-waits for preparation and discards that time instead of catching it up. Empty
-liquid meshes briefly activate the refraction buffer during preparation, then
-return to their hidden state. Two hidden enemy representatives retain shared
-programs across districts. Shader diagnostic queries remain enabled in development.
+Проверена сборка `1579bd6` в Chrome 156 на MacBook Pro M2 (ANGLE Metal). Настольное окно: 1440 × 900 CSS-пикселей, DPR 2. Измерялись интервалы кадров, время JavaScript в игровом кадре, вызовы отрисовки и компиляции WebGL. Это короткий профиль первого боя и прямых переключений карт через `?debug=maps`, а не замер полной кампании.
 
-Desktop refraction uses a half-width, half-height scene buffer: 75% fewer pixels
-in that additional pass. The main canvas retains its existing resolution,
-antialiasing, shadows and geometry. Touch devices still skip refraction.
+## Что показал новый код
 
-## Local comparison, 3 November 2026
+В трёх одинаковых четырёхсекундных запусках West Harbor со струёй предыдущая сборка `1c504bb` компилировала 15 программ после PLAY и каждый раз имела пропуски кадров (>25 мс). Новая сборка связывала только одну программу после PLAY; все три запуски прошли без таких пропусков. Подготовка графики до игры убрала воспроизводимый рывок первого боя.
 
-Compared production builds of `1c504bb` and the preparation changes in Chrome
-on an Apple M5 Pro, at 1440 × 900 CSS pixels and device pixel ratio 2. Each sample
-started West Harbor and held fire for four seconds with seeded randomness.
+На пяти картах короткая игра со струёй держала около 60 кадров/с; 95-й процентиль времени JavaScript в кадре оставался ниже 5 мс. В West Harbor было около 330 вызовов отрисовки на кадр со струёй — это стоит проверить на настоящем телефоне. Эмуляция сенсорного экрана на том же M2 не заменяет замер мобильного GPU.
 
-| Measurement | Main | With preparation |
-| --- | ---: | ---: |
-| Longest frame interval | 64.1 ms | 9.5 ms |
-| Frame intervals above 25 ms | 2 | 0 |
-| Median frame interval | 8.3 ms | 8.3 ms |
+## Оставшийся пик: смена района
 
-The original run blocked on GPU shader diagnostic queries after starting.
-These queries did not occur during the modified production run. Three complete
-cycles of manual district changes left the same Harbor resource counts:
-112 geometries, 15 textures and 94 programs. Pause/resume and mobile rendering
-were checked separately. These are local checks, not an M2 performance guarantee.
+Прямой переход через меню карт синхронно занимал **180–212 мс в Kamppi** и **152–173 мс на Aleksanterinkatu**; до первого нового кадра проходило примерно 367 и 233 мс соответственно. В повторных переходах время построения почти не уменьшилось. Профиль CPU указывает на процедурные фасады: в Kamppi создание городского блока заняло около 110 мс, из них много времени ушло на отдельные `BoxGeometry`; на Aleksanterinkatu обычные фасады заняли около 72 мс. Генерация текстур мостовой была заметно дешевле (около 6 мс).
 
-## Remaining profiling work
-
-- Validate startup, crowds, sustained spraying and frame-time peaks on the
-  reported M2 and on a phone. Compare the same scenes and input sequences.
-- District geometry is still built synchronously. Aleksanterinkatu regenerates
-  its paving textures on entry. Profile construction separately from shader
-  preparation before adding staged building or texture caching.
-- Arena separation still compares enemies pairwise. Introduce a neighbour grid
-  only if a crowd profile points here, preserving movement in narrow passages.
-- Building sight checks and navigation refreshes for moving trams remain
-  candidates for CPU profiling. Verify occlusion from several positions before
-  reducing their frequency.
-
-Keep gameplay balance changes separate from performance measurements.
+Следующий отдельный PR стоит посвятить построению фасадов: уменьшить число временных геометрий и операций слияния, сохранив форму зданий и освобождение ресурсов карты. Целые районы кэшировать не требуется. После этого повторить замер переходов; по результату решить, нужна ли подготовка карты по этапам. Отдельно проверить долгий бой с большой толпой и настоящий телефон: только эти профили покажут, нужны ли сетка соседей для врагов или снижение цены рендера.
