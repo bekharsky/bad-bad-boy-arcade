@@ -4,6 +4,7 @@ import { loadHero } from './models/hero-loader.js';
 import { maps, mapOrder } from './maps/index.js';
 import { createArenaCombat } from './arena-combat.js';
 import { createFrameClock } from './world/frame-clock.js';
+import { prepareScene } from './world/render-preparation.js';
 import { createMapManager } from './world/map-manager.js';
 import { createGameCamera } from './world/game-camera.js';
 import { createMapTransition } from './world/map-transition.js';
@@ -101,6 +102,7 @@ const touchControls = createTouchControls({
 });
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.debug.checkShaderErrors = import.meta.env.DEV;
 // High-density touch screens need fewer shaded pixels and a smaller shadow
 // atlas; desktop keeps the full detail tier.
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, coarsePointer ? 1.5 : 2));
@@ -109,6 +111,9 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.12;
+// Refraction is only visible through the thin stream. A half-size source keeps
+// the glossy appearance while shading 75% fewer pixels in its extra scene pass.
+renderer.transmissionResolutionScale = .5;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#7c929f');
@@ -231,6 +236,7 @@ let playing = false;
 let gameTime = 0;
 let score = 0;
 let audioContext = null;
+let renderingReady = false;
 const frameClock = createFrameClock();
 const isRunner = () => world.mode === 'runner';
 const runnerSession = createRunnerSession({
@@ -272,6 +278,19 @@ function finishMapTransition() {
   syncMouseAim();
 }
 
+async function prepareGraphics() {
+  renderingReady = false;
+  try {
+    await prepareScene(renderer, scene, camera, () => {
+      if (mapTransition.active) transitionRenderer.render(scene, camera, mapTransition.progress, reducedMotion.matches);
+      else renderer.render(scene, camera);
+    });
+  } finally {
+    frameClock.reset();
+  }
+  renderingReady = true;
+}
+
 function syncLevelUI() {
   const runner = isRunner();
   toast.hidden = runner;
@@ -302,6 +321,7 @@ if (debugMaps) {
       name.textContent = map.name; id.textContent = map.id;
       button.append(name, id);
       button.addEventListener('click', () => {
+        if (!renderingReady) return;
         campaign.setStartingMap(map.id);
         if (controlsDialog.open) controlsDialog.close();
         startGame();
@@ -324,6 +344,15 @@ async function loadModels() {
     player.model.scale.setScalar(HERO_SCALE);
     player.body.add(player.model);
     placePlayerAtSpawn();
+    // These hidden representatives retain enemy programs across districts,
+    // including runs that start on a track without any arena enemies.
+    const enemyPrograms = new THREE.Group();
+    enemyPrograms.name = 'Prepared enemy programs';
+    enemyPrograms.visible = false;
+    for (const kind of ['goose', 'slug']) enemyPrograms.add(createEnemy(kind, 1).root);
+    scene.add(enemyPrograms);
+    status.textContent = 'Preparing the graphics…';
+    await prepareGraphics();
     status.classList.add('hidden');
     startButton.disabled = false;
     startButton.textContent = 'PLAY';
@@ -385,11 +414,17 @@ function applyWave(plan) {
   syncLevelUI();
   if (isRunner()) {
     runnerSession.start(world.runner, score);
-    return;
+  } else {
+    waveLabel.textContent = String(plan.number).padStart(2, '0');
+    spawnEnemies(plan.enemyCount, plan.number);
+    if (plan.number > 1) showToast(`WAVE ${plan.number}`);
   }
-  waveLabel.textContent = String(plan.number).padStart(2, '0');
-  spawnEnemies(plan.enemyCount, plan.number);
-  if (plan.number > 1) showToast(`WAVE ${plan.number}`);
+  if (changedMap && renderingReady) {
+    prepareGraphics().catch(error => {
+      console.warn('Could not prepare district graphics:', error);
+      renderingReady = true;
+    });
+  }
 }
 
 function removeEnemy(enemy, pop = false) {
@@ -656,7 +691,7 @@ function placePlayerAtSpawn() {
 }
 
 function startGame() {
-  if (!player.model) return;
+  if (!player.model || !renderingReady) return;
   playing = false;
   mapTransition.cancel(); finishMapTransition();
   mouseCaptureFailed = false;
@@ -725,11 +760,12 @@ function resize() {
 
 function animate(now) {
   requestAnimationFrame(animate);
-  if (document.hidden) { frameClock.reset(); return; }
+  if (document.hidden || !renderingReady) { frameClock.reset(); return; }
   const dt = frameClock.advance(now, step => {
     update(step);
-    return !controlsDialog.open;
+    return !controlsDialog.open && renderingReady;
   });
+  if (!renderingReady) return;
   if (player.model) world.updateVisibility(camera, player.root, HERO_HEIGHT, dt);
   if (mapTransition.active) {
     transitionRenderer.render(scene, camera, mapTransition.progress, reducedMotion.matches);
