@@ -40,6 +40,30 @@ test('scenery merges indexed and silhouette geometry, preserves colours and tran
   disposeObject(root);
 });
 
+test('batched facade boxes preserve the original shape and order around custom geometry', () => {
+  const model = createSceneryModel('Facade boxes');
+  const x = 1.3, y = 2.1, z = -3.2, w = 1.7, h = .8, d = .3, turn = .37;
+  model.box('#ff0000', x, y, z, w, h, d, turn);
+  model.box('#ff0000', 4, 5, 6, 2, 1, 3);
+  const triangle = new THREE.BufferGeometry();
+  triangle.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 1, 0, 0, 0, 1, 0], 3));
+  model.geometry('#ff0000', triangle);
+  model.box('#ff0000', -2, 1, 4, .5, .7, .9);
+  const mesh = model.finish({ vertexColors: true }).children[0];
+  const expected = new THREE.BoxGeometry(w, h, d).rotateZ(turn).translate(x, y, z);
+  for (const name of ['position', 'normal', 'uv']) {
+    const actual = mesh.geometry.getAttribute(name).array;
+    const original = expected.getAttribute(name).array;
+    for (let i = 0; i < original.length; i++) assert.ok(Math.abs(actual[i] - original[i]) < 1e-5, `${name}[${i}] changed`);
+  }
+  assert.deepEqual(Array.from(mesh.geometry.index.array.slice(0, 36)), Array.from(expected.index.array));
+  assert.equal(mesh.geometry.index.array[36], expected.index.array[0] + 24, 'Second box uses its own vertices');
+  assert.equal(mesh.geometry.getAttribute('position').count, 75);
+  assert.equal(mesh.geometry.index.count, 111);
+  assert.equal(mesh.geometry.getAttribute('position').getX(48), 0, 'Custom triangle remains between box runs');
+  expected.dispose();
+});
+
 test('nested facade parts fade together with unique materials and reset shadows', () => {
   const model = createSceneryModel('House'); model.box('#abcdef', 0, 2, 0, 3, 4, 3);
   const root = model.finish({ vertexColors: true }), mesh = root.children[0];
@@ -50,6 +74,13 @@ test('nested facade parts fade together with unique materials and reset shadows'
   camera.position.set(0, 2, 10); hero.position.set(0, 0, -4);
   const visibility = createBuildingVisibility([house]); visibility.update(camera, hero, 3.45, 1);
   assert.ok(mesh.material.opacity < .2); assert.equal(mesh.castShadow, false);
+  const fadedVersion = mesh.material.version;
+  for (let i = 0; i < 60; i++) visibility.update(camera, hero, 3.45, 1 / 60);
+  assert.equal(mesh.material.version, fadedVersion, 'An already faded building does not invalidate its shader every frame');
+  hero.position.set(20, 0, -4);
+  visibility.update(camera, hero, 3.45, 1);
+  assert.equal(mesh.material.opacity, 1);
+  assert.equal(mesh.material.version, fadedVersion + 1, 'Restoring the opaque shader happens once');
   visibility.reset(); assert.equal(mesh.material.opacity, 1); assert.equal(mesh.castShadow, true);
   disposeObject(root);
 });
