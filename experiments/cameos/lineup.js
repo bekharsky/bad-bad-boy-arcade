@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { createCameoModel, animateCameo } from '../../runner/cameo-models.js';
-import { preloadCameoPhotos } from '../../runner/cameo-photos.js';
 
 const root = document.getElementById('cameo-lineup');
 const slider = root.querySelector('#lineup-angle');
@@ -32,9 +31,6 @@ function makeView(canvas) {
 }
 
 try {
-  const photoUrls = JSON.parse(document.getElementById('lineup-photos').textContent);
-  const failedPhotos = await preloadCameoPhotos(file => photoUrls[file]);
-  if (failedPhotos) throw new Error('Не загрузились фотографии');
   const views = [...root.querySelectorAll('canvas')].map(makeView);
   let angle = 0, time = 0, last = 0, frame = 0;
   function draw() {

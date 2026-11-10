@@ -1,12 +1,14 @@
 import * as THREE from 'three';
 import { createSceneryModel } from '../maps/scenery-model.js';
-import { createCameoPhotoHead, poseCameoPhoto } from './cameo-photos.js';
+import { animateCameoHead, createCameoHead, createCameoNeck } from './cameo-heads.js';
 
 const LOOKS = {
-  purra: { name: 'Purra', skin: '#f1c5aa', jacket: '#d73587', lapel: '#bd2d75', shirt: '#25212a', trousers: '#32313a', scale: [.98, 1, 1] },
-  orpo: { name: 'Orpo', skin: '#e9bd9e', jacket: '#344356', lapel: '#29384a', shirt: '#f2eee4', trousers: '#303b4d', scale: [1.03, 1, 1] },
-  marin: { name: 'Marin', skin: '#f3cbb1', jacket: '#f1eee4', lapel: '#e1ddd4', shirt: '#333039', trousers: '#34333b', scale: [.94, 1, 1] },
-  stubb: { name: 'Stubb', skin: '#eabe9d', jacket: '#304563', lapel: '#253a56', shirt: '#f4efe4', trousers: '#2d3b53', scale: [.97, 1.05, 1] },
+  purra: { name: 'Purra', skin: '#e9bda8', jacket: '#d73587', lapel: '#bd2d75', shirt: '#25212a', tie: '#25212a', trousers: '#32313a', scale: [.98, 1, 1] },
+  orpo: { name: 'Orpo', skin: '#dfb59d', jacket: '#344356', lapel: '#29384a', shirt: '#f2eee4', tie: '#6691b4', trousers: '#303b4d', formal: true, scale: [1.03, 1, 1] },
+  marin: { name: 'Marin', skin: '#f0c9b3', jacket: '#f1eee4', lapel: '#e1ddd4', shirt: '#333039', tie: '#333039', trousers: '#34333b', scale: [.94, 1, 1] },
+  stubb: { name: 'Stubb', skin: '#e6b79c', jacket: '#304563', lapel: '#253a56', shirt: '#f4efe4', tie: '#8185b2', trousers: '#2d3b53', formal: true, scale: [.97, 1.05, 1] },
+  putin: { name: 'Putin', skin: '#e2b8a5', jacket: '#333a42', lapel: '#292f36', shirt: '#eee9de', tie: '#4b3030', trousers: '#30353c', formal: true, scale: [1, 1.02, 1] },
+  trump: { name: 'Trump', skin: '#d8a074', jacket: '#29364b', lapel: '#202d42', shirt: '#f5efe3', tie: '#b63232', trousers: '#283446', formal: true, scale: [1.06, 1.04, 1] },
 };
 const INK = '#29282c';
 const JACKET = { bottom: 1.145, height: 1.03, waist: .28, shoulders: .33, depth: .7, sides: 20 };
@@ -68,7 +70,7 @@ function jacketPanel(model, color, outline, layer) {
 }
 
 function body(model, look, kind) {
-  const suit = kind === 'orpo' || kind === 'stubb';
+  const suit = look.formal;
   const { bottom, height, waist, shoulders, depth, sides } = JACKET;
   model.geometry(look.jacket, new THREE.CylinderGeometry(shoulders, waist, height, sides)
     .scale(1, 1, depth).translate(0, bottom + height / 2, 0));
@@ -79,7 +81,7 @@ function body(model, look, kind) {
       [[side*.14, 2.16], [side*.27, 2.06], [side*.08, 1.68], [side*.19, 1.94], [side*.10, 2.02]], .002);
   }
   if (suit) {
-    jacketPanel(model, kind === 'stubb' ? '#8185b2' : '#6691b4',
+    jacketPanel(model, look.tie,
       [[0, 2.10], [-.039, 2.03], [-.045, 1.69], [0, 1.65], [.045, 1.69], [.039, 2.03]], .003);
   }
   jacketPanel(model, INK, [[-.004, 1.65], [.004, 1.65], [.004, 1.17], [-.004, 1.17]], .001);
@@ -133,25 +135,20 @@ export function createCameoModel(kind) {
   const root = new THREE.Group();
   root.name = `cameo ${kind}`;
   root.userData.character = kind;
-  root.userData.style = 'photo-cutout';
+  root.userData.style = 'sculpted-3d';
   root.scale.set(...look.scale);
   const costume = createSceneryModel(`${look.name} body`);
   body(costume, look, kind);
-  const collarDrop = kind === 'orpo' ? .16 : 0;
-  const jacketScale = 1 - collarDrop / JACKET.height;
-  const jacketOffset = JACKET.bottom * (1 - jacketScale);
-  if (collarDrop) {
-    // The jacket and its details move together to meet the photo neck.
-    const localY = y => (y - jacketOffset) / jacketScale;
-    const collarTop = JACKET.bottom + JACKET.height - collarDrop;
-    rod(costume, look.shirt, [0, localY(collarTop - .015), .075], [0, localY(collarTop + .025), .075], .158, .143);
-  }
   const jacket = costume.finish({ vertexColors: true, roughness: .95 });
-  jacket.scale.y = jacketScale;
-  jacket.position.y = jacketOffset;
   root.add(jacket);
-  limbs(root, look, collarDrop * .7);
-  root.add(createCameoPhotoHead(kind, kind === 'stubb' ? 1.04 : .98));
+  const neck=createCameoNeck(kind);
+  neck.name=`${look.name} neck`;
+  root.add(neck);
+  limbs(root, look);
+  const head=createCameoHead(kind);
+  head.name='3D head';
+  root.add(head);
+  root.userData.head=head;
   return root;
 }
 
@@ -172,5 +169,6 @@ export function animateCameo(root, time, running = true, viewerYaw = 0) {
       part.children.find(child => child.userData.elbow).rotation.x = running ? -.92 + Math.min(0, swing) * .24 : -.18;
     }
   }
-  return poseCameoPhoto(root, viewerYaw, time, running);
+  animateCameoHead(root.userData.head, time, running);
+  return 'sculpted-3d';
 }

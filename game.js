@@ -4,7 +4,6 @@ import { loadHero } from './models/hero-loader.js';
 import { maps, mapOrder } from './maps/index.js';
 import { createArenaCombat } from './arena-combat.js';
 import { createArenaCameos } from './arena-cameos.js';
-import { preloadCameoPhotos } from './runner/cameo-photos.js';
 import { createFrameClock } from './world/frame-clock.js';
 import { prepareScene } from './world/render-preparation.js';
 import { createMapManager } from './world/map-manager.js';
@@ -339,12 +338,10 @@ if (debugMaps) {
 async function loadModels() {
   try {
     status.textContent = 'Loading the hero, barnacle geese, and Spanish slugs…';
-    const [gltf, , missingPhotos] = await Promise.all([
+    const [gltf] = await Promise.all([
       loadHero(message => { status.textContent = message; }),
       loadEnemyModels(),
-      preloadCameoPhotos(),
     ]);
-    if (missingPhotos) console.warn(`${missingPhotos} cameo photographs could not be loaded`);
     player.rig = createHero(gltf.scene);
     player.model = player.rig.mesh;
     player.model.scale.setScalar(HERO_SCALE);
