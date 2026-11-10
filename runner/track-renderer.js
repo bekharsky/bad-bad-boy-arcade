@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { createSceneryModel } from '../maps/scenery-model.js';
 import { createTrafficModel, animateTraffic } from './traffic-models.js';
 import { RUN_LANES, TRAFFIC_COLORS, TRAFFIC_CAPACITY, ROADWORK_TYPES } from './course.js';
+import { isCameo } from './cameo-roster.js';
 
 // Geometry is shared within this map; hit-flash materials belong to each slot.
 export function createRunnerTraffic(root, name, { riderKinds = ['bike', 'scooter'], lanes = RUN_LANES, tramChance = 0, tramRoute = null, roadworkKinds = ROADWORK_TYPES } = {}) {
@@ -19,7 +20,7 @@ export function createRunnerTraffic(root, name, { riderKinds = ['bike', 'scooter
     templateRoot.add(template);
   }
   const pose = {};
-  for (const kind of riderKinds) for (const color of TRAFFIC_COLORS) addTemplate(kind, color);
+  for (const kind of riderKinds) for (const color of isCameo(kind) ? ['cameo'] : TRAFFIC_COLORS) addTemplate(kind, color);
   for (const kind of roadworkKinds) addTemplate(kind, 'roadwork');
   if (tramChance > 0) addTemplate('tram', 'tram');
   const emptyGeometry = new THREE.BufferGeometry();
@@ -34,20 +35,20 @@ export function createRunnerTraffic(root, name, { riderKinds = ['bike', 'scooter
     root.add(object); trafficPool.push(object);
   }
   // Shared templates and per-slot materials are owned by the map subtree.
-  return { update(state) {
+  return { update(state, viewPosition) {
     for (let i = 0; i < trafficPool.length; i++) {
       const object = trafficPool[i], agent = state.traffic[i], material = trafficMaterials[i];
       object.visible = !!agent && !agent.cleared;
       material.emissive.set(agent?.hitUntil > state.elapsed ? '#ffe58c' : '#000000');
       material.emissiveIntensity = agent?.hitUntil > state.elapsed ? .7 : 0;
       if (!agent) continue;
-      const key = `${ROADWORK_TYPES.includes(agent.kind) ? 'roadwork' : agent.color} ${agent.kind}`;
+      const key = `${isCameo(agent.kind) ? 'cameo' : ROADWORK_TYPES.includes(agent.kind) ? 'roadwork' : agent.color} ${agent.kind}`;
       if (activeVariants[i] !== key) {
         const template = templates.get(key);
         if (!template) throw new Error(`Unknown traffic model: ${key}`);
         object.clear();
         const variant = template.clone(true);
-        variant.traverse(node => { if (node.isMesh) node.material = material; });
+        variant.traverse(node => { if (node.isMesh && node.material.vertexColors) node.material = material; });
         object.add(variant);
         activeVariants[i] = key;
       }
@@ -68,7 +69,10 @@ export function createRunnerTraffic(root, name, { riderKinds = ['bike', 'scooter
         part.position.set(dx * c - dz * s, 0, dx * s + dz * c);
         part.rotation.y = pose.heading - object.rotation.y;
       }
-      animateTraffic(variant, state.elapsed + agent.id, agent.crossing ? Math.abs(agent.vx) : agent.speed + state.speed);
+      const viewerYaw = viewPosition
+        ? Math.atan2(viewPosition.x - object.position.x, viewPosition.z - object.position.z) - object.rotation.y
+        : 0;
+      animateTraffic(variant, state.elapsed + agent.id, agent.crossing ? Math.abs(agent.vx) : agent.speed + state.speed, viewerYaw);
     }
   } };
 }

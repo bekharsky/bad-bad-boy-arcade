@@ -3,6 +3,8 @@ import { createHero, animateHero, HERO_BASE_HEIGHT } from './hero.js';
 import { loadHero } from './models/hero-loader.js';
 import { maps, mapOrder } from './maps/index.js';
 import { createArenaCombat } from './arena-combat.js';
+import { createArenaCameos } from './arena-cameos.js';
+import { preloadCameoPhotos } from './runner/cameo-photos.js';
 import { createFrameClock } from './world/frame-clock.js';
 import { prepareScene } from './world/render-preparation.js';
 import { createMapManager } from './world/map-manager.js';
@@ -172,6 +174,7 @@ scene.add(player.root);
 
 function hitEnemy(enemy, direction, impact) {
   if (enemy.kind === 'gull') { seagulls.repel(enemy); return; }
+  if (enemy.civilian) { arenaCameos.splash(enemy); return; }
   if (isRunner()) {
     if (runnerSession.sprayHit(enemy.id, impact)) {
       burst(enemy.x, enemy.hitHeight, enemy.z, 0xffd34e, 20, null, 3);
@@ -189,6 +192,7 @@ const streamOptions = { scale: HERO_HEIGHT / 2.25, refraction: !window.matchMedi
 const stream = createSpraySystem(scene, world, hitEnemy, streamOptions);
 
 const enemies = [];
+const arenaCameos = createArenaCameos(scene, world);
 const arenaCombat = createArenaCombat({
   world, player, enemies, animateEnemy,
   onBite(enemy) {
@@ -335,10 +339,12 @@ if (debugMaps) {
 async function loadModels() {
   try {
     status.textContent = 'Loading the hero, barnacle geese, and Spanish slugs…';
-    const [gltf] = await Promise.all([
+    const [gltf, , missingPhotos] = await Promise.all([
       loadHero(message => { status.textContent = message; }),
       loadEnemyModels(),
+      preloadCameoPhotos(),
     ]);
+    if (missingPhotos) console.warn(`${missingPhotos} cameo photographs could not be loaded`);
     player.rig = createHero(gltf.scene);
     player.model = player.rig.mesh;
     player.model.scale.setScalar(HERO_SCALE);
@@ -407,6 +413,7 @@ function applyWave(plan) {
     updateHealth();
     world.reset();
     placePlayerAtSpawn();
+    arenaCameos.reset(player, camera.position);
     seagulls.reset(player, isRunner());
     medkits.reset(player);
     if (!isRunner()) batteries.reset(player);
@@ -556,7 +563,7 @@ function update(dt) {
   effects.update(dt, playing && isRunner() ? runnerSession.state.speed : 0);
   if (!playing) return;
   if (isRunner()) { runnerSession.update(dt); return; }
-  const announcement = world.update(dt, [player, ...enemies]);
+  const announcement = world.update(dt, [player, ...enemies, ...arenaCameos.actors]);
   if (announcement) showToast(announcement);
 
   const firing = keys.has('Space') || keys.has('Fire') || touchControls.input.firing || player.tapTimer > 0;
@@ -567,6 +574,7 @@ function update(dt) {
   }
 
   player.root.position.set(player.x, 0, player.z);
+  arenaCameos.update(dt, player, camera.position);
   player.runBlend = THREE.MathUtils.damp(player.runBlend, moving ? 1 : 0, 18, dt);
   player.body.position.y = (Math.abs(Math.sin(player.runTime)) * 0.035 * player.runBlend + Math.sin(gameTime * 1.5) * 0.008 * (1 - player.runBlend)) * HERO_SCALE;
   player.body.rotation.z = Math.cos(player.runTime) * 0.025 * player.runBlend;
@@ -612,6 +620,7 @@ function update(dt) {
 function updateSpray(dt, firing, groundTargets, powered = false) {
   sprayTargets.length = 0;
   sprayTargets.push(...groundTargets, ...seagulls.birds);
+  if (!isRunner()) sprayTargets.push(...arenaCameos.actors);
   const direction = sprayAim(player, seagulls.birds, aimingUp(keys, touchControls.input));
   return stream.update(dt, firing, player.rig.emitter, direction, sprayTargets, powered);
 }
@@ -724,6 +733,7 @@ function clearArena() {
   player.tapTimer = 0;
   player.powerTimer = 0;
   batteries.clear();
+  arenaCameos.clear();
   for (const enemy of enemies) disposeEnemy(enemy);
   effects.clear();
   enemies.length = 0;

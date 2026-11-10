@@ -10,6 +10,8 @@ Fight your way through **West Harbor**, **Kamppi** and **Senate Square**. Barnac
 
 Between the squares, race down **Baana** and **Aleksanterinkatu**. Change lanes to slip past cyclists, scooters, roadworks and trams; spray a path through the moving traffic. The route changes with every run, and your score carries into the next district.
 
+Caricatures of **Riikka Purra**, **Petteri Orpo**, **Sanna Marin** and **Alexander Stubb** appear throughout the city. They flee from you in West Harbor, Kamppi and Senate Square, and also appear on both running routes. They cause no damage and never count toward wave completion. Spraying them is entirely optional: on the squares, a splash just makes them hurry away. The cutout heads switch among five photo views as each character turns, including a view from behind. The lower lip and chin move as one separate cutout during the run. The heads sit directly on the articulated bodies. Purra wears a pink jacket with a blonde bob, Orpo a dark suit with round glasses, Marin a white blazer with long brown hair, and Stubb a dark suit with broad rectangular glasses and a toothy smile.
+
 The city is an affectionate arcade version of Helsinki: a ferry and cranes at the harbour, market stalls and landmark façades along Aleksanterinkatu, the Chapel of Silence in Kamppi, and the cathedral above Senate Square. Look for the little details in the houses and the playful trees along the way.
 
 ## Controls

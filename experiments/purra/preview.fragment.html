@@ -1,0 +1,47 @@
+<div id="purra-study">
+  <div class="viz-controls">
+    <label class="form-label">Ракурс <output id="purra-yaw-value" class="tabular-nums">0°</output>
+      <input id="purra-yaw" type="range" class="form-range" min="-180" max="180" step="1" value="0" aria-label="Ракурс">
+    </label>
+    <label class="form-label">Движение
+      <select id="purra-motion" class="form-select">
+        <option value="still">Стойка</option>
+        <option value="run">Бег</option>
+        <option value="turn">Бег с поворотами</option>
+      </select>
+    </label>
+    <label class="form-check form-switch"><input id="purra-close" type="checkbox" class="form-check-input" checked><span class="form-check-label">Крупный план</span></label>
+  </div>
+  <div class="purra-pair">
+    <section>
+      <h3 class="text-center">Объёмная голова</h3>
+      <div class="purra-stage"><canvas id="purra-sculpt" role="img" aria-label="Объёмная модель Риикки Пурры"></canvas></div>
+    </section>
+    <section>
+      <h3 class="text-center">Фотоголова</h3>
+      <div class="purra-stage"><canvas id="purra-photo" role="img" aria-label="Фотоколлаж Риикки Пурры с подвижной челюстью"></canvas></div>
+      <div id="purra-photo-angle" class="text-center text-small">Анфас</div>
+    </section>
+  </div>
+  <div id="purra-error" role="alert" class="text-destructive" hidden></div>
+  <details class="text-small">
+    <summary>Фотографии</summary>
+    <p>Анфас: <a href="https://commons.wikimedia.org/wiki/File:Riikka_Purra_(Riikka-Purra-O45A3317).jpg">Fanni Uusitalo / Finnish Government</a>, <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>.</p>
+    <p>Три четверти: <a href="https://commons.wikimedia.org/wiki/File:Riikka-Purra-01_(cropped).jpg">Lauri Heikkinen / Finnish Government</a>, <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>.</p>
+    <p>Правый профиль: <a href="https://commons.wikimedia.org/wiki/File:Belgian_Presidency_of_the_Council_of_the_European_Union_-_EU2024BE_240620_EUROGROUP_European_Convention_Center_JNZT_0031_(53803497637).jpg">Belgian Presidency of the Council of the EU 2024</a>, <a href="https://creativecommons.org/licenses/by/2.0/">CC BY 2.0</a>.</p>
+    <p>Левый профиль: <a href="https://commons.wikimedia.org/wiki/File:P%C3%A4%C3%A4ministeri_Orpon_ja_valtiovarainministeri_Purran_tiedotustilaisuus_finanssipoliittisista_s%C3%A4%C3%A4nn%C3%B6ist%C3%A4_18.6.2025_(54598343938).jpg">Lauri Heikkinen / Finnish Government</a>, <a href="https://creativecommons.org/licenses/by/2.0/">CC BY 2.0</a>.</p>
+    <p>Со спины: <a href="https://commons.wikimedia.org/wiki/File:Riikka_Purra,_Finnish_Minister_for_Finance_-_2024.webm">кадр из видео European Union, 2024</a>, <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>.</p>
+    <p>Снимки обрезаны по контуру головы. Нижняя губа и подбородок вырезаны отдельно.</p>
+  </details>
+</div>
+<style>
+#purra-study .purra-pair { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; margin-block: 12px 16px; }
+#purra-study .purra-stage { height: 360px; }
+#purra-study h3, #purra-photo-angle { text-align: center; }
+#purra-study canvas { display: block; width: 100%; height: 100%; }
+@media (max-width: 520px) {
+  #purra-study .purra-pair { grid-template-columns: 1fr; }
+  #purra-study .purra-stage { height: 290px; }
+}
+</style>
+<script type="module" id="purra-study-script"></script>

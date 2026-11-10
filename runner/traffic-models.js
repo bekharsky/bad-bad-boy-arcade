@@ -1,10 +1,12 @@
 import * as THREE from 'three';
 import { createSceneryModel } from '../maps/scenery-model.js';
 import { TRAM_CAR_OFFSET } from './tram-route.js';
+import { createCameoModel, animateCameo } from './cameo-models.js';
+import { isCameo } from './cameo-roster.js';
 
 export const TRAFFIC_PALETTE = { green: '#64c94c', blue: '#51bde0', red: '#e45c5c' };
 
-// These eleven procedural templates contain less than a megabyte of geometry.
+// This bounded set of procedural templates stays in CPU memory.
 // They never enter a scene or allocate GPU buffers. Each map receives owned
 // copies, so unloading one district cannot dispose another district's model.
 const templateCache = new Map();
@@ -13,13 +15,21 @@ export function createTrafficModel(kind, color) {
   const key = `${kind}:${color}`;
   if (!templateCache.has(key)) templateCache.set(key, buildTrafficModel(kind, color));
   const model = templateCache.get(key).clone(true);
-  const geometries = new Map(), materials = new Map();
+  const geometries = new Map(), materials = new Map(), textures = new Map();
   model.traverse(node => {
     if (!node.isMesh) return;
     if (!geometries.has(node.geometry)) geometries.set(node.geometry, node.geometry.clone());
     node.geometry = geometries.get(node.geometry);
     const ownMaterial = original => {
-      if (!materials.has(original)) materials.set(original, original.clone());
+      if (!materials.has(original)) {
+        const material = original.clone();
+        material.onBeforeCompile = original.onBeforeCompile;
+        if (original.map) {
+          if (!textures.has(original.map)) textures.set(original.map, original.map.clone());
+          material.map = textures.get(original.map);
+        }
+        materials.set(original, material);
+      }
       return materials.get(original);
     };
     node.material = Array.isArray(node.material) ? node.material.map(ownMaterial) : ownMaterial(node.material);
@@ -29,6 +39,7 @@ export function createTrafficModel(kind, color) {
 
 function buildTrafficModel(kind, color) {
   if (kind === 'tram') return createRunnerTram();
+  if (isCameo(kind)) return createCameoModel(kind);
   const model = createSceneryModel(`${color} ${kind}`), { box } = model;
   const paint = TRAFFIC_PALETTE[color];
   function rod(shade, a, b, radius = .055) {
@@ -173,6 +184,7 @@ function createRunnerTram() {
   return root;
 }
 
-export function animateTraffic(root, time, speed) {
+export function animateTraffic(root, time, speed, viewerYaw = 0) {
+  if (isCameo(root.userData.character)) { animateCameo(root, time, true, viewerYaw); return; }
   for (const wheel of root.children) if (wheel.name === 'Traffic wheel') wheel.rotation.x = time * speed / (root.name.endsWith('bike') ? .4 : .22);
 }

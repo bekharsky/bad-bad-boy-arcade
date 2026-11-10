@@ -109,6 +109,27 @@ export function createNavigation({ bounds, colliders = [], dynamicColliders = ()
     const p = next < 0 ? { x, z } : coords(next);
     return { x: p.x - x, z: p.z - z };
   }
+  function flee(x, z, tx, tz, heading = 0) {
+    const away = Math.atan2(x - tx, z - tz), here = distances[cell(x, z)];
+    const distance = Math.hypot(x - tx, z - tz);
+    // Reuse the player's flood field in reverse. Local clearance probes let
+    // civilians turn along walls instead of running straight into them.
+    for (const reach of [1.3, .5]) {
+      let best = -Infinity, direction = null;
+      for (let i = 0; i < 16; i++) {
+        const angle = away + i * Math.PI / 8, dx = Math.sin(angle), dz = Math.cos(angle);
+        const nx = x + dx * reach, nz = z + dz * reach;
+        if (!lineClear(x, z, nx, nz, .55)) continue;
+        const route = distances[cell(nx, nz)];
+        if (route < 0) continue;
+        const score = (route - here) * .35 + (Math.hypot(nx - tx, nz - tz) - distance) * 1.4
+          + Math.cos(angle - heading) * .35;
+        if (score > best) { best = score; direction = { x: dx, z: dz }; }
+      }
+      if (direction) return direction;
+    }
+    return { x: 0, z: 0 };
+  }
   function spawnPoint(player, index, count) {
     for (let tries = 0; tries < 100; tries++) {
       const angle = index / count * Math.PI * 2 + tries * .41;
@@ -136,5 +157,5 @@ export function createNavigation({ bounds, colliders = [], dynamicColliders = ()
     return !blocked(x, z, radius) && distances[cell(x, z)] >= 0 ? { x, z } : null;
   }
   refresh();
-  return { move, lineClear, lineClear3D, routeTo, chase, spawnPoint, pickupPoint, refresh, canStandAt: (x, z, radius) => !blocked(x, z, radius) };
+  return { move, lineClear, lineClear3D, routeTo, chase, flee, spawnPoint, pickupPoint, refresh, canStandAt: (x, z, radius) => !blocked(x, z, radius) };
 }

@@ -82,7 +82,7 @@ test('two-lane tram and cross-scooter traffic leaves a complete safe route acros
     }
     assert.equal(hits, 0, `${fps} FPS, seed ${seed}`);
     assert.equal(run.state.distance, ALEKSI_LENGTH);
-    assert.deepEqual([...kinds].sort(), ['bike', 'scooter', 'tram']);
+    assert.deepEqual([...kinds].sort(), ['bike', 'marin', 'orpo', 'purra', 'scooter', 'stubb', 'tram']);
     assert.equal(warnings, ALEKSI_CROSSINGS.length);
     assert.equal(crosses, ALEKSI_CROSSINGS.length * 2);
     assert.deepEqual([...sideWarnings].sort(), ['left', 'right']);
@@ -234,8 +234,11 @@ test('real frontages keep their street sides, opposite neighbours and a lower Se
   assert.ok(Math.abs(water.max.z + 664) < .001);
   map.updateRunner({ distance: ALEKSI_LENGTH, elapsed: 50, traffic: [], crossings: [] });
   assert.ok(ferry.getWorldPosition(new THREE.Vector3()).z < -50, 'The finish still looks across a quay and sea');
-  const geometries = new Set(); map.root.traverse(node => { if (node.geometry) geometries.add(node.geometry); });
+  const cameoGeometries = new Set();
+  for (const kind of ['purra', 'orpo', 'marin', 'stubb']) map.root.getObjectByName(`cameo ${kind}`).traverse(node => { if (node.geometry) cameoGeometries.add(node.geometry); });
+  const geometries = new Set(); map.root.traverse(node => { if (node.geometry && !cameoGeometries.has(node.geometry)) geometries.add(node.geometry); });
   assert.ok([...geometries].reduce((sum, geometry) => sum + geometry.attributes.position.count, 0) <= 563701, 'Landmark detail stays within the previous street geometry budget');
+  assert.ok([...cameoGeometries].reduce((sum, geometry) => sum + geometry.attributes.position.count, 0) < 44000, 'Detailed portrait faces stay within the four-character geometry budget');
   map.dispose();
 });
 

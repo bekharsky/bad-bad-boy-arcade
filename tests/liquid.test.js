@@ -180,10 +180,11 @@ test('disabling refraction preserves gloss, pressure, range, and collision damag
 
 test('runner liquid clears approaching riders while roadwork obstacles survive and still collide', async () => {
   const { createBaanaRun, trafficProfile, riderHealth } = await import('../runner/baana-run.js');
-  for (const kind of ['bike', 'scooter', 'cone', 'tractor', 'barrier', 'trench']) {
+  for (const kind of ['bike', 'scooter', 'purra', 'orpo', 'marin', 'stubb', 'cone', 'tractor', 'barrier', 'trench']) {
     const run = createBaanaRun();
-    const agent = { id: -1, kind, lane: 1, speed: kind === 'bike' || kind === 'scooter' ? 5.2 : 0,
-      progress: 38, hp: kind === 'bike' || kind === 'scooter' ? riderHealth(kind) : 1.5,
+    const rider = ['bike', 'scooter', 'purra', 'orpo', 'marin', 'stubb'].includes(kind);
+    const agent = { id: -1, kind, lane: 1, speed: rider ? 5.2 : 0,
+      progress: 38, hp: rider ? riderHealth(kind) : 1.5,
       hitHeight: trafficProfile(kind).hitHeight, size: trafficProfile(kind).size,
       x: 0, z: -38, alive: true, hit: false, passed: false };
     run.state.traffic.push(agent);
@@ -194,7 +195,6 @@ test('runner liquid clears approaching riders while roadwork obstacles survive a
       run.update(1 / 60);
       stream.update(1 / 60, true, emitter, { dx: 0, dz: -1 }, [agent]);
     }
-    const rider = kind === 'bike' || kind === 'scooter';
     assert.equal(agent.alive, !rider, kind);
     assert.equal(agent.hit, !rider, rider ? `${kind} clears before colliding` : `${kind} still collides`);
     assert.equal(run.state.cleared, rider ? 1 : 0);

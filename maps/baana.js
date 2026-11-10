@@ -4,10 +4,11 @@ import { addTree } from './vegetation.js';
 import { createSceneryModel } from './scenery-model.js';
 import { createRunnerTraffic, createRunnerFinish } from '../runner/track-renderer.js';
 import { BAANA_LENGTH } from '../runner/course.js';
+import { CAMEO_KINDS } from '../runner/cameo-roster.js';
 
 export const baanaMap = {
   id: 'baana', name: 'Baana Run', mode: 'runner',
-  runner: { length: BAANA_LENGTH, variety: true },
+  runner: { length: BAANA_LENGTH, variety: true, riderKinds: ['bike', 'scooter', ...CAMEO_KINDS] },
   spawn: { x: 0, z: 0, heading: Math.PI },
   bounds: { minX: -5.5, maxX: 5.5, minZ: -130, maxZ: 30 },
   create() { return createMap(baanaMap, buildBaana); },
@@ -80,13 +81,13 @@ function buildBaana(root) {
       buildings.push({ group: object, meshes: [...object.children], materials: object.children.map(mesh => mesh.material), bounds: new THREE.Box3(), opacity: 1, hiddenUntil: 0 });
     }
   }
-  const traffic = createRunnerTraffic(root, 'Baana');
+  const traffic = createRunnerTraffic(root, 'Baana', baanaMap.runner);
   const finish = createRunnerFinish(root, 'Baana', BAANA_LENGTH);
-  function updateRunner(state) {
+  function updateRunner(state, viewPosition) {
     for (let i = 0; i < sections.length; i++) sections[i].position.z = ((i * 32 + state.distance + 128) % 160) - 128;
     for (const section of sections) section.updateMatrixWorld(true);
     for (const bridge of buildings) bridge.bounds.setFromObject(bridge.group);
-    traffic.update(state);
+    traffic.update(state, viewPosition);
     finish.update(state);
   }
   return { colliders: [], buildings, updateRunner, reset() { updateRunner({ distance: 0, elapsed: 0, traffic: [] }); } };

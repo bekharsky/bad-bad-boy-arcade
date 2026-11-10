@@ -25,7 +25,7 @@ export function createRunnerSession({
     player.invulnerable = 0;
     steering.reset();
     onProgress(0);
-    world.updateRunner(run.state);
+    world.updateRunner(run.state, cameraRig.camera?.position);
   }
 
   function update(dt) {
@@ -45,7 +45,7 @@ export function createRunnerSession({
     player.invulnerable = state.invulnerable;
     const firing = keys.has('Space') || keys.has('Fire') || touchControls.input.firing || player.tapTimer > 0;
     player.tapTimer = Math.max(0, player.tapTimer - dt);
-    world.updateRunner(state);
+    world.updateRunner(state, cameraRig.camera?.position);
     if (result.hits && !onDamage(result.hits)) return;
     seagulls.update(dt, player, { scroll: state.speed, attacks: !state.finished });
     if (!isPlaying()) return;
