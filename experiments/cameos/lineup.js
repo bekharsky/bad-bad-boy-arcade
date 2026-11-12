@@ -16,17 +16,17 @@ function makeView(canvas) {
   const scene = new THREE.Scene();
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, .1, 30);
   const model = createCameoModel(canvas.dataset.kind);
-  const sun = new THREE.DirectionalLight(0xfff1e4, 2.35);
-  sun.position.set(-3, 5, 6);
+  const sun = new THREE.DirectionalLight(0xffedda, 1.65);
+  sun.position.set(-5, 7, 10);
   sun.castShadow = true;
   sun.shadow.mapSize.set(512, 512);
   sun.shadow.normalBias = .018;
-  const fill = new THREE.DirectionalLight(0xe7efff, 1.15);
-  fill.position.set(4, 2, 5);
+  const fill = new THREE.DirectionalLight(0xe7efff, .72);
+  fill.position.set(5, 3, 8);
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(24, 24), new THREE.ShadowMaterial({ opacity: .13 }));
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
-  scene.add(model, sun, fill, ground, new THREE.HemisphereLight(0xf3f6ff, 0xa99a89, 1.7));
+  scene.add(model, sun, fill, ground, new THREE.HemisphereLight(0xd8e9ff, 0x8f8276, .82));
   return { canvas, renderer, camera, scene, model };
 }
 
