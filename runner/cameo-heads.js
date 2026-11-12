@@ -11,7 +11,7 @@ export const CAMEO_HEADS = {
   purra: {
     name: 'Purra',
     skin: '#e9bda8', blush: '#d99c8f', lips: '#a95e65', eyes: '#71899a',
-    hair: '#c8ba9d', hairLight: '#eee2c9', brow: '#766754',
+    hair: '#bbb4a7', hairLight: '#e8e1d4', brow: '#766754',
     head: [[-.54,.025,.07,0],[-.49,.12,.15,0],[-.37,.18,.20,-.005],[-.18,.245,.24,-.02],[.08,.25,.245,-.026],[.31,.225,.215,-.04],[.49,.09,.11,-.055],[.53,.015,.03,-.055]],
     style: 'long-straight', hairline: .30, hairLength: 'bob', faceWidth: .91, faceLength: 1.07, jawWidth: .86, eyeOpen: .76, browLift: -.004, browRadius: .0055, noseTipInset: .012, nose: [.95,.92], eye: [.115,.050], glasses: null,
     scale: [.98,1,1], profileDepth: [.008,.025,.012,.014], smile: .012, multiViewFace: true,
@@ -19,7 +19,7 @@ export const CAMEO_HEADS = {
   orpo: {
     name: 'Orpo',
     skin: '#dfb59d', blush: '#ce9585', lips: '#965e5e', eyes: '#71818a',
-    hair: '#625b52', hairLight: '#918677', brow: '#51463c',
+    hair: '#5d574f', hairLight: '#94897a', brow: '#51463c',
     head: [[-.54,.025,.075,0],[-.48,.16,.17,0],[-.34,.245,.225,-.005],[-.13,.305,.255,-.02],[.12,.305,.25,-.035],[.34,.25,.22,-.05],[.51,.105,.12,-.06],[.55,.016,.03,-.06]],
     style: 'short-side-part', hairline: .335, faceWidth: 1.10, faceLength: .98, jawWidth: 1.18, eyeOpen: .58, browLift: -.018, browRadius: .008, noseTipInset: .018, nose: [1.09,1.10], eye: [.12,.046], glasses: 'round',
     scale: [1.03,1,1], profileDepth: [.008,.026,.012,.015], smile: .006, multiViewFace: true,
@@ -35,7 +35,7 @@ export const CAMEO_HEADS = {
   stubb: {
     name: 'Stubb',
     skin: '#e6b79c', blush: '#d69a89', lips: '#a7776c', eyes: '#677f94',
-    hair: '#806849', hairLight: '#b29a75', brow: '#62584d',
+    hair: '#89775b', hairLight: '#b9a27f', brow: '#62584d',
     head: [[-.54,.04,.075,0],[-.48,.175,.17,0],[-.34,.255,.225,-.005],[-.13,.31,.255,-.02],[.12,.30,.255,-.03],[.34,.245,.22,-.045],[.51,.105,.12,-.06],[.55,.016,.03,-.06]],
     style: 'short-swept', hairline: .315, faceWidth: .90, faceLength: 1.11, jawWidth: .86, eyeOpen: .64, browLift: .008, browRadius: .007, noseTipInset: .020, nose: [1.10,1.08], eye: [.12,.048], glasses: 'roundrect',
     scale: [.97,1.04,1], profileDepth: [.008,.027,.015,.020], smile: .060, multiViewFace: true,
@@ -44,15 +44,15 @@ export const CAMEO_HEADS = {
     name: 'Putin',
     skin: '#e2b8a5', blush: '#cf9384', lips: '#975e5e', eyes: '#77878d',
     hair: '#85827a', hairLight: '#b8b2a5', brow: '#70695d',
-    head: [[-.54,.02,.07,0],[-.48,.145,.17,0],[-.34,.24,.22,-.005],[-.13,.29,.255,-.02],[.12,.30,.25,-.035],[.34,.25,.22,-.05],[.51,.11,.12,-.06],[.55,.016,.03,-.06]],
+    head: [[-.54,.02,.07,0],[-.48,.13,.17,0],[-.34,.215,.22,-.005],[-.13,.27,.255,-.02],[.12,.276,.25,-.035],[.34,.235,.22,-.05],[.51,.105,.12,-.06],[.55,.016,.03,-.06]],
     style: 'receding-short', hairline: .37, faceWidth: .96, faceLength: 1.02, jawWidth: .96, eyeOpen: .58, browLift: -.012, browRadius: .008, noseTipInset: .014, nose: [1.06,1.02], eye: [.118,.046], glasses: null,
     scale: [1.06,1.02,1], profileDepth: [.012,.045,.028,.035], smile: .004,
   },
   trump: {
     name: 'Trump',
     skin: '#d8a074', blush: '#c77c61', lips: '#8b5148', eyes: '#65798a',
-    hair: '#c8892d', hairLight: '#e7b04f', brow: '#8b6940',
-    head: [[-.55,.025,.075,0],[-.48,.155,.17,0],[-.34,.26,.235,-.005],[-.13,.32,.27,-.02],[.12,.32,.27,-.035],[.34,.265,.235,-.05],[.51,.115,.13,-.06],[.56,.018,.03,-.06]],
+    hair: '#bc9140', hairLight: '#e2bd6b', brow: '#8b6940',
+    head: [[-.55,.025,.075,0],[-.48,.19,.17,0],[-.34,.29,.235,-.005],[-.13,.34,.27,-.02],[.12,.345,.27,-.035],[.34,.295,.235,-.05],[.51,.125,.13,-.06],[.56,.018,.03,-.06]],
     style: 'comb-over', hairline: .37, faceWidth: 1.12, faceLength: .98, jawWidth: 1.12, eyeOpen: .60, browLift: -.014, browRadius: .009, noseTipInset: .014, nose: [1.15,1.14], eye: [.126,.048], glasses: null,
     scale: [1.08,1.04,1], profileDepth: [.020,.062,.040,.050], smile: .022,
   },
@@ -243,7 +243,7 @@ function sculptedHead(points,look,surface) {
   return geometry;
 }
 
-function subdivideMesh(vertices, faces, rounds = 2) {
+function subdivideMesh(vertices, faces, rounds = 2, boundaryLoop = []) {
   for (let step = 0; step < rounds; step++) {
     const edges = new Map(), neighbors = vertices.map(() => new Set()), border = vertices.map(() => []);
     for (const [a,b,c] of faces) for (const [u,v,opposite] of [[a,b,c],[b,c,a],[c,a,b]]) {
@@ -268,6 +268,14 @@ function subdivideMesh(vertices, faces, rounds = 2) {
       if (edge.opposite.length===2) for (const opposite of edge.opposite) point.addScaledVector(vertices[opposite],.125);
       edge.index=next.length; next.push(point);
     }
+    if(boundaryLoop.length) {
+      const refined=[];
+      for(let index=0;index<boundaryLoop.length;index++) {
+        const a=boundaryLoop[index],b=boundaryLoop[(index+1)%boundaryLoop.length];
+        refined.push(a,edges.get(a<b?`${a}:${b}`:`${b}:${a}`).index);
+      }
+      boundaryLoop=refined;
+    }
     const edgeIndex=(a,b)=>edges.get(a<b?`${a}:${b}`:`${b}:${a}`).index, refined=[];
     for (const [a,b,c] of faces) {
       const ab=edgeIndex(a,b),bc=edgeIndex(b,c),ca=edgeIndex(c,a);
@@ -275,14 +283,14 @@ function subdivideMesh(vertices, faces, rounds = 2) {
     }
     vertices=next; faces=refined;
   }
-  return {vertices,faces};
+  return {vertices,faces,boundaryLoop};
 }
 
 const LIP_LOOP=[61,185,40,39,37,0,267,269,270,409,291,375,321,405,314,17,84,181,91,146];
 const FACE_OVAL=[10,338,297,332,284,251,389,356,454,323,361,288,397,365,379,378,400,377,152,148,176,149,150,136,172,58,132,93,234,127,162,21,54,103,67,109];
 
 function headBack(vertices, boundary, look, lips) {
-  const contour=boundary.map(index=>vertices[index]);
+  const contour=boundary.map(index=>typeof index==='number'?vertices[index]:index);
   const center=new THREE.Vector3();
   for (const point of contour) center.add(point);
   center.multiplyScalar(1/contour.length);
@@ -456,24 +464,28 @@ function landmarkSculpt(points,look,depthAt) {
 }
 
 function multiviewHead(points,look) {
-  const positions=new Float32Array(points.length*3),colors=new Float32Array(points.length*3),indices=[];
+  const initialVertices=points.slice(0,468).map(point=>point.clone()),initialFaces=[];
+  for(const triangle of CAMEO_FACE_TRIANGLES) {
+    if(triangle[0]>=468||triangle[1]>=468||triangle[2]>=468) continue;
+    initialFaces.push(triangle);
+  }
+  const refined=subdivideMesh(initialVertices,initialFaces,2,FACE_OVAL.slice());
+  const {vertices,faces,boundaryLoop}=refined;
+  const positions=new Float32Array(vertices.length*3),colors=new Float32Array(vertices.length*3),indices=[];
   const point=new THREE.Vector3();
-  for(let index=0;index<468;index++) {
-    const vertex=points[index];
+  for(let index=0;index<vertices.length;index++) {
+    const vertex=vertices[index];
     vertex.toArray(positions,index*3);
     faceColor(point.copy(vertex),look,[]).toArray(colors,index*3);
   }
-  for(const triangle of CAMEO_FACE_TRIANGLES) {
-    if(triangle[0]>=468||triangle[1]>=468||triangle[2]>=468) continue;
-    indices.push(...triangle);
-  }
+  for(const triangle of faces) indices.push(...triangle);
   const front=new THREE.BufferGeometry();
   front.setAttribute('position',new THREE.BufferAttribute(positions,3));
   front.setAttribute('color',new THREE.BufferAttribute(colors,3));
   front.setIndex(indices);
   front.computeVertexNormals();
-  const back=headBack(points,FACE_OVAL,look,[]),backColors=back.getAttribute('color');
-  const ringSize=FACE_OVAL.length,skullSkin=new THREE.Color(look.skin),hair=new THREE.Color(look.hair),hairLight=hair.clone().lerp(new THREE.Color(look.hairLight),.10);
+  const back=headBack(vertices,boundaryLoop,look,[]),backColors=back.getAttribute('color');
+  const ringSize=boundaryLoop.length,skullSkin=new THREE.Color(look.skin),hair=new THREE.Color(look.hair),hairLight=hair.clone().lerp(new THREE.Color(look.hairLight),.10);
   const high=Math.max(...points.slice(0,468).map(vertex=>vertex.y));
   for(let index=0;index<backColors.count;index++) {
     const ring=Math.floor(index/ringSize);
@@ -558,17 +570,17 @@ function landmarkEyes(model, look, points, depthAt) {
     const cx=(minX+maxX)/2,cy=(minY+maxY)/2,eyeWidth=Math.max(maxX-minX,.078);
     const eyeOpen=look.eyeOpen??1,positions=[],indices=[];
     for(const point of ring) positions.push(point.x,cy+(point.y-cy)*eyeOpen,depthAt(point.x,point.y)+.003);
-    const center=depthAt(cx,cy)+.005,centerIndex=positions.length/3;
+    const center=depthAt(cx,cy)+.018,centerIndex=positions.length/3;
     positions.push(cx,cy,center);
     for(let index=0;index<ring.length;index++) indices.push(centerIndex,index,(index+1)%ring.length);
     const eyeGeometry=new THREE.BufferGeometry();
     eyeGeometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
     eyeGeometry.setIndex(indices);eyeGeometry.computeVertexNormals();
     model.geometry('#e8ddd0',eyeGeometry);
-    const irisX=eyeWidth*.145,irisY=Math.max(.010,(maxY-minY)*.24*eyeOpen),irisZ=center+.003;
-    addOval(model,look.eyes,[cx,cy,irisZ],[irisX,irisY,.004],28);
-    addOval(model,'#29343a',[cx,cy,irisZ+.002],[irisX*.47,irisY*.78,.0025],24);
-    addOval(model,'#fff7eb',[cx-irisX*.24,cy+irisY*.27,irisZ+.004],[.0028,.0028,.001],14);
+    const irisX=eyeWidth*.145,irisY=Math.max(.010,(maxY-minY)*.24*eyeOpen),irisZ=center+.004;
+    addOval(model,look.eyes,[cx,cy,irisZ],[irisX,irisY,.006],28);
+    addOval(model,'#29343a',[cx,cy,irisZ+.004],[irisX*.47,irisY*.78,.003],24);
+    addOval(model,'#fff7eb',[cx-irisX*.24,cy+irisY*.27,irisZ+.008],[.0028,.0028,.0015],14);
     const upper=contours[side].slice(0,5).map(index=>[points[index].x,points[index].y,depthAt(points[index].x,points[index].y)+.006]);
     const lower=contours[side].slice(4).map(index=>[points[index].x,points[index].y,depthAt(points[index].x,points[index].y)+.005]);
     addTube(model,look.blush,upper,.0019,24);
@@ -915,12 +927,12 @@ function scalp(model,look,points,depthAt) {
   };
   const styleHeight=(x,y)=>{
     const top=high;
-    if(look.style==='comb-over') return bump(x,y,-.08,top-.005,.25,.13,.009)
-      +ridge(x,y,[[.30,top-.22],[.20,top-.12],[.08,top-.035],[-.06,top+.018],[-.22,top-.03],[-.30,top-.12]],.10,.010);
-    if(look.style==='short-side-part') return bump(x,y,.04,top-.02,.22,.12,.016)
-      +ridge(x,y,[[.28,top-.18],[.18,top-.09],[.06,top-.025],[-.07,top+.012],[-.22,top-.03],[-.29,top-.12]],.105,.022);
-    if(look.style==='short-swept') return bump(x,y,.08,top-.02,.20,.12,.018)
-      +ridge(x,y,[[-.29,top-.18],[-.18,top-.10],[-.06,top-.035],[.08,top+.01],[.22,top-.025],[.30,top-.12]],.10,.026);
+    if(look.style==='comb-over') return bump(x,y,-.08,top-.005,.25,.13,.016)
+      +ridge(x,y,[[.30,top-.22],[.20,top-.12],[.08,top-.035],[-.06,top+.018],[-.22,top-.03],[-.30,top-.12]],.10,.020);
+    if(look.style==='short-side-part') return bump(x,y,.04,top-.02,.22,.12,.018)
+      +ridge(x,y,[[.28,top-.18],[.18,top-.09],[.06,top-.025],[-.07,top+.012],[-.22,top-.03],[-.29,top-.12]],.105,.026);
+    if(look.style==='short-swept') return bump(x,y,.08,top-.02,.20,.12,.023)
+      +ridge(x,y,[[-.29,top-.18],[-.18,top-.10],[-.06,top-.035],[.08,top+.01],[.22,top-.025],[.30,top-.12]],.10,.031);
     if(look.style==='long-straight') return bump(x,y,-.09,top,.18,.10,.012)+bump(x,y,.09,top,.18,.10,.012);
     if(look.style==='long-wavy') return bump(x,y,-.13,top,.20,.12,.014);
     if(look.style==='receding-short') return bump(x,y,-.18,top-.10,.17,.13,.008)+bump(x,y,.18,top-.10,.17,.13,.008);
@@ -950,7 +962,9 @@ function scalp(model,look,points,depthAt) {
     const z=THREE.MathUtils.lerp(baseZ+frontFit,backZ,backBlend)+styleRelief(x,y);
     vertices.push(x,y+styleHeight(x,y),z);
     const wave=Math.sin(angle*9+row*.42),part=look.style==='short-side-part'
-      ?Math.exp(-(((x-.02)/.018)**2+((y-(high-.05))/.16)**2)):.0;
+      ?Math.exp(-(((x-.02)/.018)**2+((y-(high-.05))/.16)**2))
+      :look.style==='long-straight'?Math.exp(-((x/.016)**2+((y-(high-.045))/.15)**2))
+      :look.style==='long-wavy'?Math.exp(-(((x+.13)/.020)**2+((y-(high-.035))/.16)**2)):.0;
     const sideLight=look.style==='long-straight'?.10*Math.exp(-(((Math.abs(x)-.09)/.08)**2))
       :look.style==='short-side-part'?.08*THREE.MathUtils.smoothstep(x,-.28,.18)
       :look.style==='comb-over'?.12*THREE.MathUtils.smoothstep(x,-.28,.12)
@@ -1118,14 +1132,15 @@ function scalpProfiled(model,look,points,depthAt) {
 
 function addHairCurtain(model,look,side,cap) {
   const wavy=look.style==='long-wavy',bob=look.hairLength==='bob',top=look.hairline+.035,
-    bottom=bob?-.44:wavy?-.59:-.56;
+    bottom=bob?-.44:wavy?-.92:-.56;
   const rows=48,across=18,positions=[],colors=[],indices=[];
   const baseHair=new THREE.Color(look.hair),highlightHair=new THREE.Color(look.hairLight),shadowHair=baseHair.clone().multiplyScalar(.90);
   const frontDepth=(x,y)=>{
     const [cy,rx,rz,centerZ]=profileAt(cap.profile,THREE.MathUtils.clamp(y,cap.profile[0][0],cap.profile.at(-1)[0]));
     const ratio=THREE.MathUtils.clamp(Math.abs(x)/Math.max(.05,rx),0,1.08);
     const skull=centerZ+rz*Math.sqrt(Math.max(.015,1-ratio**2));
-    if(y<cap.profile[0][0]) return centerZ-.055;
+    if(y<cap.profile[0][0]) return THREE.MathUtils.lerp(centerZ-.055,.205,
+      THREE.MathUtils.smoothstep(cap.profile[0][0]-y,.02,.34));
     if(y>cap.profile.at(-1)[0]) return skull;
     const sideBlend=THREE.MathUtils.smoothstep(ratio,.86,1.06);
     return THREE.MathUtils.lerp(cap.depthAt(x,y),skull,sideBlend);
@@ -1142,7 +1157,8 @@ function addHairCurtain(model,look,side,cap) {
     const endCenter=wavy ? (side<0 ? .29 : .33) : bob ? .30 : .32;
     const center=THREE.MathUtils.lerp(startCenter,endCenter,spread)
       +(wavy?.025*Math.sin(v*Math.PI*2+side*.45):.004*Math.sin(v*Math.PI*1.4))+wave*.18;
-    const width=(wavy ? .066 : bob ? .052 : .060)+(wavy ? .012 : bob ? .006 : .008)*Math.sin(v*Math.PI*.72);
+    const width=(wavy ? .074 : bob ? .052 : .060)+(wavy ? .026 : bob ? .006 : .008)*THREE.MathUtils.smoothstep(v,.30,.88)
+      +(wavy ? .012 : bob ? .006 : .008)*Math.sin(v*Math.PI*.72);
     const taperedWidth=width*fadeTop*fadeBottom;
     const x=side*(center+t*taperedWidth);
     const round=Math.sqrt(Math.max(0,1-t*t));
@@ -1521,8 +1537,13 @@ export function createCameoHead(kind) {
   scalp(geometry,look,points,depthAt);
   addEars(geometry,look,points,depthAt);
   const shell=geometry.finish({vertexColors:true,roughness:.84});
-  shell.traverse(part=>{if(part.isMesh){part.castShadow=false;part.receiveShadow=false;
-    part.material.side=THREE.DoubleSide;part.material.needsUpdate=true;}});
+  shell.traverse(part=>{if(part.isMesh){
+    part.castShadow=false;part.receiveShadow=true;
+    part.material.dispose();
+    part.material=new THREE.MeshPhysicalMaterial({vertexColors:true,roughness:.68,sheen:.10,
+      sheenColor:new THREE.Color(look.blush),side:THREE.DoubleSide});
+    part.material.needsUpdate=true;
+  }});
   head.add(shell);
   const jawBuilder=createSceneryModel(`${look.name} lower chin`);
   jawBuilder.geometry(null,chinGeometry);
