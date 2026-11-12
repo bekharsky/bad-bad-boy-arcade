@@ -11,21 +11,24 @@ function makeView(canvas) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.12;
+  renderer.toneMappingExposure = 1.0;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   const scene = new THREE.Scene();
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, .1, 30);
   const model = createCameoModel(canvas.dataset.kind);
-  const sun = new THREE.DirectionalLight(0xffdfad, 2.6);
+  const sun = new THREE.DirectionalLight(0xffeee0, 2.35);
   sun.position.set(-12, 25, 10);
   sun.castShadow = true;
   sun.shadow.mapSize.set(512, 512);
   sun.shadow.normalBias = .018;
+  const faceFill = new THREE.DirectionalLight(0xd8e3f4, .75);
+  faceFill.position.set(8, 7, 12);
+  faceFill.castShadow = false;
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(24, 24), new THREE.ShadowMaterial({ opacity: .13 }));
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
-  scene.add(model, sun, ground, new THREE.HemisphereLight(0xd8e9ff, 0x757264, 2.3));
+  scene.add(model, sun, faceFill, ground, new THREE.HemisphereLight(0xd8e9ff, 0x757264, 1.45));
   return { canvas, renderer, camera, scene, model };
 }
 
