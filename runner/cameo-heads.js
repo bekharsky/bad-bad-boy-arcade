@@ -393,7 +393,7 @@ function deformFaceLandmarks(points,look) {
   return vertices;
 }
 
-function applySmoothFaceRelief(vertices,anchors,look) {
+function makeSmoothFaceReliefSampler(anchors,look) {
   const relief={
     purra:{cheek:.048,brow:.048,socket:.030,nose:.052,tip:.062,chin:.066,muzzle:.018},
     orpo:{cheek:.052,brow:.055,socket:.038,nose:.058,tip:.064,chin:.080,muzzle:.025},
@@ -406,19 +406,25 @@ function applySmoothFaceRelief(vertices,anchors,look) {
     [(anchors[33].x*.58+anchors[133].x*.42),(anchors[33].y+anchors[133].y)*.5],
     [(anchors[263].x*.58+anchors[362].x*.42),(anchors[263].y+anchors[362].y)*.5],
   ];
-  const bump=(point,cx,cy,sx,sy)=>Math.exp(-(((point.x-cx)/sx)**2+((point.y-cy)/sy)**2));
-  for(const point of vertices) {
-    const cheeks=bump(point,anchors[205].x,anchors[205].y,.125,.115)+bump(point,anchors[425].x,anchors[425].y,.125,.115);
-    const brows=bump(point,anchors[70].x,anchors[70].y,.070,.040)+bump(point,anchors[300].x,anchors[300].y,.070,.040);
-    const sockets=eyes.reduce((sum,[x,y])=>sum+bump(point,x,y,.054,.040),0);
-    const nose=bump(point,0,(anchors[6].y+anchors[4].y)*.5,.050,.13);
-    const tip=bump(point,anchors[1].x,anchors[1].y,.058,.055);
-    const alae=bump(point,anchors[1].x-.042,anchors[1].y-.018,.026,.027)
-      +bump(point,anchors[1].x+.042,anchors[1].y-.018,.026,.027);
-    const chin=bump(point,anchors[152].x,anchors[152].y+.025,.09,.065);
-    const muzzle=bump(point,0,(anchors[13].y+anchors[14].y)*.5-.018,.11,.050);
-    point.z+=cheeks*relief.cheek+brows*relief.brow-sockets*relief.socket
+  return (x,y)=>{
+    const localBump=(cx,cy,sx,sy)=>Math.exp(-(((x-cx)/sx)**2+((y-cy)/sy)**2));
+    const cheeks=localBump(anchors[205].x,anchors[205].y,.125,.115)+localBump(anchors[425].x,anchors[425].y,.125,.115);
+    const brows=localBump(anchors[70].x,anchors[70].y,.070,.040)+localBump(anchors[300].x,anchors[300].y,.070,.040);
+    const sockets=eyes.reduce((sum,[cx,cy])=>sum+localBump(cx,cy,.054,.040),0);
+    const nose=localBump(0,(anchors[6].y+anchors[4].y)*.5,.050,.13);
+    const tip=localBump(anchors[1].x,anchors[1].y,.058,.055);
+    const alae=localBump(anchors[1].x-.042,anchors[1].y-.018,.026,.027)
+      +localBump(anchors[1].x+.042,anchors[1].y-.018,.026,.027);
+    const chin=localBump(anchors[152].x,anchors[152].y+.025,.09,.065);
+    const muzzle=localBump(0,(anchors[13].y+anchors[14].y)*.5-.018,.11,.050);
+    return cheeks*relief.cheek+brows*relief.brow-sockets*relief.socket
       +nose*relief.nose+tip*relief.tip+alae*relief.nose*.48+chin*relief.chin+muzzle*relief.muzzle;
+  };
+}
+
+function applySmoothFaceRelief(vertices,reliefAt) {
+  for(const point of vertices) {
+    point.z+=reliefAt(point.x,point.y);
   }
 }
 
@@ -463,7 +469,7 @@ function landmarkSculpt(points,look,depthAt) {
   return geometry;
 }
 
-function multiviewHead(points,look) {
+function multiviewHead(points,look,smoothReliefAt) {
   const initialVertices=points.slice(0,468).map(point=>point.clone()),initialFaces=[];
   for(const triangle of CAMEO_FACE_TRIANGLES) {
     if(triangle[0]>=468||triangle[1]>=468||triangle[2]>=468) continue;
@@ -471,6 +477,7 @@ function multiviewHead(points,look) {
   }
   const refined=subdivideMesh(initialVertices,initialFaces,2,FACE_OVAL.slice());
   const {vertices,faces,boundaryLoop}=refined;
+  applySmoothFaceRelief(vertices,smoothReliefAt);
   const positions=new Float32Array(vertices.length*3),colors=new Float32Array(vertices.length*3),indices=[];
   const point=new THREE.Vector3();
   for(let index=0;index<vertices.length;index++) {
@@ -911,13 +918,15 @@ function scalp(model,look,points,depthAt) {
   };
   const styleRelief=(x,y)=>{
     const top=high;
-    if(look.style==='comb-over') return bump(x,y,-.08,top-.005,.25,.13,.018)
-      +ridge(x,y,[[.30,top-.22],[.20,top-.12],[.08,top-.035],[-.06,top+.018],[-.22,top-.03],[-.30,top-.12]],.10,.030)
-      +ridge(x,y,[[.25,top-.29],[.10,top-.20],[-.07,top-.12],[-.22,top-.13],[-.29,top-.20]],.08,.014);
-    if(look.style==='short-side-part') return bump(x,y,.045,top-.02,.23,.13,.012)
-      +ridge(x,y,[[.28,top-.18],[.18,top-.09],[.06,top-.025],[-.07,top+.012],[-.22,top-.03],[-.29,top-.12]],.105,.025);
-    if(look.style==='short-swept') return bump(x,y,.08,top-.02,.21,.13,.012)
-      +ridge(x,y,[[-.29,top-.18],[-.18,top-.10],[-.06,top-.035],[.08,top+.01],[.22,top-.025],[.30,top-.12]],.10,.024);
+    if(look.style==='comb-over') return bump(x,y,-.08,top-.005,.25,.13,.023)
+      +ridge(x,y,[[.30,top-.22],[.20,top-.12],[.08,top-.035],[-.06,top+.018],[-.22,top-.03],[-.30,top-.12]],.10,.038)
+      +ridge(x,y,[[.25,top-.29],[.10,top-.20],[-.07,top-.12],[-.22,top-.13],[-.29,top-.20]],.08,.020)
+      -ridge(x,y,[[.105,top-.16],[.09,top-.10],[.08,top-.03],[.075,top+.04],[.07,top+.10]],.018,.012);
+    if(look.style==='short-side-part') return bump(x,y,.045,top-.02,.23,.13,.016)
+      +ridge(x,y,[[.28,top-.18],[.18,top-.09],[.06,top-.025],[-.07,top+.012],[-.22,top-.03],[-.29,top-.12]],.105,.030)
+      -ridge(x,y,[[.025,top-.16],[.02,top-.09],[.015,top-.02],[.01,top+.05]],.015,.008);
+    if(look.style==='short-swept') return bump(x,y,.08,top-.02,.21,.13,.018)
+      +ridge(x,y,[[-.29,top-.18],[-.18,top-.10],[-.06,top-.035],[.08,top+.01],[.22,top-.025],[.30,top-.12]],.10,.032);
     if(look.style==='long-straight') return bump(x,y,-.09,top,.18,.10,.022)+bump(x,y,.09,top,.18,.10,.022)
       -bump(x,y,0,top-.045,.018,.12,.018);
     if(look.style==='long-wavy') return bump(x,y,-.13,top,.20,.12,.020)
@@ -927,12 +936,14 @@ function scalp(model,look,points,depthAt) {
   };
   const styleHeight=(x,y)=>{
     const top=high;
-    if(look.style==='comb-over') return bump(x,y,-.08,top-.005,.25,.13,.016)
-      +ridge(x,y,[[.30,top-.22],[.20,top-.12],[.08,top-.035],[-.06,top+.018],[-.22,top-.03],[-.30,top-.12]],.10,.020);
-    if(look.style==='short-side-part') return bump(x,y,.04,top-.02,.22,.12,.018)
-      +ridge(x,y,[[.28,top-.18],[.18,top-.09],[.06,top-.025],[-.07,top+.012],[-.22,top-.03],[-.29,top-.12]],.105,.026);
-    if(look.style==='short-swept') return bump(x,y,.08,top-.02,.20,.12,.023)
-      +ridge(x,y,[[-.29,top-.18],[-.18,top-.10],[-.06,top-.035],[.08,top+.01],[.22,top-.025],[.30,top-.12]],.10,.031);
+    if(look.style==='comb-over') return bump(x,y,-.08,top-.005,.25,.13,.022)
+      +ridge(x,y,[[.30,top-.22],[.20,top-.12],[.08,top-.035],[-.06,top+.018],[-.22,top-.03],[-.30,top-.12]],.10,.028)
+      -ridge(x,y,[[.105,top-.16],[.09,top-.10],[.08,top-.03],[.075,top+.04],[.07,top+.10]],.018,.006);
+    if(look.style==='short-side-part') return bump(x,y,.04,top-.02,.22,.12,.020)
+      +ridge(x,y,[[.28,top-.18],[.18,top-.09],[.06,top-.025],[-.07,top+.012],[-.22,top-.03],[-.29,top-.12]],.105,.028)
+      -ridge(x,y,[[.025,top-.16],[.02,top-.09],[.015,top-.02],[.01,top+.05]],.015,.005);
+    if(look.style==='short-swept') return bump(x,y,.08,top-.02,.20,.12,.025)
+      +ridge(x,y,[[-.29,top-.18],[-.18,top-.10],[-.06,top-.035],[.08,top+.01],[.22,top-.025],[.30,top-.12]],.10,.035);
     if(look.style==='long-straight') return bump(x,y,-.09,top,.18,.10,.012)+bump(x,y,.09,top,.18,.10,.012);
     if(look.style==='long-wavy') return bump(x,y,-.13,top,.20,.12,.014);
     if(look.style==='receding-short') return bump(x,y,-.18,top-.10,.17,.13,.008)+bump(x,y,.18,top-.10,.17,.13,.008);
@@ -963,6 +974,7 @@ function scalp(model,look,points,depthAt) {
     vertices.push(x,y+styleHeight(x,y),z);
     const wave=Math.sin(angle*9+row*.42),part=look.style==='short-side-part'
       ?Math.exp(-(((x-.02)/.018)**2+((y-(high-.05))/.16)**2))
+      :look.style==='comb-over'?Math.exp(-(((x-.08)/.020)**2+((y-(high-.04))/.16)**2))
       :look.style==='long-straight'?Math.exp(-((x/.016)**2+((y-(high-.045))/.15)**2))
       :look.style==='long-wavy'?Math.exp(-(((x+.13)/.020)**2+((y-(high-.035))/.16)**2)):.0;
     const sideLight=look.style==='long-straight'?.10*Math.exp(-(((Math.abs(x)-.09)/.08)**2))
@@ -1515,14 +1527,18 @@ export function createCameoHead(kind) {
   if(fitted) deepenMultiviewFace(points,look);
   smoothLandmarkDepth(points,fitted?2:6);
   if(fitted) points=deformFaceLandmarks(points,look);
-  const depthAt=fitted?makeLandmarkDepthSampler(points,look):makeSculptedLandmarkDepthSampler(points,look);
+  const smoothReliefAt=fitted?makeSmoothFaceReliefSampler(points,look):null;
+  const measuredDepthAt=fitted?makeLandmarkDepthSampler(points,look):null;
+  const depthAt=fitted
+    ?(x,y)=>measuredDepthAt(x,y)+smoothReliefAt(x,y)
+    :makeSculptedLandmarkDepthSampler(points,look);
   const mouthY=(points[13].y+points[14].y)/2,mouthZ=depthAt(0,mouthY);
   const jawBoundary=point=>{
     const frontness=THREE.MathUtils.smoothstep(point.z,-.055,.115);
     const faceLine=mouthY-.012-.145*THREE.MathUtils.smoothstep(Math.abs(point.x),.055,.245);
     return THREE.MathUtils.lerp(-1.1,faceLine,frontness);
   };
-  const fullHead=fitted?multiviewHead(points,look):landmarkSculpt(points,look,depthAt);
+  const fullHead=fitted?multiviewHead(points,look,smoothReliefAt):landmarkSculpt(points,look,depthAt);
   const position=fullHead.getAttribute('position'),normal=fullHead.getAttribute('normal'),color=fullHead.getAttribute('color'),index=fullHead.index;
   const vertices=Array.from({length:position.count},(_,i)=>new THREE.Vector3().fromBufferAttribute(position,i));
   const normals=Array.from({length:normal.count},(_,i)=>new THREE.Vector3().fromBufferAttribute(normal,i));
