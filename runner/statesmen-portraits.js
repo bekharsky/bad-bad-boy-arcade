@@ -13,8 +13,8 @@ const styles={
     hair:['#595144','#b5a991'], crown:.149, sweep:.051, depth:.37, width:1.04, age:.58,
   },
   trump:{
-    palette:palette('#dca477','#dda982','#c88e76','#c79e87','#b59a79','#a26c63','#c89480','#8195a1'),
-    hair:['#9d8867','#e5d7b7'], crown:.162, sweep:.077, depth:.382, width:1.04, age:1.12,
+    palette:palette('#c88a5d','#c88559','#be7053','#d09c7a','#b07c4e','#995d52','#bf8270','#8195a1'),
+    hair:['#974f2e','#e4a56b'], crown:.162, sweep:.077, depth:.382, width:1.04, age:1.12,
   },
   putin:{
     palette:palette('#e2b8a5','#dfb9aa','#c69689','#be9c94','#968174','#986c67','#b7867e','#77909b'),
@@ -57,8 +57,16 @@ function fittedPoints(kind, style) {
       case 'trump': return new THREE.Vector3(x*(1+.082*smooth(-y,.12,.33)-.22*lip),
         y-.032*brow-.13*(y-eyeY)*lid-.009*g(.11,mouthY,.045,.055)+.28*(mouthY-y)*lip,
         z+.032*cheek+.031*lip+.023*g(.19,-.286,.085,.10));
-      case 'putin': return new THREE.Vector3(x*(1+.045*cheek),y-.030*brow-.19*(y-eyeY)*lid-.22*(y-mouthY)*lip,
-        z+.031*cheek+.016*g(eyeX,eyeY-.038,.088,.044)+.010*g(.018,-.111,.032,.061));
+      case 'putin': {
+        const fullCheek=g(.218,-.122,.168,.171);
+        const jowl=g(.227,-.248,.151,.140);
+        return new THREE.Vector3(
+          x*(1+.11*fullCheek+.093*jowl),
+          y-.016*jowl-.030*brow-.19*(y-eyeY)*lid-.22*(y-mouthY)*lip,
+          z+.066*fullCheek+.034*jowl+.024*g(eyeX,eyeY-.040,.093,.047)
+            +.019*g(.07,-.395,.124,.07)+.010*g(.018,-.111,.032,.061)
+        );
+      }
       case 'macron': return new THREE.Vector3(x*(1-.05*smooth(-y,.20,.46)),y-.020*brow+.012*g(.131,-.22,.050,.047),
         z*.94+.021*cheek+.018*g(.04,-.37,.115,.056));
       case 'merz': return new THREE.Vector3(x*(1-.055*smooth(-y,.20,.44)),y-.026*brow,
@@ -142,29 +150,49 @@ function ears(head,points,kind,style) {
 }
 
 function frames(head,points,kind) {
-  const dark=material(kind==='merz'?'#25303b':'#473c34');
+  const aviator=kind==='macron';
+  const dark=material(aviator?'#807464':kind==='merz'?'#25303b':'#473c34');
+  if(aviator) {dark.metalness=.50;dark.roughness=.32;}
+  const glass=aviator?new THREE.MeshStandardMaterial({
+    vertexColors:true, roughness:.23, metalness:.20, side:THREE.DoubleSide
+  }):null;
   function rod(pts,r,closed=false) {
     const path=new THREE.CatmullRomCurve3(pts,closed);
     const mesh=new THREE.Mesh(new THREE.TubeGeometry(path,closed?64:20,r,8,closed),dark);
     mesh.name='Spectacle frame'; head.add(mesh);
   }
   const vec=(x,y,z)=>new THREE.Vector3(x,y,z);
-  const inner=[];
+  const inner=[], upperBridge=[];
   for(const side of [-1,1]){
     const [a,b]=side<0?[33,133]:[263,362],eye=points[a].clone().lerp(points[b],.50);
-    const wide=kind==='merz'?.106:.118, high=kind==='merz'?.070:.078;
-    const rim=[];
-    for(let i=0;i<40;i++) {
-      const phi=tau*i/40,h=Math.sin(phi),w=Math.cos(phi);
-      const x=eye.x+side*wide*w*(1+.10*h), y=eye.y-.018+high*Math.sign(h)*Math.abs(h)**.78;
-      rim.push(vec(x,y,points[168].z+.084-.082*(Math.abs(x)/.27)**1.72+.010*h));
+    const wide=aviator?.131:kind==='merz'?.106:.118;
+    const high=aviator?.094:kind==='merz'?.070:.078;
+    function lensPoint(phi,radius=1) {
+      const h=Math.sin(phi),w=Math.cos(phi);
+      const x=eye.x+(aviator?side*.008:0)+side*radius*wide*w*(1+(aviator?.16:.10)*h);
+      const drop=aviator ? -.014*w*Math.max(0,-h) : 0;
+      const y=eye.y-.018+radius*(high*Math.sign(h)*Math.abs(h)**(aviator?.63:.78)+drop);
+      const wrap=aviator?.111:.082;
+      const z=points[168].z+(aviator?.066:.084)-wrap*(Math.abs(x)/.27)**1.72+.010*h*radius;
+      return vec(x,y,z+(aviator?.012*(1-radius*radius):0));
     }
-    rod(rim,kind==='merz'?.0082:.0057,true);
+    const rim=Array.from({length:40},(_,i)=>lensPoint(tau*i/40));
+    if(aviator) {
+      const sky=new THREE.Color('#526579'), shade=new THREE.Color('#14212e');
+      const lens=grid(9,80,(u,r)=>{
+        const phi=u*tau, p=lensPoint(phi,r);
+        return [p,shade.clone().lerp(sky,smooth(Math.sin(phi)*r,.05,.87)*.85)];
+      });
+      surface(head,'Smoke-blue sunglass lens',lens.positions,lens.indices,glass,lens.colors);
+      upperBridge.push(rim[15]);
+    }
+    rod(rim,aviator?.0047:kind==='merz'?.0082:.0057,true);
     inner.push(rim[17]);
     const ear=points[side<0?234:454];
     rod([rim[4],vec(ear.x*.94,eye.y+.024,.055),vec(ear.x+side*.023,ear.y+.069,ear.z+.047),vec(ear.x+side*.029,ear.y+.016,ear.z-.016)],.006);
   }
-  rod([inner[0],vec((inner[0].x+inner[1].x)*.5,(inner[0].y+inner[1].y)*.5+.012,points[168].z+.090),inner[1]],.0065);
+  if(aviator) rod(upperBridge,.0045);
+  rod([inner[0],vec((inner[0].x+inner[1].x)*.5,(inner[0].y+inner[1].y)*.5+.012,points[168].z+(aviator?.061:.090)),inner[1]],.0065);
 }
 
 function smile(head,points,coverage) {
@@ -204,8 +232,8 @@ export function createStatesmanPortrait(kind) {
       beard:.35*g(.11,-.34,.19,.10)};
   });
   ears(head,points,kind,style);
+  if(kind==='stubb'||kind==='merz'||kind==='macron') frames(head,points,kind);
   if(kind==='stubb'||kind==='merz') {
-    frames(head,points,kind);
     smile(head,points,kind==='stubb'?.73:.62);
   }
   return head;
