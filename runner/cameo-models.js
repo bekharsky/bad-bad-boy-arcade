@@ -156,7 +156,8 @@ export function animateCameo(root, time, running = true, viewerYaw = 0) {
   const phase = time * 9, stride = running ? Math.sin(phase) : 0;
   root.position.y = running ? Math.abs(Math.cos(phase)) * .035 : 0;
   const viewAngle=Math.atan2(Math.sin(viewerYaw),Math.cos(viewerYaw));
-  root.userData.head.userData.faceGroup.visible=Math.cos(viewAngle)>-.25;
+  const faceGroup = root.userData.head.userData.faceGroup;
+  if (faceGroup) faceGroup.visible = Math.cos(viewAngle) > -.25;
   for (const part of root.children) {
     if (part.userData.stride) {
       const side = part.userData.stride;

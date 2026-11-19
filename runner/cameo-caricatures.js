@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { createPurraPortrait } from './purra-portrait.js';
 import { CAMEO_FACE_DATA, CAMEO_FACE_TRIANGLES } from './cameo-face-data.js';
 
 const TAU = Math.PI * 2;
@@ -403,6 +404,7 @@ function createMaterials(look) {
 }
 
 export function createCameoHead(kind) {
+  if (kind === 'purra') return createPurraPortrait();
   const look=CAMEO_CARICATURES[kind],baseProfile=PROFILES[kind];
   if(!look||!baseProfile) throw new Error(`Unknown cameo head: ${kind}`);
   const profile=fitProfileToLandmarks(baseProfile),{geometry:headGeometry,landmarks}=makeLandmarkHead(kind);
@@ -447,6 +449,10 @@ export function createCameoNeck(kind) {
 export function animateCameoHead(head,time,running) {
   const bounce=running?Math.max(0,Math.sin(time*9)):0;
   head.rotation.z=running?Math.sin(time*9)*.012:0;
+  if (head.userData.animatedFace) {
+    head.userData.animatedFace.morphTargetInfluences[0] = running ? .35 + .65 * bounce : 0;
+    return;
+  }
   head.userData.mouth.visible=running;
   head.userData.mouthLine.visible=!running;
   head.userData.jaw.rotation.x=running?.12+bounce*.055:0;
