@@ -7,6 +7,8 @@ export const CAMEO_LOOKS = {
   trump: { name: 'Trump', skin: '#c88a5d', jacket: '#29364b', lapel: '#202d42', shirt: '#f5efe3', tie: '#b63232', trousers: '#283446', formal: true, scale: [1.06, 1.04, 1] },
   macron: { name: 'Macron', skin: '#e3b69f', jacket: '#283348', lapel: '#333e51', shirt: '#f6f1e8', tie: '#303c54', trousers: '#262d3d', formal: true, scale: [.97, 1.01, 1] },
   merz: { name: 'Merz', skin: '#e6bdab', jacket: '#374b65', lapel: '#425773', shirt: '#f5f3eb', tie: '#5079a4', trousers: '#303b50', formal: true, scale: [.96, 1.065, 1] },
+  lepen: { name: 'Le Pen', skin: '#e6bca1', jacket: '#273345', lapel: '#303a49', shirt: '#f6efe4', trousers: '#2f3440', scale: [1.02, 1, 1] },
+  zelenskyy: { name: 'Zelenskyy', skin: '#d2a587', jacket: '#545840', trousers: '#434536', shortSleeves: true, scale: [1.04, .98, 1] },
 };
 export const CAMEO_KINDS = Object.freeze(Object.keys(CAMEO_LOOKS));
 export const isCameo = kind => CAMEO_KINDS.includes(kind);

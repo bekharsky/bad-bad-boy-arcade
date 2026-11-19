@@ -69,6 +69,10 @@ function body(model, look, kind) {
   model.geometry(look.jacket, new THREE.CylinderGeometry(shoulders, waist, height, sides)
     .scale(1, 1, depth).translate(0, bottom + height / 2, 0));
   oval(model, look.trousers, 0, 1.19, 0, .255, .16, .18);
+  if (look.shortSleeves) {
+    oval(model, '#454834', 0, 2.17, 0, .157, .031, .133);
+    return;
+  }
   jacketPanel(model, look.shirt, [[-.14, 2.16], [.14, 2.16], [.095, 1.69], [-.095, 1.69]], .001);
   for (const side of [-1, 1]) {
     jacketPanel(model, look.lapel,
@@ -107,12 +111,17 @@ function limbs(root, look, shoulderDrop = 0) {
 
     const arm = createSceneryModel(`${look.name} arm ${side}`);
     oval(arm, look.jacket, 0, -.04, 0, .105, .13, .12);
-    rod(arm, look.jacket, [0, -.06, 0], [0, -.37, 0], .105, .083);
+    if (look.shortSleeves) {
+      rod(arm, look.skin, [0, -.16, 0], [0, -.37, 0], .099, .083);
+      rod(arm, look.jacket, [0, -.06, 0], [0, -.21, 0], .109, .105);
+    } else {
+      rod(arm, look.jacket, [0, -.06, 0], [0, -.37, 0], .105, .083);
+    }
     const armRoot = arm.finish({ vertexColors: true });
     armRoot.position.set(side * .34, 2.05 - shoulderDrop, 0);
     armRoot.userData.swing = -side;
     const forearm = createSceneryModel(`${look.name} elbow ${side}`);
-    rod(forearm, look.jacket, [0, 0, 0], [0, -.30, 0], .085, .067);
+    rod(forearm, look.shortSleeves ? look.skin : look.jacket, [0, 0, 0], [0, -.30, 0], .085, .067);
     oval(forearm, look.skin, 0, -.35, 0, .077, .10, .068);
     const elbow = forearm.finish({ vertexColors: true });
     elbow.position.y = -.37;

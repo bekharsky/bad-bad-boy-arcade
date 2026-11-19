@@ -39,6 +39,8 @@ These photographs are retained as likeness references for the fully sculpted 3D 
 - **Emmanuel Macron**. Face proportions fitted from the [2025 Ljubljana portrait](https://commons.wikimedia.org/wiki/File:Emmanuel_Macron_2025_%28cropped%29.jpg) by Nebojša Tejić / STA, published by gov.si (Public Domain Mark).
 - **Friedrich Merz**. Face proportions fitted from [Friedrich Merz in Erfurt, 2024](https://commons.wikimedia.org/wiki/File:2024-08-21_Friedrich_Merz_in_Erfurt_2024_STP_3041_by_Stepro_%283x4_cropped%29.jpg) by Steffen Prößdorf ([CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)).
 - Additional frontal geometry references: [Vladimir Putin, February 2026](https://commons.wikimedia.org/wiki/File:Vladimir_Putin_%282026_02_23%29_%28cropped%29.jpg), Kremlin.ru, and [Donald Trump, official 2025 portrait](https://commons.wikimedia.org/wiki/File:Official_Presidential_Portrait_of_President_Donald_J._Trump_%282025%29.jpg), The White House.
+- **Marine Le Pen**. Measured from the [2025 portrait](https://commons.wikimedia.org/wiki/File:Marine_Le_Pen_2025_%283x4_cropped%29.jpg), Vox España.
+- **Volodymyr Zelenskyy**. Measured from the [2022 official portrait](https://commons.wikimedia.org/wiki/File:Volodymyr_Zelensky_2022_official_portrait_%28cropped%29.jpg), Press Service of the President of Ukraine ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)).
 
 Bad Bad Boy is a sculpture by Tommi Toija in Helsinki. The game character was prepared from the user-provided `bc222867938641be8050f747614e5d34.glb`; it is not covered by the snail and slug licences above.
 
