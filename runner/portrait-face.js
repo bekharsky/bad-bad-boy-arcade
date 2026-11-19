@@ -47,15 +47,15 @@ export function grid(rows, columns, point) {
   return {positions,indices,colors};
 }
 
-function addEye(head,points,{upper,lower,brow}, browColor) {
+function addEye(head,points,{upper,lower,brow}, palette) {
   const curve = ids => new THREE.CatmullRomCurve3(ids.map(i=>points[i]));
   const lid=curve(upper), rim=curve(lower);
   const irisCenter=lid.getPoint(.49).lerp(rim.getPoint(.49),.43);
-  const white=color('#ece2d9'), iris=color('#587482'), ring=color('#394b54'), pupil=color('#22252b');
+  const white=color('#ece2d9'), iris=color(palette.iris ?? '#587482'), ring=color('#394b54'), pupil=color('#22252b');
   const eye=grid(22,54,(u,v)=>{
     const p=lid.getPoint(u).lerp(rim.getPoint(u),v);
     p.z+=.013*Math.sin(Math.PI*u)*Math.sin(Math.PI*v);
-    const dx=p.x-irisCenter.x, dy=p.y-irisCenter.y, r=Math.hypot(dx,dy);
+    const dx=p.x-irisCenter.x, dy=p.y-irisCenter.y, r=Math.hypot(dx,dy)/(palette.irisScale ?? 1);
     const tint=ring.clone().lerp(white,smooth(r,.022,.024));
     tint.lerp(iris,1-smooth(r,.018,.020)).lerp(pupil,1-smooth(r,.008,.010));
     tint.lerp(white,.85*(1-smooth(Math.hypot(dx+.006,dy-.007),.002,.005)));
@@ -63,11 +63,15 @@ function addEye(head,points,{upper,lower,brow}, browColor) {
   });
   surface(head,'Eye between fitted lids',eye.positions,eye.indices,colored(),eye.colors);
   for(const [name,path,thickness,tint] of [
-    ['Upper eyelid',lid,.0026,'#735448'],['Eyebrow',curve(brow),.009,browColor]
+    ['Upper eyelid',lid,palette.lashWidth ?? .0026,palette.lash ?? '#735448'],
+    ['Eyebrow',curve(brow),palette.browWidth ?? .009,palette.brow],
+    ...(palette.lowerLid ? [['Lower lid',rim,.0018,palette.lowerLid]] : [])
   ]) {
     const band=grid(6,30,(u,v)=>{
       const p=path.getPoint(u);
-      const taper=Math.pow(Math.sin(Math.PI*u),.45);
+      const taper=(name==='Eyebrow' && palette.browTaper)
+        ? Math.sin(Math.PI*u)**.55*(.38+.94*u)
+        : Math.pow(Math.sin(Math.PI*u),.45);
       p.y+=(v-.5)*2*thickness*taper;
       p.z+=.004+thickness*.55*Math.sin(Math.PI*v)*taper;
       return [p];
@@ -112,8 +116,8 @@ export function addPortraitFace(head, points, palette) {
   const back=grid(24,oval.length,(u,v)=>{
     const edge=points[oval[Math.round(u*oval.length)%oval.length]];
     const angle=v*Math.PI/2;
-    return [new THREE.Vector3(edge.x*Math.cos(angle),edge.y*Math.cos(angle),edge.z*Math.cos(angle)-.34*Math.sin(angle))];
+    return [new THREE.Vector3(edge.x*Math.cos(angle),edge.y*Math.cos(angle),edge.z*Math.cos(angle)-(palette.backDepth ?? .34)*Math.sin(angle))];
   });
   surface(head,'Back of head',back.positions,back.indices,skin);
-  eyes.forEach(eye=>addEye(head,points,eye,palette.brow));
+  eyes.forEach(eye=>addEye(head,points,eye,palette));
 }

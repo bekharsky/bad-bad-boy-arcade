@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { createMarinPortrait } from './marin-portrait.js';
 import { createOrpoPortrait } from './orpo-portrait.js';
 import { createPurraPortrait } from './purra-portrait.js';
 import { CAMEO_FACE_DATA, CAMEO_FACE_TRIANGLES } from './cameo-face-data.js';
@@ -407,6 +408,7 @@ function createMaterials(look) {
 export function createCameoHead(kind) {
   if (kind === 'purra') return createPurraPortrait();
   if (kind === 'orpo') return createOrpoPortrait();
+  if (kind === 'marin') return createMarinPortrait();
   const look=CAMEO_CARICATURES[kind],baseProfile=PROFILES[kind];
   if(!look||!baseProfile) throw new Error(`Unknown cameo head: ${kind}`);
   const profile=fitProfileToLandmarks(baseProfile),{geometry:headGeometry,landmarks}=makeLandmarkHead(kind);
