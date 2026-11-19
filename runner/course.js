@@ -21,9 +21,7 @@ export const ROADWORK_TYPES = Object.freeze(['cone', 'tractor', 'barrier', 'tren
 const PROFILES = {
   bike: { halfLength: 1.2, width: 1.05, depth: 1.65, size: .7, hitHeight: 1.2 },
   scooter: { halfLength: .95, width: 1.05, depth: 1.65, size: .7, hitHeight: 1.2 },
-  purra: { halfLength: .6, width: .9, depth: 1.65, size: .7, hitHeight: 1.45 },
-  orpo: { halfLength: .6, width: .9, depth: 1.65, size: .7, hitHeight: 1.45 },
-  marin: { halfLength: .6, width: .9, depth: 1.65, size: .7, hitHeight: 1.45 },
+  ...Object.fromEntries(CAMEO_KINDS.map(kind => [kind, { halfLength: .6, width: .9, depth: 1.65, size: .7, hitHeight: 1.45 }])),
   stubb: { halfLength: .6, width: .9, depth: 1.65, size: .7, hitHeight: 1.6 },
   cone: { halfLength: .6, width: 1.05, depth: 1.65, size: .55, hitHeight: .55 },
   tractor: { halfLength: 1.9, width: 1.65, depth: 2.4, size: 1.1, hitHeight: 1.2 },

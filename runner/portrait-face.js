@@ -80,7 +80,7 @@ function addEye(head,points,{upper,lower,brow}, palette) {
   }
 }
 
-export function addPortraitFace(head, points, palette) {
+export function addPortraitFace(head, points, palette, makeScalp) {
   const eyeLoops=eyes.map(e=>new Set([...e.upper,...e.lower]));
   const lipLoops=[[...upperContour,...upperBands],[...lowerContour,...lowerBands],[...upperInner,...lowerInner]].map(loop=>new Set(loop));
   const groups=[[],[],[],[]];
@@ -89,9 +89,8 @@ export function addPortraitFace(head, points, palette) {
     const [a,b,c]=tri.map(i=>points[i]);
     const facing=(b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x);
     const group=1+lipLoops.findIndex(loop=>tri.every(i=>loop.has(i)));
-    groups[group].push(...(facing>=0?tri:[tri[0],tri[2],tri[1]]));
+    groups[group].push(...(makeScalp || facing>=0?tri:[tri[0],tri[2],tri[1]]));
   }
-  const skin=material(palette.skin);
   const faceSkin=colored(), complexion=[];
   const ivory=color(palette.base), rose=color(palette.rose), shade=color(palette.shade);
   for(const p of points) {
@@ -113,11 +112,15 @@ export function addPortraitFace(head, points, palette) {
   face.updateMorphTargets();
   head.userData.animatedFace=face;
 
-  const back=grid(24,oval.length,(u,v)=>{
-    const edge=points[oval[Math.round(u*oval.length)%oval.length]];
-    const angle=v*Math.PI/2;
-    return [new THREE.Vector3(edge.x*Math.cos(angle),edge.y*Math.cos(angle),edge.z*Math.cos(angle)-(palette.backDepth ?? .34)*Math.sin(angle))];
-  });
-  surface(head,'Back of head',back.positions,back.indices,skin);
+  if(makeScalp) {
+    makeScalp(head,oval.map(i=>points[i]));
+  } else {
+    const back=grid(24,oval.length,(u,v)=>{
+      const edge=points[oval[Math.round(u*oval.length)%oval.length]];
+      const angle=v*Math.PI/2;
+      return [new THREE.Vector3(edge.x*Math.cos(angle),edge.y*Math.cos(angle),edge.z*Math.cos(angle)-(palette.backDepth ?? .34)*Math.sin(angle))];
+    });
+    surface(head,'Back of head',back.positions,back.indices,material(palette.skin));
+  }
   eyes.forEach(eye=>addEye(head,points,eye,palette));
 }

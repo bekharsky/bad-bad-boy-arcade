@@ -2,14 +2,8 @@ import * as THREE from 'three';
 import { createSceneryModel } from '../maps/scenery-model.js';
 import { animateCameoHead, createCameoHead, createCameoNeck } from './cameo-heads.js';
 
-const LOOKS = {
-  purra: { name: 'Purra', skin: '#e8bca7', jacket: '#d73587', lapel: '#bd2d75', shirt: '#25212a', tie: '#25212a', trousers: '#32313a', scale: [.98, 1, 1] },
-  orpo: { name: 'Orpo', skin: '#dfb59d', jacket: '#344356', lapel: '#29384a', shirt: '#f2eee4', tie: '#6691b4', trousers: '#303b4d', formal: true, scale: [1.03, 1, 1] },
-  marin: { name: 'Marin', skin: '#f0c9b4', jacket: '#f1eee4', lapel: '#e1ddd4', shirt: '#333039', tie: '#333039', trousers: '#34333b', scale: [.94, 1, 1] },
-  stubb: { name: 'Stubb', skin: '#e6b79c', jacket: '#304563', lapel: '#253a56', shirt: '#f4efe4', tie: '#8185b2', trousers: '#2d3b53', formal: true, scale: [.97, 1.05, 1] },
-  putin: { name: 'Putin', skin: '#e2b8a5', jacket: '#333a42', lapel: '#292f36', shirt: '#eee9de', tie: '#4b3030', trousers: '#30353c', formal: true, scale: [1, 1.02, 1] },
-  trump: { name: 'Trump', skin: '#dca477', jacket: '#29364b', lapel: '#202d42', shirt: '#f5efe3', tie: '#b63232', trousers: '#283446', formal: true, scale: [1.06, 1.04, 1] },
-};
+import { CAMEO_LOOKS as LOOKS } from './cameo-roster.js';
+
 const INK = '#29282c';
 const JACKET = { bottom: 1.145, height: 1.03, waist: .28, shoulders: .33, depth: .7, sides: 20 };
 
@@ -140,6 +134,7 @@ export function createCameoModel(kind) {
   const costume = createSceneryModel(`${look.name} body`);
   body(costume, look, kind);
   const jacket = costume.finish({ vertexColors: true, roughness: .95 });
+  if (kind === 'trump') jacket.scale.set(1.10, 1, 1.09);
   root.add(jacket);
   const neck=createCameoNeck(kind);
   neck.name=`${look.name} neck`;
@@ -155,9 +150,6 @@ export function createCameoModel(kind) {
 export function animateCameo(root, time, running = true, viewerYaw = 0) {
   const phase = time * 9, stride = running ? Math.sin(phase) : 0;
   root.position.y = running ? Math.abs(Math.cos(phase)) * .035 : 0;
-  const viewAngle=Math.atan2(Math.sin(viewerYaw),Math.cos(viewerYaw));
-  const faceGroup = root.userData.head.userData.faceGroup;
-  if (faceGroup) faceGroup.visible = Math.cos(viewAngle) > -.25;
   for (const part of root.children) {
     if (part.userData.stride) {
       const side = part.userData.stride;
