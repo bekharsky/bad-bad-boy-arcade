@@ -1,10 +1,8 @@
-import * as THREE from 'three';
-
-export function cameoMaterials(model) {
+export function prepareFadingMaterials(model) {
   const materials = new Set();
   model.traverse(node => {
     if (!node.isMesh) return;
-    if (node.castShadow) node.userData.cameoShadow = true;
+    if (node.castShadow) node.userData.fadeShadow = true;
     for (const material of Array.isArray(node.material) ? node.material : [node.material]) {
       material.alphaHash = true;
       materials.add(material);
@@ -13,15 +11,14 @@ export function cameoMaterials(model) {
   return materials;
 }
 
-export function showCameo(model, materials, age, flash) {
-  const opacity = THREE.MathUtils.smoothstep(age, 0, 1.2);
+export function setModelAppearance(model, materials, opacity, flash) {
   // Three's standard shadow pass does not use the mesh material's opacity.
   const shadows = opacity >= .65;
-  if (model.userData.cameoShadows !== shadows) {
+  if (model.userData.fadeShadows !== shadows) {
     model.traverse(node => {
-      if (node.userData.cameoShadow) node.castShadow = shadows;
+      if (node.userData.fadeShadow) node.castShadow = shadows;
     });
-    model.userData.cameoShadows = shadows;
+    model.userData.fadeShadows = shadows;
   }
   for (const material of materials) {
     material.opacity = opacity;

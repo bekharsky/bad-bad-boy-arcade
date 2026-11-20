@@ -189,7 +189,7 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
     safeLane = safeChoices[choose(safeChoices.length)];
     const group = candidates.filter(agent => agent.lane !== safeLane);
     for (const agent of group) {
-      agent.id = nextId++; agent.safeLane = safeLane; state.traffic.push(agent);
+      agent.id = nextId++; agent.safeLane = safeLane; agent.spawnTime = state.elapsed; state.traffic.push(agent);
     }
     return true;
   }
@@ -272,7 +272,7 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
             crossing.phase = 'crossing'; crossing.launched++;
             if (state.traffic.length >= TRAFFIC_CAPACITY) continue;
             const profile = trafficProfile('scooter');
-            state.traffic.push({ id: nextId++, kind: 'scooter', color: TRAFFIC_COLORS[choose(3)], crossing: true, vx: -crossing.side * pass.speed, x: crossing.side * 14, z: state.distance - progress, progress, speed: 0, size: profile.size, hitHeight: profile.hitHeight, hp: SCOOTER_HEALTH, alive: true, hit: false, passed: false, hitUntil: 0 });
+            state.traffic.push({ id: nextId++, kind: 'scooter', color: TRAFFIC_COLORS[choose(3)], crossing: true, vx: -crossing.side * pass.speed, x: crossing.side * 14, z: state.distance - progress, progress, speed: 0, size: profile.size, hitHeight: profile.hitHeight, hp: SCOOTER_HEALTH, alive: true, hit: false, passed: false, hitUntil: 0, spawnTime: state.elapsed });
           }
           if (crossing.launched === 2 && state.elapsed > crossing.nextLaunchAt + 2.2 && gap < -10) crossing.phase = 'clear';
         }

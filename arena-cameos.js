@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CAMEO_KINDS, cameoGaitForDistance } from './runner/cameo-roster.js';
-import { cameoMaterials, showCameo } from './runner/cameo-appearance.js';
+import { prepareFadingMaterials, setModelAppearance } from './runner/model-appearance.js';
 import { createTrafficModel } from './runner/traffic-models.js';
 import { animateCameo } from './runner/cameo-models.js';
 import { disposeObject } from './world/dispose.js';
@@ -13,7 +13,7 @@ export function createArenaCameos(scene, world, random = Math.random) {
   const pool = CAMEO_KINDS.map((kind, index) => {
     const root = new THREE.Group(), model = createTrafficModel(kind, 'cameo');
     root.name = `Civilian: ${kind}`; root.add(model); root.visible = false; group.add(root);
-    const materials = cameoMaterials(model);
+    const materials = prepareFadingMaterials(model);
     return { kind, civilian: true, root, model, materials, size: .55, hitHeight: kind === 'stubb' ? 1.6 : 1.45, speed: 3.9 + index * .12, alive: false };
   });
   let disposed = false;
@@ -44,7 +44,7 @@ export function createArenaCameos(scene, world, random = Math.random) {
       Object.assign(actor, { x, z, alive: true, fleeing: false, panic: 0, flash: 0, decision: 0, gait: index * .7, nextJetHit: 0,
         age: -index * .6, heading, route, waypoint: 1, escapeFrom: null, direction: { x: 0, z: 0 } });
       actor.root.visible = true; actor.root.position.set(actor.x, 0, actor.z); actor.root.rotation.y = actor.heading;
-      showCameo(actor.model, actor.materials, actor.age, 0);
+      setModelAppearance(actor.model, actor.materials, 0, 0);
       pose(actor, false, viewPosition);
       actors.push(actor);
     }
@@ -92,7 +92,7 @@ export function createArenaCameos(scene, world, random = Math.random) {
       }
       actor.root.position.set(actor.x, 0, actor.z); actor.root.rotation.y = actor.heading;
       pose(actor, moved > 1e-6, viewPosition);
-      showCameo(actor.model, actor.materials, actor.age, actor.flash > 0 ? .45 : 0);
+      setModelAppearance(actor.model, actor.materials, THREE.MathUtils.smoothstep(actor.age, 0, 1.2), actor.flash > 0 ? .45 : 0);
     }
   }
 

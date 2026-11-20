@@ -31,7 +31,7 @@ export const aleksanterinkatuMap = {
   spawn: { x: TRAM_LANES[0], z: 0, heading: Math.PI },
   pickups: { medkit: [{ x: TRAM_LANES[0], z: -300 }] },
   bounds: { minX: -5.3, maxX: 5.3, minZ: -150, maxZ: 35 },
-  environment: { background: new THREE.Color('#9ebbc1'), fog: new THREE.Fog('#9ebbc1', 65, 165) },
+  environment: { background: new THREE.Color('#9ebbc1'), fog: new THREE.Fog('#9ebbc1', 42, 132) },
   create() { return createMap(aleksanterinkatuMap, buildAleksi); },
 };
 

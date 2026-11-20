@@ -182,6 +182,42 @@ test('harmless runner cameos cannot absorb the damage from a bicycle in the same
   assert.equal(run.update(.5).hits, 1);
 });
 
+test('runner hazards fade per spawn, with crossing traffic visible before it reaches a lane', () => {
+  const root = new THREE.Group();
+  const renderer = createRunnerTraffic(root, 'Test', {
+    roadworkKinds: ['barrier'], tramChance: 1,
+  });
+  const state = { distance: 0, speed: 9, elapsed: 1, traffic: [
+    { kind: 'barrier', lane: 0, progress: 25, speed: 0, spawnTime: 1 },
+    { kind: 'tram', lane: 1, color: 'tram', progress: 45, speed: 7.5, spawnTime: 1 },
+    { kind: 'scooter', color: 'red', crossing: true, x: 14, vx: -18, progress: 10, speed: 0, spawnTime: 1 },
+  ] };
+  const slots = root.children.filter(node => node.name === 'Test traffic');
+  const meshes = slot => {
+    const children = [];
+    slot.traverse(child => { if (child.isMesh) children.push(child); });
+    return children;
+  };
+  renderer.update(state);
+  for (const slot of slots.slice(0, 3)) {
+    assert.ok(meshes(slot).every(mesh => mesh.material.alphaHash && mesh.material.opacity === 0 && !mesh.castShadow));
+  }
+  state.elapsed = 1.35;
+  renderer.update(state);
+  for (const slot of slots.slice(0, 2)) {
+    assert.ok(meshes(slot).every(mesh => Math.abs(mesh.material.opacity - .5) < 1e-6));
+  }
+  assert.ok(meshes(slots[2]).every(mesh => mesh.material.opacity === 1 && mesh.castShadow));
+  state.elapsed = 2;
+  renderer.update(state);
+  assert.ok(meshes(slots[0]).every(mesh => mesh.material.opacity === 1 && mesh.castShadow));
+  state.traffic[0] = { ...state.traffic[0], spawnTime: 2 };
+  renderer.update(state);
+  assert.ok(meshes(slots[0]).every(mesh => mesh.material.opacity === 0 && !mesh.castShadow));
+  assert.ok(meshes(slots[1]).every(mesh => mesh.material.opacity === 1));
+  disposeObject(root);
+});
+
 test('pooled cameo animates without new resources, keeps hit flashes local and resets when a slot changes kind', () => {
   const root = new THREE.Group(), renderer = createRunnerTraffic(root, 'Test', baanaMap.runner);
   const state = { distance: 0, elapsed: .1, speed: 9, traffic: [

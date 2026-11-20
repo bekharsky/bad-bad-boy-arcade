@@ -212,19 +212,22 @@ test('the cathedral fits the shared camera and real map switches dispose their o
 });
 
 
-test('harbor and Aleksanterinkatu use their own environments and other districts restore the original', () => {
+test('the harbor and runner maps set their environments and other districts restore the original', () => {
   const scene = new THREE.Scene();
   const background = scene.background = new THREE.Color('#7c929f');
   const fog = scene.fog = new THREE.Fog('#7c929f', 40, 100);
   const world = createMapManager(scene, maps, .736);
-  for (const id of ['baana', 'kamppi', 'senate-square']) {
+  for (const id of ['kamppi', 'senate-square']) {
     world.activate('harbor'); assert.equal(scene.fog, null); assert.equal(scene.background.getHexString(), '376b7c');
     world.activate(id); assert.equal(scene.fog, fog); assert.equal(scene.background, background);
     assert.equal(scene.fog.near, 40); assert.equal(scene.fog.far, 100);
   }
+  world.activate('baana');
+  assert.equal(scene.background.getHexString(), '7c929f');
+  assert.equal(scene.fog.near, 30); assert.equal(scene.fog.far, 112);
   world.activate('aleksanterinkatu');
   assert.equal(scene.background.getHexString(), '9ebbc1');
-  assert.equal(scene.fog.near, 65); assert.equal(scene.fog.far, 165);
+  assert.equal(scene.fog.near, 42); assert.equal(scene.fog.far, 132);
   world.activate('senate-square');
   assert.equal(scene.fog, fog); assert.equal(scene.background, background);
   world.activate('harbor'); world.dispose();
