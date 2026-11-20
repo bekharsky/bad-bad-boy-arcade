@@ -5,6 +5,7 @@ import { createSceneryModel } from './scenery-model.js';
 import { createRunnerTraffic, createRunnerFinish } from '../runner/track-renderer.js';
 import { BAANA_LENGTH } from '../runner/course.js';
 import { CAMEO_KINDS } from '../runner/cameo-roster.js';
+import { registerBuilding } from '../world/building-visibility.js';
 
 export const baanaMap = {
   id: 'baana', name: 'Baana Run', mode: 'runner',
@@ -78,16 +79,17 @@ function buildBaana(root) {
         for (let x = -8; x <= 8; x += 1.4) bridge.box('#73867e', x, 8.15, side * 2.3, .045, 1.15, .045);
         bridge.box('#73867e', 0, 8.7, side * 2.3, 19, .06, .06);
       }
-      const object = bridge.finish({ vertexColors: true }); group.add(object); object.updateMatrixWorld(true);
-      buildings.push({ group: object, meshes: [...object.children], materials: object.children.map(mesh => mesh.material), bounds: new THREE.Box3(), opacity: 1, hiddenUntil: 0 });
+      const object = bridge.finish({ vertexColors: true }); group.add(object);
+      const building = registerBuilding(object);
+      buildings.push({ ...building, section: group, baseBounds: building.bounds.clone() });
     }
   }
   const traffic = createRunnerTraffic(root, 'Baana', baanaMap.runner);
   const finish = createRunnerFinish(root, 'Baana', BAANA_LENGTH);
   function updateRunner(state, viewPosition) {
     for (let i = 0; i < sections.length; i++) sections[i].position.z = ((i * 32 + state.distance + 128) % 160) - 128;
-    for (const section of sections) section.updateMatrixWorld(true);
-    for (const bridge of buildings) bridge.bounds.setFromObject(bridge.group);
+    // Only the parent section translates. The bridge's local bounds are fixed.
+    for (const bridge of buildings) bridge.bounds.copy(bridge.baseBounds).translate(bridge.section.position);
     traffic.update(state, viewPosition);
     finish.update(state);
   }

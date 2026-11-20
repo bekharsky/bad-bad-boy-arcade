@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { PURRA_FRAMES } from '../assets/cameos/purra-frames.js';
-import { ROSTER_FRAMES } from '../assets/cameos/roster-frames.js';
+import { PURRA_FRAMES } from './assets/purra-frames.js';
+import { ROSTER_FRAMES } from './assets/roster-frames.js';
 import { aimPhotoHead, animatePhotoJaw, createSplitPhotoHead, photoDirection, PHOTO_HEAD_Y } from './cameo-photo-head.js';
 
 const framesByKind = { purra: PURRA_FRAMES, ...ROSTER_FRAMES };
@@ -10,7 +10,7 @@ export const CAMEO_PHOTO_FILES = Object.values(framesByKind).flatMap(frames => O
 // pixels are shared, so district disposal leaves the other owners intact.
 const sources = new Map(CAMEO_PHOTO_FILES.map(file => [file, new THREE.Source()]));
 
-export async function preloadCameoPhotos(resolveUrl = file => new URL(`../assets/cameos/${file}`, import.meta.url).href) {
+export async function preloadCameoPhotos(resolveUrl = file => new URL(`./assets/${file}`, import.meta.url).href) {
   const loader = new THREE.ImageLoader();
   const results = await Promise.allSettled([...sources].map(async ([file, source]) => {
     if (source.data) return;

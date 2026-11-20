@@ -60,12 +60,30 @@ export function createNavigation({ bounds, colliders = [], dynamicColliders = ()
   const width = Math.ceil(bounds.maxX) - originX, depth = Math.ceil(bounds.maxZ) - originZ;
   const cells = width * depth;
   const distances = new Int32Array(cells), queue = new Uint32Array(cells), open = new Uint8Array(cells);
+  const staticOpen = new Uint8Array(cells);
+  const routeRadius = .56;
   const cell = (x, z) => clamp(Math.floor(z - originZ), 0, depth - 1) * width + clamp(Math.floor(x - originX), 0, width - 1);
   const coords = i => ({ x: i % width + originX + .5, z: Math.floor(i / width) + originZ + .5 });
   const neighbours = i => [i % width > 0 ? i - 1 : -1, i % width < width - 1 ? i + 1 : -1, i >= width ? i - width : -1, i < cells - width ? i + width : -1].filter(n => n >= 0);
   let lastCell = -1;
+  // Use the same strict edges as overlaps() when rasterizing collider bounds.
+  function closeCells(grid, collider) {
+    const minX = Math.max(0, Math.floor(collider.minX - routeRadius - originX - .5) + 1);
+    const maxX = Math.min(width - 1, Math.ceil(collider.maxX + routeRadius - originX - .5) - 1);
+    const minZ = Math.max(0, Math.floor(collider.minZ - routeRadius - originZ - .5) + 1);
+    const maxZ = Math.min(depth - 1, Math.ceil(collider.maxZ + routeRadius - originZ - .5) - 1);
+    if (minX > maxX) return;
+    for (let z = minZ; z <= maxZ; z++) grid.fill(0, z * width + minX, z * width + maxX + 1);
+  }
+  // Static scenery is fixed. Refresh only the cells under moving colliders.
+  for (let i = 0; i < cells; i++) {
+    const { x, z } = coords(i);
+    staticOpen[i] = Number(!outside(x, z, routeRadius));
+  }
+  for (const collider of colliders) closeCells(staticOpen, collider);
   function refresh() {
-    for (let i = 0; i < cells; i++) { const p = coords(i); open[i] = Number(!blocked(p.x, p.z, .56)); }
+    open.set(staticOpen);
+    for (const collider of dynamicColliders()) closeCells(open, collider);
     lastCell = -1;
     distances.fill(-1);
   }

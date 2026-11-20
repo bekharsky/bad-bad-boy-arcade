@@ -11,6 +11,7 @@ export function createRunnerTraffic(root, name, { riderKinds = ['bike', 'scooter
   const trafficPool = [], trafficMaterials = [];
   const templates = new Map(), activeVariants = Array(TRAFFIC_CAPACITY).fill(null);
   const slotAppearance = [];
+  const actorSlots = new Map(), activeActors = new Set(), slotOwners = Array(TRAFFIC_CAPACITY).fill(null);
   // Keep one copy of each geometry in the map subtree for deterministic
   // disposal. Slots clone only the variant they currently display.
   const templateRoot = new THREE.Group();
@@ -40,10 +41,26 @@ export function createRunnerTraffic(root, name, { riderKinds = ['bike', 'scooter
   }
   // Shared templates and per-slot materials are owned by the map subtree.
   return { update(state, viewPosition) {
-    for (let i = 0; i < trafficPool.length; i++) {
-      const object = trafficPool[i], agent = state.traffic[i], material = trafficMaterials[i];
-      object.visible = !!agent && !agent.cleared;
-      if (!agent) continue;
+    activeActors.clear();
+    for (const agent of state.traffic) activeActors.add(agent);
+    // Compacting the course's array must not replace the models of surviving actors.
+    for (const [agent, index] of actorSlots) {
+      if (activeActors.has(agent)) continue;
+      trafficPool[index].visible = false;
+      slotOwners[index] = null;
+      actorSlots.delete(agent);
+    }
+    for (const agent of state.traffic) {
+      let i = actorSlots.get(agent);
+      if (i === undefined) {
+        i = slotOwners.indexOf(null);
+        if (i < 0) break;
+        actorSlots.set(agent, i);
+        slotOwners[i] = agent;
+      }
+      const object = trafficPool[i], material = trafficMaterials[i];
+      object.visible = !agent.cleared;
+      if (agent.cleared) continue;
       const cameo = isCameo(agent.kind);
       const key = `${cameo ? 'cameo' : ROADWORK_TYPES.includes(agent.kind) ? 'roadwork' : agent.color} ${agent.kind}`;
       if (activeVariants[i] !== key) {

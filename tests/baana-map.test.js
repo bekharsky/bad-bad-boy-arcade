@@ -12,22 +12,29 @@ const THREE = await import('three');
 const { baanaMap } = await import('../maps/baana.js');
 const { harborMap } = await import('../maps/harbor.js');
 const { createMapManager } = await import('../world/map-manager.js');
+const { CAMEO_KINDS } = await import('../runner/cameo-roster.js');
 const { createBaanaRun, TRAFFIC_CAPACITY } = await import('../runner/baana-run.js');
 
 test('Baana recycles scenery and traffic with bounded geometry and all rider colour variants', () => {
-  const map = baanaMap.create(), run = createBaanaRun({ random: () => .6 });
+  const map = baanaMap.create(), run = createBaanaRun({ ...baanaMap.runner, random: () => .6 });
   assert.equal(map.mode, 'runner'); assert.equal(map.canStandAt(0, 0, .736), true);
   assert.equal(map.pickupCapacity('medkit'), 0);
   const meshCount = () => { let count = 0; map.root.traverse(node => { if (node.isMesh) count++; }); return count; };
   const initialCount = meshCount();
-  assert.ok(initialCount < 200, 'Only shared templates are built before traffic appears');
+  const templates = map.root.getObjectByName('Baana traffic templates');
+  const maxModelMeshes = Math.max(...templates.children.map(template => {
+    let count = 0; template.traverse(node => { if (node.isMesh) count++; }); return count;
+  }));
   for (let i = 0; i < 100; i++) { run.update(.5); map.updateRunner(run.state); }
-  assert.ok(meshCount() <= initialCount + TRAFFIC_CAPACITY * 3, 'Traffic variants stay bounded by active slots');
+  assert.ok(meshCount() <= initialCount + TRAFFIC_CAPACITY * maxModelMeshes, 'Traffic variants stay bounded by active slots');
   const pool = map.root.children.filter(node => node.name === 'Baana traffic');
   assert.equal(pool.length, TRAFFIC_CAPACITY);
   assert.equal(pool.filter(node => node.visible).length, run.state.traffic.length);
-  const templates = map.root.getObjectByName('Baana traffic templates');
-  assert.deepEqual(templates.children.map(node => node.name).filter(Boolean).sort(), ['blue bike', 'blue scooter', 'cameo marin', 'cameo orpo', 'cameo purra', 'cameo stubb', 'green bike', 'green scooter', 'red bike', 'red scooter', 'roadwork barrier', 'roadwork cone', 'roadwork tractor', 'roadwork trench']);
+  assert.deepEqual(templates.children.map(node => node.name).filter(Boolean).sort(), [
+    ...CAMEO_KINDS.map(kind => 'cameo ' + kind),
+    ...['blue', 'green', 'red'].flatMap(color => [color + ' bike', color + ' scooter']),
+    ...['barrier', 'cone', 'tractor', 'trench'].map(kind => 'roadwork ' + kind),
+  ].sort());
   assert.ok(pool.every(object => object.children.length <= 1));
   for (const object of pool.filter(node => node.visible)) assert.equal(object.children.length, 1);
   const sections = map.root.children.filter(node => node.name === 'Baana cutting section');
@@ -41,7 +48,7 @@ test('switching between runner and arena disposes shared traffic resources once 
   world.activate('baana'); const root = scene.children[0], resources = new Set(), disposals = new Map();
   root.traverse(node => {
     if (node.geometry) resources.add(node.geometry);
-    if (node.material) resources.add(node.material);
+    for (const material of [node.material].flat().filter(Boolean)) resources.add(material);
   });
   for (const resource of resources) resource.addEventListener('dispose', () => disposals.set(resource, (disposals.get(resource) ?? 0) + 1));
   world.activate('harbor'); assert.equal(world.mode, 'arena'); assert.equal(root.parent, null);

@@ -17,7 +17,7 @@ const { maps, mapOrder } = await import('../maps/index.js');
 const { createMapManager } = await import('../world/map-manager.js');
 const { createCampaign, createWaveDirector } = await import('../waves.js');
 const { createMedkits } = await import('../medkits.js');
-const { isCameo } = await import('../runner/cameo-roster.js');
+const { CAMEO_KINDS, isCameo } = await import('../runner/cameo-roster.js');
 const { createRunnerRun, TRAFFIC_CAPACITY, TRAM_LANES, trafficProfile } = await import('../runner/course.js');
 const seeded = seed => () => ((seed = seed * 16807 % 2147483647) - 1) / 2147483646;
 
@@ -192,9 +192,9 @@ test('the complete tram body blocks liquid and map switches release every owned 
   const root = scene.children[0], resources = new Set(), disposals = new Map();
   root.traverse(node => {
     if (node.geometry) resources.add(node.geometry);
-    if (node.material) {
-      resources.add(node.material);
-      for (const value of Object.values(node.material)) if (value?.isTexture) resources.add(value);
+    for (const material of [node.material].flat().filter(Boolean)) {
+      resources.add(material);
+      for (const value of Object.values(material)) if (value?.isTexture) resources.add(value);
     }
   });
   for (const resource of resources) resource.addEventListener('dispose', () => disposals.set(resource, (disposals.get(resource) ?? 0) + 1));
@@ -236,10 +236,10 @@ test('real frontages keep their street sides, opposite neighbours and a lower Se
   map.updateRunner({ distance: ALEKSI_LENGTH, elapsed: 50, traffic: [], crossings: [] });
   assert.ok(ferry.getWorldPosition(new THREE.Vector3()).z < -50, 'The finish still looks across a quay and sea');
   const cameoGeometries = new Set();
-  for (const kind of ['purra', 'orpo', 'marin', 'stubb']) map.root.getObjectByName(`cameo ${kind}`).traverse(node => { if (node.geometry) cameoGeometries.add(node.geometry); });
+  for (const kind of CAMEO_KINDS) map.root.getObjectByName(`cameo ${kind}`).traverse(node => { if (node.geometry) cameoGeometries.add(node.geometry); });
   const geometries = new Set(); map.root.traverse(node => { if (node.geometry && !cameoGeometries.has(node.geometry)) geometries.add(node.geometry); });
   assert.ok([...geometries].reduce((sum, geometry) => sum + geometry.attributes.position.count, 0) <= 563701, 'Landmark detail stays within the previous street geometry budget');
-  assert.ok([...cameoGeometries].reduce((sum, geometry) => sum + geometry.attributes.position.count, 0) < 44000, 'Detailed portrait faces stay within the four-character geometry budget');
+  assert.ok([...cameoGeometries].reduce((sum, geometry) => sum + geometry.attributes.position.count, 0) < 310000, 'The full roster fits its 3D geometry budget');
   map.dispose();
 });
 

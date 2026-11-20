@@ -55,79 +55,55 @@ test('both runner maps vary the roadside roster across seeds and agree across fr
   }
 });
 
-test('all four photo heads switch direction, open the jaw in a run and close it at rest', () => {
+test('every 3D head keeps its volume under rotation and animates the jaw only while running', () => {
+  const ray = new THREE.Raycaster();
   for (const kind of CAMEO_KINDS) {
-    const model = createCameoModel(kind), head = model.getObjectByName('Photo head');
-    const photos = head.children.map(frame => {
-      const [upper, jaw] = frame.children;
-      assert.ok(upper.geometry.index.count > 0);
-      if (frame.name === 'rear') assert.equal(jaw, undefined);
-      else {
-        assert.equal(upper.material.map, jaw.material.map, 'Both pieces use the same photograph');
-        assert.ok(jaw.geometry.index.count > 0);
-      }
-      return upper.material.map;
+    const model = createCameoModel(kind);
+    const head = model.getObjectByName('3D head');
+    const face = head.getObjectByName('Continuous face and lips');
+    assert.equal(model.userData.style, 'sculpted-3d');
+    head.traverse(node => {
+      if (!node.isMesh) return;
+      for (const material of [node.material].flat()) assert.equal(material.map, null, kind);
     });
-    assert.equal(new Set(photos).size, 5);
-    assert.equal(model.userData.style, 'photo-cutout');
-    try {
-      // These geometry checks run without a DOM or image decoder.
-      for (const texture of photos) texture.image = { width: 1, height: 1 };
-      for (const [yaw, direction] of [[0, 'front'], [.55, 'quarter'], [1.3, 'left'], [-1.3, 'right']]) {
-        assert.equal(animateCameo(model, .1, true, yaw), direction);
-        assert.equal(head.rotation.y, yaw);
-        const active = head.children.filter(frame => frame.visible);
-        assert.deepEqual(active.map(frame => frame.name), [direction]);
-        assert.ok(active[0].getObjectByName('Lower jaw').position.y < -.05);
-        assert.equal(active[0].getObjectByName('Upper photo').position.y, 0);
-        animateCameo(model, .1, false, yaw);
-        assert.ok(active[0].getObjectByName('Lower jaw').position.y === 0);
-      }
-      assert.equal(animateCameo(model, .1, true, Math.PI), 'rear');
-      assert.equal(head.visible, true);
-      assert.deepEqual(head.children.filter(frame => frame.visible).map(frame => frame.name), ['rear']);
-    } finally {
-      for (const texture of photos) texture.image = null;
-      disposeObject(model);
+    const position = face.geometry.attributes.position;
+    const opened = face.geometry.morphAttributes.position[0];
+    assert.equal(opened.count, position.count);
+    assert.ok(opened.getY(14) < position.getY(14), kind + ' lowers the lower lip');
+    assert.equal(opened.getY(10), position.getY(10), kind + ' leaves the forehead at rest');
+    for (const yaw of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
+      model.rotation.y = yaw;
+      assert.equal(animateCameo(model, .16, true), 'sculpted-3d');
+      assert.ok(face.morphTargetInfluences[0] > .9);
+      model.updateMatrixWorld(true);
+      const centre = head.getWorldPosition(new THREE.Vector3());
+      ray.set(centre.clone().add(new THREE.Vector3(0, .12, 2)), new THREE.Vector3(0, 0, -1));
+      const front = ray.intersectObject(head)[0];
+      ray.set(centre.clone().add(new THREE.Vector3(0, .12, -2)), new THREE.Vector3(0, 0, 1));
+      const back = ray.intersectObject(head)[0];
+      assert.ok(front && back && front.point.z - back.point.z > .3, kind + ' has depth at ' + yaw);
+      animateCameo(model, .16, false);
+      assert.equal(face.morphTargetInfluences[0], 0);
+      animateCameo(model, .16, true, 0, true);
+      assert.equal(face.morphTargetInfluences[0], 0);
     }
+    disposeObject(model);
   }
 });
 
-test('the photo stays over the center of the jacket as each cameo turns and runs', () => {
-  const ray = new THREE.Raycaster(), origin = new THREE.Vector3(), direction = new THREE.Vector3();
+test('the 3D head, neck and jacket overlap through the running cycle', () => {
   for (const kind of CAMEO_KINDS) {
-    const model = createCameoModel(kind);
-    const head = model.getObjectByName('Photo head');
-    const jacket = model.children[0];
-    const textures = head.children.map(frame => frame.children[0].material.map);
-    try {
-      for (const texture of textures) texture.image = { width: 1, height: 1 };
-      for (const angle of [0, 14, 16, 32, 33, 42, 46, 48, 75, 81, 90, 108, 119, 121, 135, 180]) {
-        for (const sign of [-1, 1]) for (const time of [0, .08, .48]) {
-          const yaw = THREE.MathUtils.degToRad(angle * sign);
-          model.rotation.y = yaw;
-          const frameName = animateCameo(model, time, time !== 0, -yaw);
-          model.updateMatrixWorld(true);
-          const pieces = head.getObjectByName(frameName).children.filter(piece => piece.visible);
-          // Sample through the collar from eye level and from an elevated game camera.
-          const collar = kind === 'orpo' ? 2.015 : 2.145;
-          const y = model.position.y + collar * model.scale.y;
-          for (const slope of [0, .22, .64]) {
-            direction.set(0, -slope, -1).normalize();
-            let overlap = 0;
-            for (const x of [-.08, 0, .08]) {
-              ray.set(origin.set(x, y + 6 * slope, 6), direction);
-              const [photo] = ray.intersectObjects(pieces, false);
-              if (photo && ray.intersectObject(jacket).some(hit => hit.distance > photo.distance)) overlap++;
-            }
-            assert.ok(overlap >= 2, `${kind} ${frameName} at ${angle * sign}°, gait ${time}, slope ${slope}`);
-          }
-        }
-      }
-    } finally {
-      for (const texture of textures) texture.image = null;
-      disposeObject(model);
+    const model = createCameoModel(kind), [jacket, neck] = model.children;
+    const head = model.getObjectByName('3D head');
+    for (const yaw of [0, Math.PI / 2, Math.PI]) for (const gait of [0, .16, .48]) {
+      model.rotation.y = yaw;
+      animateCameo(model, gait, gait > 0);
+      model.updateMatrixWorld(true);
+      const neckBounds = new THREE.Box3().setFromObject(neck);
+      assert.ok(neckBounds.intersectsBox(new THREE.Box3().setFromObject(jacket)), kind + ' neck connects to the jacket');
+      assert.ok(neckBounds.intersectsBox(new THREE.Box3().setFromObject(head)), kind + ' head connects to the neck');
     }
+    disposeObject(model);
   }
 });
 
@@ -244,6 +220,12 @@ test('pooled cameo animates without new resources, keeps hit flashes local and r
   state.traffic[0] = { ...state.traffic[1], id: 3 }; renderer.update(state);
   assert.equal(slots[0].children[0].name, 'red bike');
   assert.equal(slots[0].children[0].position.y, 0);
+  const survivingBike = slots[1].children[0];
+  state.traffic.shift();
+  renderer.update(state);
+  assert.equal(slots[0].visible, false);
+  assert.equal(slots[1].visible, true);
+  assert.equal(slots[1].children[0], survivingBike);
   const disposals = new Map();
   for (const resource of resources) resource.addEventListener('dispose', () => disposals.set(resource, (disposals.get(resource) ?? 0) + 1));
   disposeObject(root);
@@ -251,24 +233,19 @@ test('pooled cameo animates without new resources, keeps hit flashes local and r
   assert.ok([...disposals.values()].every(count => count === 1));
 });
 
-test('all four models fit their traffic silhouette, have no labels and connect hips to animated legs', () => {
+test('all models fit their traffic silhouette, have no labels and connect hips to animated legs', () => {
   for (const kind of CAMEO_KINDS) {
     const model = createCameoModel(kind);
     model.updateMatrixWorld(true);
     const bounds = new THREE.Box3().setFromObject(model);
-    assert.ok(bounds.max.y < (kind === 'stubb' ? 3.65 : 3.3), 'No overhead nameplate remains');
+    assert.ok(bounds.max.y < 3.55, kind + ' has no geometry above the head');
     assert.ok(bounds.max.x < .7 && bounds.min.x > -.7);
-    if (kind === 'orpo' || kind === 'stubb') {
-      const head = model.getObjectByName('Photo head'), photoBounds = new THREE.Box3();
-      const frontTop = photoBounds.setFromObject(head.getObjectByName('front')).max.y;
-      const rearTop = photoBounds.setFromObject(head.getObjectByName('rear')).max.y;
-      assert.ok(Math.abs(frontTop - rearTop) < .16, `${kind}'s crown stays at a similar height from the rear`);
-    }
     const leg = model.children.find(node => node.userData.stride);
     const body = model.children[0];
     const bodyBounds = new THREE.Box3().setFromObject(body), legBounds = new THREE.Box3().setFromObject(leg);
     assert.ok(legBounds.max.y >= bodyBounds.min.y, 'Hips and thighs overlap rather than float apart');
     assert.ok(leg.children.some(node => node.userData.knee));
     assert.equal(model.userData.character, kind);
+    disposeObject(model);
   }
 });

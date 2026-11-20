@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { createSceneryModel } from '../maps/scenery-model.js';
-import { animateCameoHead, createCameoHead, createCameoNeck } from './cameo-heads.js';
+import { animateCameoHead, createCameoHead, createCameoNeck } from './cameo-caricatures.js';
 
 import { CAMEO_LOOKS as LOOKS } from './cameo-roster.js';
 

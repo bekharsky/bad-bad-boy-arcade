@@ -1,12 +1,12 @@
 import * as THREE from 'three';
 import { createBody } from './models.js';
-import { PURRA_FRAMES } from '../../assets/cameos/purra-frames.js';
-import { aimPhotoHead, animatePhotoJaw, createSplitPhotoHead, photoDirection, PHOTO_HEAD_Y } from '../../runner/cameo-photo-head.js';
-import front from '../../assets/cameos/purra-front.webp';
-import quarter from '../../assets/cameos/purra-quarter.webp';
-import right from '../../assets/cameos/purra-right.webp';
-import left from '../../assets/cameos/purra-left.webp';
-import rear from '../../assets/cameos/purra-rear.webp';
+import { PURRA_FRAMES } from '../photo-cameos/assets/purra-frames.js';
+import { aimPhotoHead, animatePhotoJaw, createSplitPhotoHead, photoDirection, PHOTO_HEAD_Y } from '../photo-cameos/cameo-photo-head.js';
+import front from '../photo-cameos/assets/purra-front.webp';
+import quarter from '../photo-cameos/assets/purra-quarter.webp';
+import right from '../photo-cameos/assets/purra-right.webp';
+import left from '../photo-cameos/assets/purra-left.webp';
+import rear from '../photo-cameos/assets/purra-rear.webp';
 
 export async function createPhotoPurra() {
   const root = createBody({ neck: false });
