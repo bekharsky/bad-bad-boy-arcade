@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { createSceneryModel as model, destination } from './scenery-model.js';
 import { overlaps } from '../world/navigation.js';
 
-export function createTram(scene, { z: routeZ = 0, display: destinationText = '9  JÄTKÄSAARI', extent = 37, initialWait = 8, returnWait = 22, returnJitter = 12 } = {}) {
+export function createTram(scene, { z: routeZ = 0, display: destinationText = '9  JÄTKÄSAARI', extent = 37, initialWait = 8 } = {}) {
   const tram = model('Helsinki tram');
   const { box } = tram;
   const green = '#26734a', yellow = '#edc74f', glass = '#294b50';
@@ -83,7 +83,7 @@ export function createTram(scene, { z: routeZ = 0, display: destinationText = '9
     if (Math.abs(nextX) > extent) {
       root.visible = false;
       direction *= -1;
-      wait = returnWait + Math.random() * returnJitter;
+      wait = 8 + Math.random() * 4;
     }
     return departed;
   }

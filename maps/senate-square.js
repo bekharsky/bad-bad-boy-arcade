@@ -15,6 +15,15 @@ export const senateSquareMap = {
   name: 'Senate Square',
   spawn: { x: -5.5, z: 6.8, heading: Math.PI },
   bounds: { minX: -34, maxX: 34, minZ: -19.5, maxZ: 34 },
+  // Each walk starts behind a building and leads into the starting square.
+  pedestrianRoutes: [
+    [[-11, 23], [-9, 12], [-8, 11], [-9, 5], [-11, 1]],
+    [[-1, 23], [-1, 21], [-8, 11], [-9, 6], [-11, 2]],
+    [[-1, -9], [-5, -9], [-6, 2], [-8.5, 5], [-9, 10]],
+    [[-11, 26], [-11, 14], [-8, 11], [-9, 5], [-11, 1]],
+    [[-1, 26], [-1, 21], [-8, 11], [-9, 6], [-12, 1]],
+    [[2, -9], [-5, -9], [-6, 2], [-8.5, 5], [-9, 11]],
+  ],
   pickups: {
     medkit: [{ x: -8, z: -3 }, hidden(-32.3, -7), hidden(32.3, -8), hidden(-17, 31), hidden(7, 31)],
     battery: [hidden(-32.3, 5), hidden(32.3, 5), hidden(-6, 31), hidden(20, 31)],

@@ -55,9 +55,8 @@ test('fast movement and knockback cannot tunnel through walls and still slide', 
   assert.ok(actor.x < 0, 'An embedded actor can escape');
 });
 
-test('fleeing follows increasing route distance and turns along walls and map edges', () => {
+test('fleeing from a fixed impact turns along walls and map edges without a player route', () => {
   const nav = createNavigation({ bounds, colliders: [{ minX: 4, maxX: 5, minZ: -2, maxZ: 2, height: 3 }] });
-  nav.routeTo(0, 0);
   assert.ok(nav.flee(2, 0, 0, 0, Math.PI / 2).x > 0, 'The chosen direction leads away from the player');
   const actor = { x: 3.35, z: 0 };
   let heading = Math.PI / 2;

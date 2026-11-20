@@ -24,6 +24,7 @@ export function createMap(definition, build) {
       mode: definition.mode ?? 'arena',
       runner: definition.runner,
       spawn: definition.spawn,
+      pedestrianRoutes: definition.pedestrianRoutes ?? [],
       root,
       pickupCapacity(kind) { return definition.pickups?.[kind]?.length ?? 0; },
       pickupPoints(kind, radius) {

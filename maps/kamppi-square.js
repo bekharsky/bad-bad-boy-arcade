@@ -15,6 +15,14 @@ export const kamppiSquareMap = {
   name: 'Kamppi · Narinkkatori',
   spawn: { x: -5.5, z: 7.5, heading: Math.PI },
   bounds: { minX: -43, maxX: 43, minZ: -43, maxZ: 68.5 },
+  // Each walk starts behind a building and leads into the starting square.
+  pedestrianRoutes: [
+    [[-16, 12], [-13, 8], [-10, 7], [-6, 4], [2, 3.5]],
+    [[5, 12], [2, 8], [-1, 6], [-4, 3], [-9, 2]],
+    [[-22, 12], [-16, 11], [-10, 7], [-7, 4], [-2, 0.5]],
+    [[11, 12], [6, 9], [-1, 6], [-3, 4], [-7, 2]],
+    [[-21, 15], [-21, 14], [-10, 7], [-5, 4], [0, 3]],
+  ],
   pickups: {
     medkit: [{ x: -2, z: 6 }, hidden(-12, -39), hidden(-38, 8), hidden(25, 27), hidden(-5, 57.5)],
     battery: [hidden(12, -39), hidden(-38, 4.5), hidden(-15, 26), hidden(18, 57.5)],

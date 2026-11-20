@@ -173,7 +173,7 @@ scene.add(player.root);
 
 function hitEnemy(enemy, direction, impact) {
   if (enemy.kind === 'gull') { seagulls.repel(enemy); return; }
-  if (enemy.civilian) { arenaCameos.splash(enemy); return; }
+  if (enemy.civilian) { arenaCameos.splash(enemy, direction); return; }
   if (isRunner()) {
     if (runnerSession.sprayHit(enemy.id, impact)) {
       burst(enemy.x, enemy.hitHeight, enemy.z, 0xffd34e, 20, null, 3);
@@ -415,7 +415,7 @@ function applyWave(plan) {
     updateHealth();
     world.reset();
     placePlayerAtSpawn();
-    arenaCameos.reset(player, camera.position);
+    arenaCameos.reset(camera.position);
     seagulls.reset(player, isRunner());
     medkits.reset(player);
     if (!isRunner()) batteries.reset(player);

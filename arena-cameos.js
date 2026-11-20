@@ -30,23 +30,19 @@ export function createArenaCameos(scene, world, random = Math.random) {
     animateCameo(actor.model, actor.gait, moving, viewerYaw, moving && !actor.fleeing);
   }
 
-  function reset(player, viewPosition) {
+  function reset(viewPosition) {
     clear();
     if (disposed || world.mode === 'runner') return;
-    world.routeTo(player.x, player.z);
     const available = [...pool];
-    const count = Math.min(4, available.length);
+    const routes = [...world.pedestrianRoutes];
+    const count = Math.min(4, available.length, routes.length);
     for (let index = 0; index < count; index++) {
-      let point = null;
-      for (let attempt = 0; attempt < 8; attempt++) {
-        const candidate = world.spawnPoint(player, index + attempt * .3, count);
-        if (candidate && actors.every(other => Math.hypot(candidate.x - other.x, candidate.z - other.z) > 1.5)) { point = candidate; break; }
-      }
-      if (!point) continue;
+      const [route] = routes.splice(Math.floor(random() * routes.length), 1);
       const [actor] = available.splice(Math.floor(random() * available.length), 1);
-      const heading = Math.atan2(point.x - player.x, point.z - player.z) + (random() < .5 ? -1 : 1) * Math.PI / 2;
-      Object.assign(actor, point, { alive: true, fleeing: false, panic: 0, flash: 0, decision: 0, gait: index * .7, nextJetHit: 0, age: -index * .18,
-        heading, strollHeading: heading, direction: { x: 0, z: 0 } });
+      const [[x, z], [nextX, nextZ]] = route;
+      const heading = Math.atan2(nextX - x, nextZ - z);
+      Object.assign(actor, { x, z, alive: true, fleeing: false, panic: 0, flash: 0, decision: 0, gait: index * .7, nextJetHit: 0,
+        age: -index * .6, heading, route, waypoint: 1, escapeFrom: null, direction: { x: 0, z: 0 } });
       actor.root.visible = true; actor.root.position.set(actor.x, 0, actor.z); actor.root.rotation.y = actor.heading;
       showCameo(actor.model, actor.materials, actor.age, 0);
       pose(actor, false, viewPosition);
@@ -54,30 +50,39 @@ export function createArenaCameos(scene, world, random = Math.random) {
     }
   }
 
+  function walk(actor, player, dt) {
+    const next = actor.route[actor.waypoint];
+    if (!next) return;
+    const dx = next[0] - actor.x, dz = next[1] - actor.z;
+    const distance = Math.hypot(dx, dz);
+    const fraction = distance > 0 ? Math.min(1, 1.3 * dt / distance) : 0;
+    // Give the player room to cross the route. Resume the walk once it clears.
+    const separation = Math.hypot(actor.x - player.x, actor.z - player.z);
+    const nextSeparation = Math.hypot(actor.x + dx * fraction - player.x, actor.z + dz * fraction - player.z);
+    if (nextSeparation >= separation || nextSeparation > actor.size + player.radius + .22) {
+      world.move(actor, dx * fraction, dz * fraction, actor.size);
+    }
+    if (Math.hypot(next[0] - actor.x, next[1] - actor.z) < .05) actor.waypoint++;
+  }
+
   function update(dt, player, viewPosition) {
     if (dt <= 0 || disposed || !actors.length) return;
-    world.routeTo(player.x, player.z);
     for (const actor of actors) {
       actor.age += dt;
+      if (actor.age <= 0) continue;
       actor.panic = Math.max(0, actor.panic - dt); actor.flash = Math.max(0, actor.flash - dt);
-      const distance = Math.hypot(actor.x - player.x, actor.z - player.z);
-      actor.fleeing = actor.panic > 0 || distance < (actor.fleeing ? 5 : 3.5);
+      actor.fleeing = actor.panic > 0;
       actor.decision -= dt;
       if (actor.fleeing && actor.decision <= 0) {
-        actor.direction = world.flee(actor.x, actor.z, player.x, player.z, actor.heading);
+        actor.direction = world.flee(actor.x, actor.z, actor.escapeFrom.x, actor.escapeFrom.z, actor.heading);
         actor.decision = .18;
       }
       const oldX = actor.x, oldZ = actor.z;
       if (actor.fleeing) {
-        const speed = actor.speed * (actor.panic > 0 ? 1.15 : 1);
+        const speed = actor.speed * 1.15;
         world.move(actor, actor.direction.x * speed * dt, actor.direction.z * speed * dt, actor.size);
       } else {
-        const dx = Math.sin(actor.strollHeading) * 1.3 * dt;
-        const dz = Math.cos(actor.strollHeading) * 1.3 * dt;
-        world.move(actor, dx, dz, actor.size);
-        if (Math.hypot(actor.x - player.x, actor.z - player.z) < distance) {
-          actor.x = oldX; actor.z = oldZ;
-        }
+        walk(actor, player, dt);
       }
       const moved = Math.hypot(actor.x - oldX, actor.z - oldZ);
       if (moved > 1e-6) {
@@ -93,8 +98,12 @@ export function createArenaCameos(scene, world, random = Math.random) {
 
   return {
     actors, reset, clear, update,
-    splash(actor) {
+    splash(actor, direction) {
       if (!actor.alive || !actors.includes(actor)) return false;
+      const heading = direction && Math.hypot(direction.x, direction.z) > .01
+        ? Math.atan2(direction.x, direction.z) : actor.heading;
+      actor.escapeFrom = { x: actor.x - 4 * Math.sin(heading), z: actor.z - 4 * Math.cos(heading) };
+      actor.waypoint = actor.route.length;
       actor.panic = 1.5; actor.flash = .18; actor.decision = 0;
       return true;
     },

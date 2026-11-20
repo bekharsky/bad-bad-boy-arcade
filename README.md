@@ -10,7 +10,7 @@ Fight your way through **West Harbor**, **Kamppi** and **Senate Square**. Clear 
 
 Between the squares, race down **Baana** and **Aleksanterinkatu**. Change lanes to slip past cyclists, scooters, roadworks and trams; spray a path through the moving traffic. The route changes with every run, and your score carries into the next district.
 
-**Riikka Purra**, **Petteri Orpo**, **Sanna Marin**, **Alexander Stubb**, **Vladimir Putin**, **Donald Trump**, **Emmanuel Macron**, **Friedrich Merz**, **Marine Le Pen**, **Volodymyr Zelenskyy** and **Ramzan Kadyrov** appear as random passers-by. On the squares they stroll and move away as you approach. On both running routes they walk alongside the outer lanes. A splash sends them running away. They deal no damage and play no part in scoring or wave completion. Each model has a sculpted head, volumetric hair and an animated lower jaw.
+**Riikka Purra**, **Petteri Orpo**, **Sanna Marin**, **Alexander Stubb**, **Vladimir Putin**, **Donald Trump**, **Emmanuel Macron**, **Friedrich Merz**, **Marine Le Pen**, **Volodymyr Zelenskyy** and **Ramzan Kadyrov** appear as random passers-by. On the squares they emerge from behind buildings and follow pedestrian routes into the plaza. On both running routes they walk alongside the outer lanes. A splash sends them running away. They deal no damage and play no part in scoring or wave completion. Each model has a sculpted head, volumetric hair and an animated lower jaw.
 
 The city is an affectionate arcade version of Helsinki: a ferry and cranes at the harbour, market stalls and landmark façades along Aleksanterinkatu, the Chapel of Silence in Kamppi, and the cathedral above Senate Square. Look for the little details in the houses and the playful trees along the way.
 

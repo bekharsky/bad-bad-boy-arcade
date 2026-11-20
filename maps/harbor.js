@@ -17,6 +17,14 @@ export const harborMap = {
   environment: { background: new THREE.Color('#376b7c'), fog: null },
   spawn: { x: -5, z: 7, heading: Math.PI / 2 },
   bounds: { minX: -27.8, maxX: 27.8, minZ: -27.8, maxZ: 27.8 },
+  // Each walk starts behind a building and leads into the starting square.
+  pedestrianRoutes: [
+    [[-12, 2], [-9, 3], [-8, 4], [-2, 3], [3, 2]],
+    [[-16, -1], [-12, 0], [-8, 4], [-3, 3.6], [4, 4]],
+    [[-5, 18], [-5, 16], [-7, 11], [-7.5, 7], [-8.5, 4]],
+    [[4, 18], [-3, 11], [-2, 7], [-1, 3.5], [3, 1]],
+    [[-8, 18], [-5, 18], [-5, 16], [-7, 11], [-7.5, 7.5], [-9, 5]],
+  ],
   pickups: {
     medkit: [{ x: 3.5, z: 9.5 }, ...courtyards.slice(0, 4).map(hiddenPoint)],
     battery: courtyards.slice(4).map(hiddenPoint),
@@ -339,7 +347,7 @@ function buildHarbor(scene) {
     part('cylinder', '#334b52', x, .15, -28.45, .24, .3, .24);
     part('box', '#334b52', x, .31, -28.45, .4, .08, .15);
   }
-  const tram = createTram(scene, { z: BOULEVARD_Z, returnWait: 8, returnJitter: 4 });
+  const tram = createTram(scene, { z: BOULEVARD_Z });
   const harbor = createHarbor(scene);
   for (const x of [-26, 9, 26]) obstacle(x, -26.6, 1.7, .85, 5.4);
 

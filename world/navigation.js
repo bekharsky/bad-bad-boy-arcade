@@ -110,19 +110,17 @@ export function createNavigation({ bounds, colliders = [], dynamicColliders = ()
     return { x: p.x - x, z: p.z - z };
   }
   function flee(x, z, tx, tz, heading = 0) {
-    const away = Math.atan2(x - tx, z - tz), here = distances[cell(x, z)];
+    const away = Math.atan2(x - tx, z - tz);
     const distance = Math.hypot(x - tx, z - tz);
-    // Reuse the player's flood field in reverse. Local clearance probes let
-    // civilians turn along walls instead of running straight into them.
+    // Local clearance probes let civilians turn along walls while moving away
+    // from the impact, independently of the enemies' route to the player.
     for (const reach of [1.3, .5]) {
       let best = -Infinity, direction = null;
       for (let i = 0; i < 16; i++) {
         const angle = away + i * Math.PI / 8, dx = Math.sin(angle), dz = Math.cos(angle);
         const nx = x + dx * reach, nz = z + dz * reach;
         if (!lineClear(x, z, nx, nz, .55)) continue;
-        const route = distances[cell(nx, nz)];
-        if (route < 0) continue;
-        const score = (route - here) * .35 + (Math.hypot(nx - tx, nz - tz) - distance) * 1.4
+        const score = (Math.hypot(nx - tx, nz - tz) - distance) * 1.4
           + Math.cos(angle - heading) * .35;
         if (score > best) { best = score; direction = { x: dx, z: dz }; }
       }
