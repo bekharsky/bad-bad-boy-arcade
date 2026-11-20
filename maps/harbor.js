@@ -5,7 +5,6 @@ import { createSceneryModel } from './scenery-model.js';
 import { addFacadeDetails, addPitchedRoof } from './facade-details.js';
 import { addTree } from './vegetation.js';
 import { createMap } from '../world/map.js';
-import { overlaps } from '../world/navigation.js';
 
 const STOREY_HEIGHT = 1.15;
 const BOULEVARD_Z = -5;
@@ -18,6 +17,14 @@ export const harborMap = {
   environment: { background: new THREE.Color('#376b7c'), fog: null },
   spawn: { x: -5, z: 7, heading: Math.PI / 2 },
   bounds: { minX: -27.8, maxX: 27.8, minZ: -27.8, maxZ: 27.8 },
+  // Each walk starts behind a building and leads into the starting square.
+  pedestrianRoutes: [
+    [[-12, 2], [-9, 3], [-8, 4], [-2, 3], [3, 2]],
+    [[-16, -1], [-12, 0], [-8, 4], [-3, 3.6], [4, 4]],
+    [[-5, 18], [-5, 16], [-7, 11], [-7.5, 7], [-8.5, 4]],
+    [[4, 18], [-3, 11], [-2, 7], [-1, 3.5], [3, 1]],
+    [[-8, 18], [-5, 18], [-5, 16], [-7, 11], [-7.5, 7.5], [-9, 5]],
+  ],
   pickups: {
     medkit: [{ x: 3.5, z: 9.5 }, ...courtyards.slice(0, 4).map(hiddenPoint)],
     battery: courtyards.slice(4).map(hiddenPoint),
@@ -368,24 +375,7 @@ function buildHarbor(scene) {
     update(dt, entities, navigation) {
       sceneryTime += dt;
       harbor.update(sceneryTime);
-      const departed = tram.update(dt);
-      if (tram.root.visible) {
-        for (const entity of entities) {
-          if (entity.alive === false) continue;
-          const radius = entity.radius ?? entity.size;
-          if (!overlaps(tram.collider, entity.x, entity.z, radius)) continue;
-          // Push onto a clear side of the boulevard without crossing a building.
-          const side = entity.z >= BOULEVARD_Z ? 1 : -1;
-          for (const direction of [side, -side]) {
-            const z = direction > 0 ? tram.collider.maxZ + radius + .08 : tram.collider.minZ - radius - .08;
-            if (navigation.canStandAt(entity.x, z, radius)) {
-              entity.z = z;
-              entity.root.position.set(entity.x, 0, entity.z);
-              break;
-            }
-          }
-        }
-      }
+      const departed = tram.update(dt, entities, navigation);
       const occupiedCell = tram.root.visible ? Math.floor(tram.root.position.x) : null;
       if (occupiedCell !== tramCell) { tramCell = occupiedCell; navigation.refresh(); }
       return departed ? 'TRAM 9 · JÄTKÄSAARI' : null;

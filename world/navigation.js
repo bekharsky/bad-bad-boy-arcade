@@ -60,12 +60,30 @@ export function createNavigation({ bounds, colliders = [], dynamicColliders = ()
   const width = Math.ceil(bounds.maxX) - originX, depth = Math.ceil(bounds.maxZ) - originZ;
   const cells = width * depth;
   const distances = new Int32Array(cells), queue = new Uint32Array(cells), open = new Uint8Array(cells);
+  const staticOpen = new Uint8Array(cells);
+  const routeRadius = .56;
   const cell = (x, z) => clamp(Math.floor(z - originZ), 0, depth - 1) * width + clamp(Math.floor(x - originX), 0, width - 1);
   const coords = i => ({ x: i % width + originX + .5, z: Math.floor(i / width) + originZ + .5 });
   const neighbours = i => [i % width > 0 ? i - 1 : -1, i % width < width - 1 ? i + 1 : -1, i >= width ? i - width : -1, i < cells - width ? i + width : -1].filter(n => n >= 0);
   let lastCell = -1;
+  // Use the same strict edges as overlaps() when rasterizing collider bounds.
+  function closeCells(grid, collider) {
+    const minX = Math.max(0, Math.floor(collider.minX - routeRadius - originX - .5) + 1);
+    const maxX = Math.min(width - 1, Math.ceil(collider.maxX + routeRadius - originX - .5) - 1);
+    const minZ = Math.max(0, Math.floor(collider.minZ - routeRadius - originZ - .5) + 1);
+    const maxZ = Math.min(depth - 1, Math.ceil(collider.maxZ + routeRadius - originZ - .5) - 1);
+    if (minX > maxX) return;
+    for (let z = minZ; z <= maxZ; z++) grid.fill(0, z * width + minX, z * width + maxX + 1);
+  }
+  // Static scenery is fixed. Refresh only the cells under moving colliders.
+  for (let i = 0; i < cells; i++) {
+    const { x, z } = coords(i);
+    staticOpen[i] = Number(!outside(x, z, routeRadius));
+  }
+  for (const collider of colliders) closeCells(staticOpen, collider);
   function refresh() {
-    for (let i = 0; i < cells; i++) { const p = coords(i); open[i] = Number(!blocked(p.x, p.z, .56)); }
+    open.set(staticOpen);
+    for (const collider of dynamicColliders()) closeCells(open, collider);
     lastCell = -1;
     distances.fill(-1);
   }
@@ -109,6 +127,25 @@ export function createNavigation({ bounds, colliders = [], dynamicColliders = ()
     const p = next < 0 ? { x, z } : coords(next);
     return { x: p.x - x, z: p.z - z };
   }
+  function flee(x, z, tx, tz, heading = 0) {
+    const away = Math.atan2(x - tx, z - tz);
+    const distance = Math.hypot(x - tx, z - tz);
+    // Local clearance probes let civilians turn along walls while moving away
+    // from the impact, independently of the enemies' route to the player.
+    for (const reach of [1.3, .5]) {
+      let best = -Infinity, direction = null;
+      for (let i = 0; i < 16; i++) {
+        const angle = away + i * Math.PI / 8, dx = Math.sin(angle), dz = Math.cos(angle);
+        const nx = x + dx * reach, nz = z + dz * reach;
+        if (!lineClear(x, z, nx, nz, .55)) continue;
+        const score = (Math.hypot(nx - tx, nz - tz) - distance) * 1.4
+          + Math.cos(angle - heading) * .35;
+        if (score > best) { best = score; direction = { x: dx, z: dz }; }
+      }
+      if (direction) return direction;
+    }
+    return { x: 0, z: 0 };
+  }
   function spawnPoint(player, index, count) {
     for (let tries = 0; tries < 100; tries++) {
       const angle = index / count * Math.PI * 2 + tries * .41;
@@ -136,5 +173,5 @@ export function createNavigation({ bounds, colliders = [], dynamicColliders = ()
     return !blocked(x, z, radius) && distances[cell(x, z)] >= 0 ? { x, z } : null;
   }
   refresh();
-  return { move, lineClear, lineClear3D, routeTo, chase, spawnPoint, pickupPoint, refresh, canStandAt: (x, z, radius) => !blocked(x, z, radius) };
+  return { move, lineClear, lineClear3D, routeTo, chase, flee, spawnPoint, pickupPoint, refresh, canStandAt: (x, z, radius) => !blocked(x, z, radius) };
 }

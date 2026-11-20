@@ -15,6 +15,15 @@ export const senateSquareMap = {
   name: 'Senate Square',
   spawn: { x: -5.5, z: 6.8, heading: Math.PI },
   bounds: { minX: -34, maxX: 34, minZ: -19.5, maxZ: 34 },
+  // Each walk starts behind a building and leads into the starting square.
+  pedestrianRoutes: [
+    [[-11, 23], [-9, 12], [-8, 11], [-9, 5], [-11, 1]],
+    [[-1, 23], [-1, 21], [-8, 11], [-9, 6], [-11, 2]],
+    [[-1, -9], [-5, -9], [-6, 2], [-8.5, 5], [-9, 10]],
+    [[-11, 26], [-11, 14], [-8, 11], [-9, 5], [-11, 1]],
+    [[-1, 26], [-1, 21], [-8, 11], [-9, 6], [-12, 1]],
+    [[2, -9], [-5, -9], [-6, 2], [-8.5, 5], [-9, 11]],
+  ],
   pickups: {
     medkit: [{ x: -8, z: -3 }, hidden(-32.3, -7), hidden(32.3, -8), hidden(-17, 31), hidden(7, 31)],
     battery: [hidden(-32.3, 5), hidden(32.3, 5), hidden(-6, 31), hidden(20, 31)],
@@ -241,18 +250,7 @@ function buildSenateSquare(root) {
     dynamicColliders: () => tram.root.visible ? [tram.collider] : [],
     reset() { tram.reset(); tramCell = null; },
     update(dt, actors, navigation) {
-      const departed = tram.update(dt);
-      if (tram.root.visible) for (const actor of actors) {
-        if (actor.alive === false) continue;
-        const radius = actor.radius ?? actor.size;
-        if (!overlaps(tram.collider, actor.x, actor.z, radius)) continue;
-        const side = actor.z >= TRAM_Z ? 1 : -1;
-        for (const direction of [side, -side]) {
-          const z = direction > 0 ? tram.collider.maxZ + radius + .08 : tram.collider.minZ - radius - .08;
-          if (!navigation.canStandAt(actor.x, z, radius)) continue;
-          actor.z = z; actor.root.position.set(actor.x, 0, z); break;
-        }
-      }
+      const departed = tram.update(dt, actors, navigation);
       const occupied = tram.root.visible ? Math.floor(tram.root.position.x) : null;
       if (occupied !== tramCell) { tramCell = occupied; navigation.refresh(); }
       return departed ? 'TRAM 7 · SENAATINTORI' : null;

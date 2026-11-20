@@ -54,3 +54,19 @@ test('fast movement and knockback cannot tunnel through walls and still slide', 
   nav.move(actor, -1, 0, .05);
   assert.ok(actor.x < 0, 'An embedded actor can escape');
 });
+
+test('fleeing from a fixed impact turns along walls and map edges without a player route', () => {
+  const nav = createNavigation({ bounds, colliders: [{ minX: 4, maxX: 5, minZ: -2, maxZ: 2, height: 3 }] });
+  assert.ok(nav.flee(2, 0, 0, 0, Math.PI / 2).x > 0, 'The chosen direction leads away from the player');
+  const actor = { x: 3.35, z: 0 };
+  let heading = Math.PI / 2;
+  for (let i = 0; i < 180; i++) {
+    const direction = nav.flee(actor.x, actor.z, 0, 0, heading);
+    heading = Math.atan2(direction.x, direction.z);
+    nav.move(actor, direction.x * .06, direction.z * .06, .55);
+    assert.equal(nav.canStandAt(actor.x, actor.z, .55), true);
+  }
+  assert.ok(Math.hypot(actor.x, actor.z) > 6, 'A wall does not trap the civilian beside the player');
+  const edge = nav.flee(9.35, 0, 0, 0, Math.PI / 2);
+  assert.ok(Math.abs(edge.z) > .5, 'A civilian at the map edge turns sideways');
+});

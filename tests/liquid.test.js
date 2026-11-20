@@ -182,8 +182,9 @@ test('runner liquid clears approaching riders while roadwork obstacles survive a
   const { createBaanaRun, trafficProfile, riderHealth } = await import('../runner/baana-run.js');
   for (const kind of ['bike', 'scooter', 'cone', 'tractor', 'barrier', 'trench']) {
     const run = createBaanaRun();
-    const agent = { id: -1, kind, lane: 1, speed: kind === 'bike' || kind === 'scooter' ? 5.2 : 0,
-      progress: 38, hp: kind === 'bike' || kind === 'scooter' ? riderHealth(kind) : 1.5,
+    const rider = ['bike', 'scooter'].includes(kind);
+    const agent = { id: -1, kind, lane: 1, speed: rider ? 5.2 : 0,
+      progress: 38, hp: rider ? riderHealth(kind) : 1.5,
       hitHeight: trafficProfile(kind).hitHeight, size: trafficProfile(kind).size,
       x: 0, z: -38, alive: true, hit: false, passed: false };
     run.state.traffic.push(agent);
@@ -194,7 +195,6 @@ test('runner liquid clears approaching riders while roadwork obstacles survive a
       run.update(1 / 60);
       stream.update(1 / 60, true, emitter, { dx: 0, dz: -1 }, [agent]);
     }
-    const rider = kind === 'bike' || kind === 'scooter';
     assert.equal(agent.alive, !rider, kind);
     assert.equal(agent.hit, !rider, rider ? `${kind} clears before colliding` : `${kind} still collides`);
     assert.equal(run.state.cleared, rider ? 1 : 0);
@@ -202,6 +202,30 @@ test('runner liquid clears approaching riders while roadwork obstacles survive a
   }
 });
 
+
+test('runner liquid can startle either passer-by from the adjacent outer lane', async () => {
+  const { createBaanaRun, trafficProfile, riderHealth } = await import('../runner/baana-run.js');
+  for (const [kind, side] of [['zelenskyy', -1], ['kadyrov', 1]]) {
+    const run = createBaanaRun({ riderKinds: [kind], roadworkKinds: [] }), { hitHeight, size } = trafficProfile(kind);
+    const lane = side < 0 ? 0 : 2;
+    run.dodge(side);
+    const agent = { id: -1, kind, x: run.lanes[lane] + side * .85, z: -38, speed: 1.8, progress: 38,
+      hp: riderHealth(kind), hitHeight, size, alive: true, passed: false };
+    run.state.traffic.push(agent);
+    const emitter = new THREE.Object3D();
+    emitter.position.set(run.lanes[lane] + .083, 1.228, -.356);
+    const stream = createLiquidStream(new THREE.Scene(), { lineClear3D: () => true },
+      (target, direction, impact) => run.sprayHit(target.id, impact), { refraction: false });
+    for (let frame = 0; frame < 240 && !agent.passed; frame++) {
+      assert.equal(run.update(1 / 60).hits, 0);
+      stream.update(1 / 60, true, emitter, { dx: 0, dz: -1 }, [agent]);
+    }
+    assert.equal(agent.panicSide, side, kind);
+    assert.ok(Math.abs(agent.x) > 3.85);
+    assert.equal(agent.alive, true);
+    assert.equal(run.state.cleared, 0);
+  }
+});
 
 test('a brief uncharged runner spray clears bikes, but scooters survive and still cause contact damage', async () => {
   const { createBaanaRun, trafficProfile, riderHealth } = await import('../runner/baana-run.js');

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { CAMEO_KINDS } from '../runner/cameo-roster.js';
 import { createMap } from '../world/map.js';
 import { addTree } from './vegetation.js';
 import { createSceneryModel as model } from './scenery-model.js';
@@ -26,11 +27,11 @@ export function aleksiRoadSpans(from, to) {
 }
 export const aleksanterinkatuMap = {
   id: 'aleksanterinkatu', name: 'Aleksanterinkatu', mode: 'runner',
-  runner: { length: ALEKSI_LENGTH, variety: true, lanes: TRAM_LANES, tramChance: .42, tramRoute: aleksiTramRoute, roadworkKinds: [], crossingPoints: ALEKSI_CROSSINGS, startSpeed: 10.5, speedLimit: 18, acceleration: .12 },
+  runner: { length: ALEKSI_LENGTH, variety: true, cameoShoulder: 7.35, riderKinds: ['bike', 'scooter', ...CAMEO_KINDS], lanes: TRAM_LANES, tramChance: .58, tramRoute: aleksiTramRoute, roadworkKinds: [], crossingPoints: ALEKSI_CROSSINGS, startSpeed: 10.5, speedLimit: 18, acceleration: .12 },
   spawn: { x: TRAM_LANES[0], z: 0, heading: Math.PI },
   pickups: { medkit: [{ x: TRAM_LANES[0], z: -300 }] },
   bounds: { minX: -5.3, maxX: 5.3, minZ: -150, maxZ: 35 },
-  environment: { background: new THREE.Color('#9ebbc1'), fog: new THREE.Fog('#9ebbc1', 65, 165) },
+  environment: { background: new THREE.Color('#9ebbc1'), fog: new THREE.Fog('#9ebbc1', 42, 132) },
   create() { return createMap(aleksanterinkatuMap, buildAleksi); },
 };
 
@@ -157,7 +158,7 @@ function buildAleksi(root) {
     }
     return tramColliders;
   }
-  function updateRunner(state) {
+  function updateRunner(state, viewPosition) {
     if (state !== currentState) colliderTime = -1;
     currentState = state;
     city.position.z = state.distance;
@@ -183,7 +184,7 @@ function buildAleksi(root) {
         }
       }
     }
-    traffic.update(state); finish.update(state);
+    traffic.update(state, viewPosition); finish.update(state);
   }
   return { colliders: [], dynamicColliders, updateRunner, reset() { colliderTime = -1; updateRunner({ distance: 0, elapsed: 0, traffic: [], crossings: [] }); } };
 }
