@@ -18,6 +18,7 @@ globalThis.document = {
 const THREE = await import('three');
 const { harborMap } = await import('../maps/harbor.js');
 const CITY_SPAWN = harborMap.spawn;
+const { createArenaCombat } = await import('../arena-combat.js');
 const { createMedkits } = await import('../medkits.js');
 const setup = () => {
   const scene = new THREE.Scene();
@@ -74,6 +75,25 @@ test('tram pushes actors clear, blocks ground spray, and restores the crossing a
   city.reset();
   assert.equal(tram.visible, false);
   assert.equal(across(), true);
+});
+
+test('West Harbor players can draw a pack of enemies onto the tracks for one tram pass', () => {
+  const { city } = setup();
+  const player = { x: 0, z: -8, radius: .6, hp: 5, invulnerable: 0, root: new THREE.Group() };
+  const eliminated = [];
+  const enemies = [-1.5, -.5, .5, 1.5].map((x, index) => ({
+    x, z: 2.8 + index * .16, size: .47, speed: .62, attack: 0, hit: 0, alive: true, root: new THREE.Group(),
+    onTramHit(enemy) { enemy.alive = false; eliminated.push(enemy); },
+  }));
+  const combat = createArenaCombat({ world: city, player, enemies, animateEnemy() {}, onBite() {} });
+  for (let frame = 0; frame < 16 * 60; frame++) {
+    city.update(1 / 60, [player, ...enemies]);
+    combat.update(1 / 60, frame / 60);
+  }
+  assert.equal(eliminated.length, enemies.length);
+  assert.equal(new Set(eliminated).size, enemies.length);
+  assert.equal(player.hp, 5);
+  city.dispose();
 });
 
 test('all five medkits reset, four are behind houses, and full health leaves them available', () => {

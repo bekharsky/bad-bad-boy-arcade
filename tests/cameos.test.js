@@ -20,7 +20,7 @@ const seeded = seed => () => ((seed = seed * 16807 % 2147483647) - 1) / 21474836
 test('both runner maps vary the roadside roster across seeds and agree across frame rates', () => {
   for (const map of [baanaMap, aleksanterinkatuMap]) {
     const kinds = new Set(), firstKinds = new Set();
-    for (const seed of [1, 42, 819, 113, 17, 234]) {
+    for (const seed of [1, 42, 819, 113, 17, 234, 718, 2001, 5003, 9871, 16729, 50123]) {
       const sequences = [];
       for (const fps of [30, 60]) {
         const run = createRunnerRun({ ...map.runner, random: seeded(seed) });
@@ -29,10 +29,16 @@ test('both runner maps vary the roadside roster across seeds and agree across fr
           run.update(1 / fps);
           const cameos = run.state.traffic.filter(agent => isCameo(agent.kind));
           assert.ok(cameos.length <= 1);
+          if (cameos.some(agent => !agent.passed)) {
+            assert.ok(run.state.traffic.every(agent => isCameo(agent.kind) || agent.passed || agent.cleared),
+              'The cameo has an open stretch of the course');
+          }
           for (const agent of cameos) if (!seen.has(agent.id)) {
             seen.add(agent.id); appearances.push([agent.id, agent.x, agent.kind]);
             assert.equal(agent.alive, true);
             assert.equal(Math.abs(agent.x), Math.abs(run.lanes[0]) + .85);
+            assert.ok(agent.age < .08);
+            assert.ok(agent.progress - run.state.distance > (run.state.speed + agent.speed) * 1.7);
           }
         }
         assert.ok(appearances.length > 1);
@@ -179,7 +185,7 @@ test('harmless runner cameos cannot absorb the damage from a bicycle in the same
 test('pooled cameo animates without new resources, keeps hit flashes local and resets when a slot changes kind', () => {
   const root = new THREE.Group(), renderer = createRunnerTraffic(root, 'Test', baanaMap.runner);
   const state = { distance: 0, elapsed: .1, speed: 9, traffic: [
-    { id: 1, kind: 'purra', color: 'red', lane: 0, progress: 10, speed: 5, hitUntil: 1 },
+    { id: 1, kind: 'purra', color: 'red', lane: 0, progress: 10, speed: 5, hitUntil: 1, age: 0 },
     { id: 2, kind: 'bike', color: 'red', lane: 1, progress: 10, speed: 5 },
   ] };
   const resources = new Set();
@@ -188,9 +194,13 @@ test('pooled cameo animates without new resources, keeps hit flashes local and r
   const slots = root.children.filter(node => node.name === 'Test traffic');
   const cameo = slots[0].children[0], leg = cameo.getObjectByName('Purra leg -1');
   const originalRotation = leg.rotation.x;
-  assert.equal(cameo.getObjectByName('Purra body').children[0].material.emissiveIntensity, .7);
+  const coat = cameo.getObjectByName('Purra body').children[0].material;
+  assert.equal(coat.emissiveIntensity, .7);
+  assert.equal(coat.opacity, 0);
   assert.equal(slots[1].children[0].children[0].children[0].material.emissiveIntensity, 0);
-  state.elapsed = .3; renderer.update(state);
+  state.elapsed = .3; state.traffic[0].age = .6; renderer.update(state);
+  assert.equal(coat.opacity, .5);
+  assert.equal(slots[1].children[0].children[0].children[0].material.opacity, 1);
   assert.notEqual(leg.rotation.x, originalRotation);
   assert.equal(slots[0].children[0], cameo);
   root.traverse(node => { if (node.geometry) assert.ok(resources.has(node.geometry)); for (const material of [node.material].flat().filter(Boolean)) assert.ok(resources.has(material)); });

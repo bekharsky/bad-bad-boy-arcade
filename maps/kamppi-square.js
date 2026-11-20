@@ -241,18 +241,7 @@ function buildKamppi(root) {
     dynamicColliders: () => tram.root.visible ? [tram.collider] : [],
     reset() { tram.reset(); tramCell = null; },
     update(dt, actors, navigation) {
-      const departed = tram.update(dt);
-      if (tram.root.visible) for (const actor of actors) {
-        if (actor.alive === false) continue;
-        const radius = actor.radius ?? actor.size;
-        if (!overlaps(tram.collider, actor.x, actor.z, radius)) continue;
-        const side = actor.z >= TRAM_Z ? 1 : -1;
-        for (const direction of [side, -side]) {
-          const z = direction > 0 ? tram.collider.maxZ + radius + .08 : tram.collider.minZ - radius - .08;
-          if (!navigation.canStandAt(actor.x, z, radius)) continue;
-          actor.z = z; actor.root.position.set(actor.x, 0, z); break;
-        }
-      }
+      const departed = tram.update(dt, actors, navigation);
       const occupied = tram.root.visible ? Math.floor(tram.root.position.x) : null;
       if (occupied !== tramCell) { tramCell = occupied; navigation.refresh(); }
       return departed ? 'KAMPPI · MANNERHEIMINTIE' : null;

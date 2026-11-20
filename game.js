@@ -372,11 +372,16 @@ async function loadModels() {
 
 function makeEnemy(x, z, level, kind) {
   const enemy = createEnemy(kind, level);
+  enemy.onTramHit = removeEnemyByTram;
   enemy.x = x;
   enemy.z = z;
   enemy.root.position.set(x, 0, z);
   scene.add(enemy.root);
   enemies.push(enemy);
+}
+
+function removeEnemyByTram(enemy) {
+  removeEnemy(enemy, true);
 }
 
 function spawnEnemies(count, level) {
@@ -616,8 +621,11 @@ function update(dt) {
 
 function updateSpray(dt, firing, groundTargets, powered = false) {
   sprayTargets.length = 0;
-  sprayTargets.push(...groundTargets, ...seagulls.birds);
-  if (!isRunner()) sprayTargets.push(...arenaCameos.actors);
+  for (const target of groundTargets) if ((target.age ?? 1) >= .24) sprayTargets.push(target);
+  sprayTargets.push(...seagulls.birds);
+  if (!isRunner()) for (const actor of arenaCameos.actors) {
+    if (actor.age >= .24) sprayTargets.push(actor);
+  }
   const direction = sprayAim(player, seagulls.birds, aimingUp(keys, touchControls.input));
   return stream.update(dt, firing, player.rig.emitter, direction, sprayTargets, powered);
 }

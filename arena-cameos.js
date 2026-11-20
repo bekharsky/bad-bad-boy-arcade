@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { CAMEO_KINDS } from './runner/cameo-roster.js';
+import { CAMEO_KINDS, cameoGaitForDistance } from './runner/cameo-roster.js';
+import { cameoMaterials, showCameo } from './runner/cameo-appearance.js';
 import { createTrafficModel } from './runner/traffic-models.js';
 import { animateCameo } from './runner/cameo-models.js';
 import { disposeObject } from './world/dispose.js';
@@ -12,13 +13,7 @@ export function createArenaCameos(scene, world, random = Math.random) {
   const pool = CAMEO_KINDS.map((kind, index) => {
     const root = new THREE.Group(), model = createTrafficModel(kind, 'cameo');
     root.name = `Civilian: ${kind}`; root.add(model); root.visible = false; group.add(root);
-    const materials = new Set();
-    model.traverse(node => {
-      if (!node.isMesh) return;
-      for (const material of Array.isArray(node.material) ? node.material : [node.material]) {
-        if (material.emissive) materials.add(material);
-      }
-    });
+    const materials = cameoMaterials(model);
     return { kind, civilian: true, root, model, materials, size: .55, hitHeight: kind === 'stubb' ? 1.6 : 1.45, speed: 3.9 + index * .12, alive: false };
   });
   let disposed = false;
@@ -50,10 +45,10 @@ export function createArenaCameos(scene, world, random = Math.random) {
       if (!point) continue;
       const [actor] = available.splice(Math.floor(random() * available.length), 1);
       const heading = Math.atan2(point.x - player.x, point.z - player.z) + (random() < .5 ? -1 : 1) * Math.PI / 2;
-      Object.assign(actor, point, { alive: true, fleeing: false, panic: 0, flash: 0, decision: 0, gait: index * .7, nextJetHit: 0,
+      Object.assign(actor, point, { alive: true, fleeing: false, panic: 0, flash: 0, decision: 0, gait: index * .7, nextJetHit: 0, age: -index * .18,
         heading, strollHeading: heading, direction: { x: 0, z: 0 } });
       actor.root.visible = true; actor.root.position.set(actor.x, 0, actor.z); actor.root.rotation.y = actor.heading;
-      for (const material of actor.materials) { material.emissive.set('#000000'); material.emissiveIntensity = 0; }
+      showCameo(actor.model, actor.materials, actor.age, 0);
       pose(actor, false, viewPosition);
       actors.push(actor);
     }
@@ -63,6 +58,7 @@ export function createArenaCameos(scene, world, random = Math.random) {
     if (dt <= 0 || disposed || !actors.length) return;
     world.routeTo(player.x, player.z);
     for (const actor of actors) {
+      actor.age += dt;
       actor.panic = Math.max(0, actor.panic - dt); actor.flash = Math.max(0, actor.flash - dt);
       const distance = Math.hypot(actor.x - player.x, actor.z - player.z);
       actor.fleeing = actor.panic > 0 || distance < (actor.fleeing ? 5 : 3.5);
@@ -87,13 +83,11 @@ export function createArenaCameos(scene, world, random = Math.random) {
       if (moved > 1e-6) {
         const heading = Math.atan2(actor.x - oldX, actor.z - oldZ);
         actor.heading += Math.atan2(Math.sin(heading - actor.heading), Math.cos(heading - actor.heading)) * (1 - Math.exp(-12 * dt));
-        actor.gait += moved * 1.5;
+        actor.gait += cameoGaitForDistance(moved, actor.fleeing);
       }
       actor.root.position.set(actor.x, 0, actor.z); actor.root.rotation.y = actor.heading;
       pose(actor, moved > 1e-6, viewPosition);
-      for (const material of actor.materials) {
-        material.emissive.set(actor.flash > 0 ? '#ffe58c' : '#000000'); material.emissiveIntensity = actor.flash > 0 ? .45 : 0;
-      }
+      showCameo(actor.model, actor.materials, actor.age, actor.flash > 0 ? .45 : 0);
     }
   }
 

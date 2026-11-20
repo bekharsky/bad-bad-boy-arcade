@@ -28,12 +28,12 @@ test('Aleksanterinkatu replaces Esplanadi between Kamppi and Senate Square, reta
   const campaign = createCampaign(maps.map(map => map.id)), entered = [];
   const waves = createWaveDirector({ campaign, onWave: plan => entered.push(plan), onReinforcements() {} });
   waves.start();
-  for (let wave = 2; wave <= 4; wave++) waves.update(1.4, 0);
+  for (let wave = 2; wave <= 3; wave++) waves.update(1.4, 0);
   waves.completeMap();
-  for (let wave = 8; wave <= 10; wave++) waves.update(1.4, 0);
+  for (let wave = 6; wave <= 7; wave++) waves.update(1.4, 0);
   assert.equal(entered.at(-1).mapId, 'aleksanterinkatu');
   waves.completeMap();
-  assert.equal(entered.at(-1).number, 13);
+  assert.equal(entered.at(-1).number, 9);
   assert.equal(entered.at(-1).mapId, 'senate-square');
 });
 

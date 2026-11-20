@@ -161,7 +161,7 @@ export function createCameoModel(kind) {
 }
 
 export function animateCameo(root, time, moving = true, viewerYaw = 0, walking = false) {
-  const phase = time * 9, stride = moving ? Math.sin(phase) * (walking ? .58 : 1) : 0;
+  const phase = time * (walking ? 5.9 : 9), stride = moving ? Math.sin(phase) * (walking ? .85 : 1) : 0;
   const running = moving && !walking;
   root.position.y = moving ? Math.abs(Math.cos(phase)) * (walking ? .018 : .035) : 0;
   for (const part of root.children) {

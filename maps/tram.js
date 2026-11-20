@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { createSceneryModel as model, destination } from './scenery-model.js';
+import { overlaps } from '../world/navigation.js';
 
-export function createTram(scene, { z: routeZ = 0, display: destinationText = '9  JÄTKÄSAARI', extent = 37, initialWait = 8 } = {}) {
+export function createTram(scene, { z: routeZ = 0, display: destinationText = '9  JÄTKÄSAARI', extent = 37, initialWait = 8, returnWait = 22, returnJitter = 12 } = {}) {
   const tram = model('Helsinki tram');
   const { box } = tram;
   const green = '#26734a', yellow = '#edc74f', glass = '#294b50';
@@ -46,7 +47,7 @@ export function createTram(scene, { z: routeZ = 0, display: destinationText = '9
     root.position.set(-extent, 0, routeZ);
     root.visible = false;
   }
-  function update(dt) {
+  function update(dt, actors, navigation) {
     let departed = false;
     if (!root.visible) {
       wait -= dt;
@@ -54,15 +55,36 @@ export function createTram(scene, { z: routeZ = 0, display: destinationText = '9
       root.visible = true;
       root.position.x = -direction * extent;
       departed = true;
+      dt = -wait;
     }
-    root.position.x += direction * 5.2 * dt;
-    if (Math.abs(root.position.x) > extent) {
-      root.visible = false;
-      direction *= -1;
-      wait = 22 + Math.random() * 12;
-    }
+    const oldX = root.position.x;
+    const nextX = oldX + direction * 5.2 * dt;
+    root.position.x = THREE.MathUtils.clamp(nextX, -extent, extent);
     collider.minX = root.position.x - 4.75;
     collider.maxX = root.position.x + 4.75;
+    const swept = { ...collider, minX: Math.min(collider.minX, oldX - 4.75), maxX: Math.max(collider.maxX, oldX + 4.75) };
+    for (const actor of actors) {
+      if (actor.alive === false) continue;
+      const radius = actor.radius ?? actor.size;
+      if (actor.onTramHit) {
+        if (overlaps(swept, actor.x, actor.z, radius + .16)) actor.onTramHit(actor);
+        continue;
+      }
+      if (!overlaps(collider, actor.x, actor.z, radius)) continue;
+      const side = actor.z >= routeZ ? 1 : -1;
+      for (const exit of [side, -side]) {
+        const z = exit > 0 ? collider.maxZ + radius + .08 : collider.minZ - radius - .08;
+        if (!navigation.canStandAt(actor.x, z, radius)) continue;
+        actor.z = z;
+        actor.root.position.set(actor.x, 0, z);
+        break;
+      }
+    }
+    if (Math.abs(nextX) > extent) {
+      root.visible = false;
+      direction *= -1;
+      wait = returnWait + Math.random() * returnJitter;
+    }
     return departed;
   }
   reset();

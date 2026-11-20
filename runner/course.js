@@ -1,6 +1,6 @@
 import { TRAM_CAR_OFFSET } from './tram-route.js';
 import { createEncounters } from './encounters.js';
-import { CAMEO_KINDS, CAMEO_HEALTH, isCameo } from './cameo-roster.js';
+import { CAMEO_KINDS, CAMEO_HEALTH, cameoGaitForDistance, isCameo } from './cameo-roster.js';
 
 export const BAANA_LENGTH = 700;
 export const RIDER_BONUS = 50;
@@ -101,11 +101,21 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
     return false;
   }
   const choose = count => Math.min(count - 1, Math.max(0, Math.floor(random() * count)));
-  function spawnCameo() {
-    if (!cameoRiders.length || state.distance < nextCameo || state.traffic.length >= TRAFFIC_CAPACITY ||
-      state.traffic.some(agent => isCameo(agent.kind))) return;
-    const progress = state.distance + state.speed * 2.5 + 8;
-    if (progress >= length) return;
+  function reserveCameoWindow() {
+    if (!cameoRiders.length) return false;
+    const active = state.traffic.find(agent => isCameo(agent.kind));
+    if (active) return !active.passed && Math.abs(active.x) < cameoShoulder - .05;
+    if (state.distance < nextCameo) return false;
+    const approachSpeed = Math.max(state.speed, state.cruiseSpeed * .75);
+    const crossing = crossings.find(entry => entry.phase !== 'clear' && entry.progress >= state.distance - 14);
+    const room = crossing ? crossing.progress - state.distance - Math.max(24, approachSpeed * 1.55) : Infinity;
+    const lead = Math.min(room, approachSpeed * 3.2 + 7);
+    if (lead < approachSpeed * 2 + 4 || state.distance + lead >= length) return false;
+    const progress = state.distance + lead;
+    // Let the previous row pass through before granting the player an open
+    // stretch. Ordinary rows resume after the cameo has passed or run off.
+    if (state.traffic.some(agent => !agent.cleared && !agent.passed)) return true;
+    if (state.traffic.length >= TRAFFIC_CAPACITY) return true;
     if (!availableCameos.length) availableCameos.push(...cameoRiders);
     const [kind] = availableCameos.splice(choose(availableCameos.length), 1);
     const profile = trafficProfile(kind);
@@ -114,9 +124,10 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
     state.traffic.push({
       id: nextId++, kind, progress, speed: 1.8, x,
       z: state.distance - progress, size: profile.size, hitHeight: profile.hitHeight,
-      hp: riderHealth(kind), alive: true, passed: false, hitUntil: 0,
+      hp: riderHealth(kind), alive: true, passed: false, hitUntil: 0, age: 0, gait: 0,
     });
-    nextCameo = state.distance + 65 + 35 * random();
+    nextCameo = state.distance + 90 + 20 * random();
+    return true;
   }
   function resetCrossings() {
     const sides = [];
@@ -233,11 +244,11 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
         encounters.update(state.distance);
         const target = lanes[state.lane], change = target - state.x;
         state.x += Math.sign(change) * Math.min(Math.abs(change), 13 * step);
-        if (state.elapsed >= nextSpawn && state.distance < length - 65) {
+        const cameoWindow = reserveCameoWindow();
+        if (!cameoWindow && state.elapsed >= nextSpawn && state.distance < length - 65) {
           const spawned = row();
           nextSpawn = state.elapsed + (spawned ? encounters.delay(state.distance) : .15);
         }
-        spawnCameo();
         for (const crossing of crossings) {
           const gap = crossing.progress - state.distance;
           if (crossing.phase === 'approach' && gap <= state.speed * 2.5) {
@@ -277,6 +288,9 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
             traffic.progress -= traffic.speed * step;
             traffic.z = state.distance - traffic.progress;
             traffic.passed = traffic.z > 2;
+            traffic.age = (traffic.age ?? 1.2) + step;
+            traffic.gait = (traffic.gait ?? 0) + cameoGaitForDistance(
+              Math.hypot(traffic.x - oldLateral, traffic.speed * step), traffic.panicSide !== undefined);
             continue;
           }
           const oldProgress = traffic.progress;

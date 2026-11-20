@@ -5,7 +5,6 @@ import { createSceneryModel } from './scenery-model.js';
 import { addFacadeDetails, addPitchedRoof } from './facade-details.js';
 import { addTree } from './vegetation.js';
 import { createMap } from '../world/map.js';
-import { overlaps } from '../world/navigation.js';
 
 const STOREY_HEIGHT = 1.15;
 const BOULEVARD_Z = -5;
@@ -340,7 +339,7 @@ function buildHarbor(scene) {
     part('cylinder', '#334b52', x, .15, -28.45, .24, .3, .24);
     part('box', '#334b52', x, .31, -28.45, .4, .08, .15);
   }
-  const tram = createTram(scene, { z: BOULEVARD_Z });
+  const tram = createTram(scene, { z: BOULEVARD_Z, returnWait: 8, returnJitter: 4 });
   const harbor = createHarbor(scene);
   for (const x of [-26, 9, 26]) obstacle(x, -26.6, 1.7, .85, 5.4);
 
@@ -368,24 +367,7 @@ function buildHarbor(scene) {
     update(dt, entities, navigation) {
       sceneryTime += dt;
       harbor.update(sceneryTime);
-      const departed = tram.update(dt);
-      if (tram.root.visible) {
-        for (const entity of entities) {
-          if (entity.alive === false) continue;
-          const radius = entity.radius ?? entity.size;
-          if (!overlaps(tram.collider, entity.x, entity.z, radius)) continue;
-          // Push onto a clear side of the boulevard without crossing a building.
-          const side = entity.z >= BOULEVARD_Z ? 1 : -1;
-          for (const direction of [side, -side]) {
-            const z = direction > 0 ? tram.collider.maxZ + radius + .08 : tram.collider.minZ - radius - .08;
-            if (navigation.canStandAt(entity.x, z, radius)) {
-              entity.z = z;
-              entity.root.position.set(entity.x, 0, entity.z);
-              break;
-            }
-          }
-        }
-      }
+      const departed = tram.update(dt, entities, navigation);
       const occupiedCell = tram.root.visible ? Math.floor(tram.root.position.x) : null;
       if (occupiedCell !== tramCell) { tramCell = occupiedCell; navigation.refresh(); }
       return departed ? 'TRAM 9 · JÄTKÄSAARI' : null;

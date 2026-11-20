@@ -6,7 +6,7 @@ Bad Bad Boy is loose in Helsinki. Take the city's cheekiest sculpture through li
 
 ## The journey
 
-Fight your way through **West Harbor**, **Kamppi** and **Senate Square**. Barnacle geese and Spanish slugs arrive in growing waves, while seagulls circle overhead and dive when you least want them to. Find medkits tucked around the neighbourhood and Battery cans that turn your spray into a bright triple stream.
+Fight your way through **West Harbor**, **Kamppi** and **Senate Square**. Clear two waves to move on from each square. Barnacle geese and Spanish slugs pursue you across the district, so you can lure a pack onto the tracks and let the tram clear it. Seagulls circle overhead and dive when you least want them to. Find medkits tucked around the neighbourhood and Battery cans that turn your spray into a bright triple stream.
 
 Between the squares, race down **Baana** and **Aleksanterinkatu**. Change lanes to slip past cyclists, scooters, roadworks and trams; spray a path through the moving traffic. The route changes with every run, and your score carries into the next district.
 

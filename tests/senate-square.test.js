@@ -113,10 +113,10 @@ test('mobile lens shift keeps aiming aligned and resizing back restores the desk
 test('Senate Square is the fifth district and direct links preserve the new campaign order', () => {
   const campaign = createCampaign(maps.map(map => map.id));
   assert.equal(campaign.plan(1).mapId, 'harbor');
-  assert.equal(campaign.plan(4).mapId, 'baana');
-  assert.equal(campaign.plan(7).mapId, 'kamppi');
-  assert.equal(campaign.plan(10).mapId, 'aleksanterinkatu');
-  assert.equal(campaign.plan(13).mapId, 'senate-square');
+  assert.equal(campaign.plan(3).mapId, 'baana');
+  assert.equal(campaign.plan(5).mapId, 'kamppi');
+  assert.equal(campaign.plan(7).mapId, 'aleksanterinkatu');
+  assert.equal(campaign.plan(9).mapId, 'senate-square');
   assert.deepEqual(mapOrder('senate-square').map(map => map.id), ['senate-square', 'harbor', 'baana', 'kamppi', 'aleksanterinkatu']);
   assert.deepEqual(mapOrder('unknown'), maps);
   assert.equal(maps[0].id, 'harbor', 'Previewing never mutates the campaign registry');

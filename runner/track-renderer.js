@@ -4,11 +4,13 @@ import { createTrafficModel, animateTraffic } from './traffic-models.js';
 import { RUN_LANES, TRAFFIC_COLORS, TRAFFIC_CAPACITY, ROADWORK_TYPES } from './course.js';
 import { isCameo } from './cameo-roster.js';
 import { animateCameo } from './cameo-models.js';
+import { cameoMaterials, showCameo } from './cameo-appearance.js';
 
 // Geometry is shared within this map; hit-flash materials belong to each slot.
 export function createRunnerTraffic(root, name, { riderKinds = ['bike', 'scooter'], lanes = RUN_LANES, tramChance = 0, tramRoute = null, roadworkKinds = ROADWORK_TYPES } = {}) {
   const trafficPool = [], trafficMaterials = [];
   const templates = new Map(), activeVariants = Array(TRAFFIC_CAPACITY).fill(null);
+  const passerbyMaterials = new Map();
   // Keep one copy of each geometry in the map subtree for deterministic
   // disposal. Slots clone only the variant they currently display.
   const templateRoot = new THREE.Group();
@@ -18,6 +20,7 @@ export function createRunnerTraffic(root, name, { riderKinds = ['bike', 'scooter
   function addTemplate(kind, color) {
     const template = createTrafficModel(kind, color);
     templates.set(`${color} ${kind}`, template);
+    if (isCameo(kind)) passerbyMaterials.set(kind, cameoMaterials(template));
     templateRoot.add(template);
   }
   const pose = {};
@@ -50,7 +53,7 @@ export function createRunnerTraffic(root, name, { riderKinds = ['bike', 'scooter
         if (!template) throw new Error(`Unknown traffic model: ${key}`);
         object.clear();
         const variant = template.clone(true);
-        variant.traverse(node => {
+        if (!cameo) variant.traverse(node => {
           if (node.isMesh && node.material.vertexColors && node.material.side === material.side) node.material = material;
         });
         object.add(variant);
@@ -78,7 +81,10 @@ export function createRunnerTraffic(root, name, { riderKinds = ['bike', 'scooter
         : 0;
       if (cameo) {
         const walking = agent.panicSide === undefined;
-        animateCameo(variant, state.elapsed * (walking ? .72 : 1.48) + agent.id, true, viewerYaw, walking);
+        // The course keeps at most one active passer-by, so it can reuse its
+        // kind's materials without sharing opacity with other visible actors.
+        showCameo(variant, passerbyMaterials.get(agent.kind), agent.age ?? 1.2, agent.hitUntil > state.elapsed ? .7 : 0);
+        animateCameo(variant, (agent.gait ?? state.elapsed) + agent.id, true, viewerYaw, walking);
       } else {
         animateTraffic(variant, state.elapsed + agent.id, agent.crossing ? Math.abs(agent.vx) : agent.speed + state.speed, viewerYaw);
       }
