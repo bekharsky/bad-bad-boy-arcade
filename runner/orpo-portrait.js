@@ -69,7 +69,7 @@ function addHair(head) {
   const rows=58, columns=190;
   // Fit the roots to the sculpt. A separate cap on an ellipsoid leaves a
   // ledge in profile, especially above the temples.
-  const scalp=[head.userData.animatedFace,head.getObjectByName('Back of head')];
+  const scalp=[head.getObjectByName('Continuous face and lips'),head.getObjectByName('Back of head')];
   // Intersect each horizontal slice with the skull once. Its short list of
   // segments supplies the radius at every azimuth without recasting mesh rays.
   const radial=[], sectors=96, slices=42, minY=-.35, maxY=.39;
@@ -187,7 +187,7 @@ export function createOrpoPortrait() {
   head.position.y=2.77;
   addPortraitFace(head,fittedFace(),palette);
   addHair(head);
-  refineOrpoFace(head.userData.animatedFace);
+  refineOrpoFace(head.getObjectByName('Continuous face and lips'));
   addEars(head);
   addFrames(head);
   return head;

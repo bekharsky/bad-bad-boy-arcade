@@ -64,7 +64,7 @@ function addEye(head,points,{upper,lower,brow}, palette) {
   surface(head,'Eye between fitted lids',eye.positions,eye.indices,colored(),eye.colors);
   for(const [name,path,thickness,tint] of [
     ['Upper eyelid',lid,palette.lashWidth ?? .0026,palette.lash ?? '#735448'],
-    ['Eyebrow',curve(brow),palette.browWidth ?? .009,palette.brow],
+    ...(palette.sculptedBrows ? [] : [['Eyebrow',curve(brow),palette.browWidth ?? .009,palette.brow]]),
     ...(palette.lowerLid ? [['Lower lid',rim,.0018,palette.lowerLid]] : [])
   ]) {
     const band=grid(6,30,(u,v)=>{
@@ -110,7 +110,6 @@ export function addPortraitFace(head, points, palette, makeScalp) {
   });
   face.geometry.morphAttributes.position=[new THREE.Float32BufferAttribute(lowered.flat(),3)];
   face.updateMorphTargets();
-  head.userData.animatedFace=face;
 
   if(makeScalp) {
     makeScalp(head,oval.map(i=>points[i]));

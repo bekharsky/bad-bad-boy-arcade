@@ -48,7 +48,9 @@ export function createRunnerTraffic(root, name, { riderKinds = ['bike', 'scooter
         if (!template) throw new Error(`Unknown traffic model: ${key}`);
         object.clear();
         const variant = template.clone(true);
-        variant.traverse(node => { if (node.isMesh && node.material.vertexColors) node.material = material; });
+        variant.traverse(node => {
+          if (node.isMesh && node.material.vertexColors && node.material.side === material.side) node.material = material;
+        });
         object.add(variant);
         activeVariants[i] = key;
       }

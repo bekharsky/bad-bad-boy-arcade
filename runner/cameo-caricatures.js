@@ -32,5 +32,8 @@ export function createCameoNeck(kind) {
 export function animateCameoHead(head,time,running) {
   const stride=running?Math.sin(time*9):0;
   head.rotation.z=stride*.012;
-  head.userData.animatedFace.morphTargetInfluences[0]=running?.35+.65*Math.max(0,stride):0;
+  const opening=running?.35+.65*Math.max(0,stride):0;
+  for(const part of head.children) {
+    if(part.morphTargetInfluences) part.morphTargetInfluences[0]=opening;
+  }
 }

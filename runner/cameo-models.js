@@ -157,7 +157,6 @@ export function createCameoModel(kind) {
   const head=createCameoHead(kind);
   head.name='3D head';
   root.add(head);
-  root.userData.head=head;
   return root;
 }
 
@@ -178,6 +177,6 @@ export function animateCameo(root, time, running = true, viewerYaw = 0) {
       part.children.find(child => child.userData.elbow).rotation.x = running ? -.92 + Math.min(0, swing) * .24 : -.18;
     }
   }
-  animateCameoHead(root.userData.head, time, running);
+  animateCameoHead(root.getObjectByName('3D head'), time, running);
   return 'sculpted-3d';
 }
