@@ -20,7 +20,7 @@ const seeded = seed => () => ((seed = seed * 16807 % 2147483647) - 1) / 21474836
 test('both runner maps vary the roadside roster across seeds and agree across frame rates', () => {
   for (const map of [baanaMap, aleksanterinkatuMap]) {
     const kinds = new Set(), firstKinds = new Set();
-    for (const seed of [1, 42, 819, 113]) {
+    for (const seed of [1, 42, 819, 113, 17, 234]) {
       const sequences = [];
       for (const fps of [30, 60]) {
         const run = createRunnerRun({ ...map.runner, random: seeded(seed) });
@@ -45,7 +45,7 @@ test('both runner maps vary the roadside roster across seeds and agree across fr
       assert.deepEqual(sequences[0], sequences[1]);
     }
     assert.ok(firstKinds.size > 1);
-    for (const kind of ['zelenskyy', 'kadyrov']) assert.ok(kinds.has(kind), map.id + ' ' + kind);
+    assert.deepEqual([...kinds].sort(), [...CAMEO_KINDS].sort(), map.id);
   }
 });
 
