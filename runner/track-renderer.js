@@ -3,6 +3,7 @@ import { createSceneryModel } from '../maps/scenery-model.js';
 import { createTrafficModel, animateTraffic } from './traffic-models.js';
 import { RUN_LANES, TRAFFIC_COLORS, TRAFFIC_CAPACITY, ROADWORK_TYPES } from './course.js';
 import { isCameo } from './cameo-roster.js';
+import { animateCameo } from './cameo-models.js';
 
 // Geometry is shared within this map; hit-flash materials belong to each slot.
 export function createRunnerTraffic(root, name, { riderKinds = ['bike', 'scooter'], lanes = RUN_LANES, tramChance = 0, tramRoute = null, roadworkKinds = ROADWORK_TYPES } = {}) {
@@ -42,7 +43,8 @@ export function createRunnerTraffic(root, name, { riderKinds = ['bike', 'scooter
       material.emissive.set(agent?.hitUntil > state.elapsed ? '#ffe58c' : '#000000');
       material.emissiveIntensity = agent?.hitUntil > state.elapsed ? .7 : 0;
       if (!agent) continue;
-      const key = `${isCameo(agent.kind) ? 'cameo' : ROADWORK_TYPES.includes(agent.kind) ? 'roadwork' : agent.color} ${agent.kind}`;
+      const cameo = isCameo(agent.kind);
+      const key = `${cameo ? 'cameo' : ROADWORK_TYPES.includes(agent.kind) ? 'roadwork' : agent.color} ${agent.kind}`;
       if (activeVariants[i] !== key) {
         const template = templates.get(key);
         if (!template) throw new Error(`Unknown traffic model: ${key}`);
@@ -59,7 +61,7 @@ export function createRunnerTraffic(root, name, { riderKinds = ['bike', 'scooter
         object.position.set(pose.x, 0, state.distance + pose.z); object.rotation.y = pose.heading;
       } else {
         object.position.set(agent.x ?? lanes[agent.lane], 0, state.distance - agent.progress);
-        object.rotation.y = agent.crossing ? Math.sign(agent.vx) * Math.PI / 2 : 0;
+        object.rotation.y = agent.heading ?? (agent.crossing ? Math.sign(agent.vx) * Math.PI / 2 : 0);
       }
       const variant = object.children[0];
       if (agent.kind === 'tram' && tramRoute) for (const part of variant.children) {
@@ -74,7 +76,12 @@ export function createRunnerTraffic(root, name, { riderKinds = ['bike', 'scooter
       const viewerYaw = viewPosition
         ? Math.atan2(viewPosition.x - object.position.x, viewPosition.z - object.position.z) - object.rotation.y
         : 0;
-      animateTraffic(variant, state.elapsed + agent.id, agent.crossing ? Math.abs(agent.vx) : agent.speed + state.speed, viewerYaw);
+      if (cameo) {
+        const walking = agent.panicSide === undefined;
+        animateCameo(variant, state.elapsed * (walking ? .72 : 1.48) + agent.id, true, viewerYaw, walking);
+      } else {
+        animateTraffic(variant, state.elapsed + agent.id, agent.crossing ? Math.abs(agent.vx) : agent.speed + state.speed, viewerYaw);
+      }
     }
   } };
 }

@@ -8,7 +8,7 @@ import { CAMEO_KINDS } from '../runner/cameo-roster.js';
 
 export const baanaMap = {
   id: 'baana', name: 'Baana Run', mode: 'runner',
-  runner: { length: BAANA_LENGTH, variety: true, riderKinds: ['bike', 'scooter', ...CAMEO_KINDS] },
+  runner: { length: BAANA_LENGTH, variety: true, cameoShoulder: 5.95, riderKinds: ['bike', 'scooter', ...CAMEO_KINDS] },
   spawn: { x: 0, z: 0, heading: Math.PI },
   bounds: { minX: -5.5, maxX: 5.5, minZ: -130, maxZ: 30 },
   create() { return createMap(baanaMap, buildBaana); },

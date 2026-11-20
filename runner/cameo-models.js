@@ -160,20 +160,21 @@ export function createCameoModel(kind) {
   return root;
 }
 
-export function animateCameo(root, time, running = true, viewerYaw = 0) {
-  const phase = time * 9, stride = running ? Math.sin(phase) : 0;
-  root.position.y = running ? Math.abs(Math.cos(phase)) * .035 : 0;
+export function animateCameo(root, time, moving = true, viewerYaw = 0, walking = false) {
+  const phase = time * 9, stride = moving ? Math.sin(phase) * (walking ? .58 : 1) : 0;
+  const running = moving && !walking;
+  root.position.y = moving ? Math.abs(Math.cos(phase)) * (walking ? .018 : .035) : 0;
   for (const part of root.children) {
     if (part.userData.stride) {
       const side = part.userData.stride;
       const swing = stride * side;
-      part.position.z = running ? 0 : side * .045;
+      part.position.z = moving ? 0 : side * .045;
       part.rotation.x = swing * .65;
       part.children.find(child => child.userData.knee).rotation.x = Math.max(0, -swing) * 1.05;
     }
     if (part.userData.swing) {
       const swing = stride * part.userData.swing;
-      part.rotation.x = running ? swing * .58 : part.userData.swing * .055;
+      part.rotation.x = moving ? swing * .58 : part.userData.swing * .055;
       part.children.find(child => child.userData.elbow).rotation.x = running ? -.92 + Math.min(0, swing) * .24 : -.18;
     }
   }

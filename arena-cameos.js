@@ -6,14 +6,19 @@ import { disposeObject } from './world/dispose.js';
 
 // Civilian actors are deliberately separate from combat enemies and wave
 // counts. The session owns this small pool across district changes/restarts.
-export function createArenaCameos(scene, world) {
+export function createArenaCameos(scene, world, random = Math.random) {
   const group = new THREE.Group(); group.name = 'Arena civilians'; scene.add(group);
   const actors = [];
   const pool = CAMEO_KINDS.map((kind, index) => {
     const root = new THREE.Group(), model = createTrafficModel(kind, 'cameo');
     root.name = `Civilian: ${kind}`; root.add(model); root.visible = false; group.add(root);
     const materials = new Set();
-    model.traverse(node => { if (node.isMesh && node.material.emissive) materials.add(node.material); });
+    model.traverse(node => {
+      if (!node.isMesh) return;
+      for (const material of Array.isArray(node.material) ? node.material : [node.material]) {
+        if (material.emissive) materials.add(material);
+      }
+    });
     return { kind, civilian: true, root, model, materials, size: .55, hitHeight: kind === 'stubb' ? 1.6 : 1.45, speed: 3.9 + index * .12, alive: false };
   });
   let disposed = false;
@@ -27,22 +32,26 @@ export function createArenaCameos(scene, world) {
     const viewerYaw = viewPosition
       ? Math.atan2(viewPosition.x - actor.x, viewPosition.z - actor.z) - actor.heading
       : 0;
-    animateCameo(actor.model, actor.gait, moving, viewerYaw);
+    animateCameo(actor.model, actor.gait, moving, viewerYaw, moving && !actor.fleeing);
   }
 
   function reset(player, viewPosition) {
     clear();
     if (disposed || world.mode === 'runner') return;
     world.routeTo(player.x, player.z);
-    for (const [index, actor] of pool.entries()) {
+    const available = [...pool];
+    const count = Math.min(4, available.length);
+    for (let index = 0; index < count; index++) {
       let point = null;
       for (let attempt = 0; attempt < 8; attempt++) {
-        const candidate = world.spawnPoint(player, 5 + index * 2 / Math.max(1, pool.length - 1) + attempt * .3, 8);
+        const candidate = world.spawnPoint(player, index + attempt * .3, count);
         if (candidate && actors.every(other => Math.hypot(candidate.x - other.x, candidate.z - other.z) > 1.5)) { point = candidate; break; }
       }
       if (!point) continue;
+      const [actor] = available.splice(Math.floor(random() * available.length), 1);
+      const heading = Math.atan2(point.x - player.x, point.z - player.z) + (random() < .5 ? -1 : 1) * Math.PI / 2;
       Object.assign(actor, point, { alive: true, fleeing: false, panic: 0, flash: 0, decision: 0, gait: index * .7, nextJetHit: 0,
-        heading: Math.atan2(point.x - player.x, point.z - player.z), direction: { x: 0, z: 0 } });
+        heading, strollHeading: heading, direction: { x: 0, z: 0 } });
       actor.root.visible = true; actor.root.position.set(actor.x, 0, actor.z); actor.root.rotation.y = actor.heading;
       for (const material of actor.materials) { material.emissive.set('#000000'); material.emissiveIntensity = 0; }
       pose(actor, false, viewPosition);
@@ -56,7 +65,7 @@ export function createArenaCameos(scene, world) {
     for (const actor of actors) {
       actor.panic = Math.max(0, actor.panic - dt); actor.flash = Math.max(0, actor.flash - dt);
       const distance = Math.hypot(actor.x - player.x, actor.z - player.z);
-      actor.fleeing = actor.panic > 0 || distance < (actor.fleeing ? 14 : 10.5);
+      actor.fleeing = actor.panic > 0 || distance < (actor.fleeing ? 5 : 3.5);
       actor.decision -= dt;
       if (actor.fleeing && actor.decision <= 0) {
         actor.direction = world.flee(actor.x, actor.z, player.x, player.z, actor.heading);
@@ -66,6 +75,13 @@ export function createArenaCameos(scene, world) {
       if (actor.fleeing) {
         const speed = actor.speed * (actor.panic > 0 ? 1.15 : 1);
         world.move(actor, actor.direction.x * speed * dt, actor.direction.z * speed * dt, actor.size);
+      } else {
+        const dx = Math.sin(actor.strollHeading) * 1.3 * dt;
+        const dz = Math.cos(actor.strollHeading) * 1.3 * dt;
+        world.move(actor, dx, dz, actor.size);
+        if (Math.hypot(actor.x - player.x, actor.z - player.z) < distance) {
+          actor.x = oldX; actor.z = oldZ;
+        }
       }
       const moved = Math.hypot(actor.x - oldX, actor.z - oldZ);
       if (moved > 1e-6) {

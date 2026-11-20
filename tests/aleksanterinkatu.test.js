@@ -17,6 +17,7 @@ const { maps, mapOrder } = await import('../maps/index.js');
 const { createMapManager } = await import('../world/map-manager.js');
 const { createCampaign, createWaveDirector } = await import('../waves.js');
 const { createMedkits } = await import('../medkits.js');
+const { isCameo } = await import('../runner/cameo-roster.js');
 const { createRunnerRun, TRAFFIC_CAPACITY, TRAM_LANES, trafficProfile } = await import('../runner/course.js');
 const seeded = seed => () => ((seed = seed * 16807 % 2147483647) - 1) / 2147483646;
 
@@ -53,7 +54,7 @@ test('the tram course has exactly two bounded lanes while Baana retains three', 
 // marked lanes of each warned side-street approach. No invulnerability or kills.
 function steer(run) {
   const state = run.state;
-  const next = state.traffic.filter(a => !a.crossing && a.progress - state.distance > -trafficProfile(a.kind).depth - .6).sort((a, b) => a.progress - b.progress)[0];
+  const next = state.traffic.filter(a => !a.crossing && !isCameo(a.kind) && a.progress - state.distance > -trafficProfile(a.kind).depth - .6).sort((a, b) => a.progress - b.progress)[0];
   const crossing = state.crossings.find(c => (c.phase === 'warning' || c.phase === 'crossing') && c.progress + 10 > state.distance);
   const closeTraffic = next && next.progress - state.distance < (state.speed + next.speed) * .75 + trafficProfile(next.kind).depth;
   if (crossing && !closeTraffic) {
@@ -75,14 +76,14 @@ test('two-lane tram and cross-scooter traffic leaves a complete safe route acros
       const result = run.update(1 / fps); hits += result.hits;
       if (result.warning) { warnings++; sideWarnings.add(result.warning.includes('LEFT') ? 'left' : 'right'); }
       for (const agent of run.state.traffic) {
-        kinds.add(agent.kind);
+        if (!isCameo(agent.kind)) kinds.add(agent.kind);
         if (agent.crossing && !seen.has(agent.id)) { seen.add(agent.id); crosses++; }
       }
       assert.ok(run.state.traffic.length <= TRAFFIC_CAPACITY);
     }
     assert.equal(hits, 0, `${fps} FPS, seed ${seed}`);
     assert.equal(run.state.distance, ALEKSI_LENGTH);
-    assert.deepEqual([...kinds].sort(), ['bike', 'marin', 'orpo', 'purra', 'scooter', 'stubb', 'tram']);
+    assert.deepEqual([...kinds].sort(), ['bike', 'scooter', 'tram']);
     assert.equal(warnings, ALEKSI_CROSSINGS.length);
     assert.equal(crosses, ALEKSI_CROSSINGS.length * 2);
     assert.deepEqual([...sideWarnings].sort(), ['left', 'right']);

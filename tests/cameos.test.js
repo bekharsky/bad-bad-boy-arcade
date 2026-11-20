@@ -10,34 +10,42 @@ registerHooks({ resolve(specifier, context, next) {
 const THREE = await import('three');
 const { baanaMap } = await import('../maps/baana.js');
 const { aleksanterinkatuMap } = await import('../maps/aleksanterinkatu.js');
-const { createRunnerRun, riderHealth, RIDER_BONUS, RIDER_DODGE_BONUS } = await import('../runner/course.js');
+const { createRunnerRun, riderHealth } = await import('../runner/course.js');
 const { createRunnerTraffic } = await import('../runner/track-renderer.js');
 const { disposeObject } = await import('../world/dispose.js');
 const { CAMEO_KINDS, isCameo } = await import('../runner/cameo-roster.js');
 const { createCameoModel, animateCameo } = await import('../runner/cameo-models.js');
 const seeded = seed => () => ((seed = seed * 16807 % 2147483647) - 1) / 2147483646;
 
-test('both actual runner configurations rotate all four cameos, one at a time, across frame rates', () => {
-  for (const map of [baanaMap, aleksanterinkatuMap]) for (const seed of [1, 42, 819, 113]) {
-    const sequences = [];
-    for (const fps of [30, 60]) {
-      const run = createRunnerRun({ ...map.runner, random: seeded(seed) });
-      const seen = new Set(), appearances = [];
-      while (!run.state.finished) {
-        run.update(1 / fps);
-        const cameos = run.state.traffic.filter(agent => isCameo(agent.kind));
-        assert.ok(cameos.length <= 1);
-        for (const agent of cameos) if (!seen.has(agent.id)) {
-          seen.add(agent.id); appearances.push([agent.id, agent.lane, agent.row, agent.speed, agent.kind]);
-          assert.equal(agent.alive, true); assert.equal(agent.hp, riderHealth(agent.kind));
-          assert.notEqual(agent.lane, agent.safeLane, 'The reserved escape lane is clear');
+test('both runner maps vary the roadside roster across seeds and agree across frame rates', () => {
+  for (const map of [baanaMap, aleksanterinkatuMap]) {
+    const kinds = new Set(), firstKinds = new Set();
+    for (const seed of [1, 42, 819, 113]) {
+      const sequences = [];
+      for (const fps of [30, 60]) {
+        const run = createRunnerRun({ ...map.runner, random: seeded(seed) });
+        const seen = new Set(), appearances = [];
+        while (!run.state.finished) {
+          run.update(1 / fps);
+          const cameos = run.state.traffic.filter(agent => isCameo(agent.kind));
+          assert.ok(cameos.length <= 1);
+          for (const agent of cameos) if (!seen.has(agent.id)) {
+            seen.add(agent.id); appearances.push([agent.id, agent.x, agent.kind]);
+            assert.equal(agent.alive, true);
+            assert.equal(Math.abs(agent.x), Math.abs(run.lanes[0]) + .85);
+          }
         }
+        assert.ok(appearances.length > 1);
+        assert.equal(new Set(appearances.map(a => a[2])).size, appearances.length);
+        firstKinds.add(appearances[0][2]);
+        for (const [, , kind] of appearances) kinds.add(kind);
+        sequences.push(appearances);
+        run.reset(); assert.equal(run.state.traffic.length, 0);
       }
-      assert.deepEqual([...new Set(appearances.map(a => a[4]))].sort(), [...CAMEO_KINDS].sort(), `${map.id}, seed ${seed}`);
-      sequences.push(appearances);
-      run.reset(); assert.equal(run.state.traffic.length, 0);
+      assert.deepEqual(sequences[0], sequences[1]);
     }
-    assert.deepEqual(sequences[0], sequences[1]);
+    assert.ok(firstKinds.size > 1);
+    for (const kind of ['zelenskyy', 'kadyrov']) assert.ok(kinds.has(kind), map.id + ' ' + kind);
   }
 });
 
@@ -144,23 +152,21 @@ function encounter(kind, lane = 1) {
   return { run, agent };
 }
 
-test('cameo contact is harmless, clean dodges give points, and optional spraying awards its bonus once', () => {
+test('runner passers-by are harmless and run away from the first splash', () => {
   for (const kind of CAMEO_KINDS) {
     const contact = encounter(kind);
     assert.equal(contact.run.update(.5).hits, 0);
-    assert.equal(contact.run.update(.5).hits, 0);
-    assert.equal(contact.run.state.invulnerable, 0, 'Civilians do not grant a damage shield');
-    const dodge = encounter(kind, 0);
-    assert.equal(dodge.run.update(.6).dodged, 1);
-    assert.equal(dodge.run.state.bonus, RIDER_DODGE_BONUS);
-    const sprayed = encounter(kind);
-    assert.equal(sprayed.run.sprayHit(-1, { damage: .5 }), false);
-    assert.equal(sprayed.agent.alive, true);
-    assert.equal(sprayed.run.sprayHit(-1, { charge: 1 }), true);
-    assert.equal(sprayed.run.sprayHit(-1, { charge: 1 }), false);
-    assert.equal(sprayed.run.state.bonus, RIDER_BONUS);
-    assert.equal(sprayed.run.update(.5).hits, 0);
-    assert.equal(sprayed.run.state.cleared, 1);
+    assert.equal(contact.run.state.invulnerable, 0);
+    assert.equal(contact.run.state.bonus, 0);
+    const { run, agent } = encounter(kind, 0);
+    for (let i = 0; i < 20; i++) assert.equal(run.sprayHit(agent.id, { damage: 100, charge: 1 }), false);
+    assert.equal(agent.hp, riderHealth(kind));
+    assert.equal(agent.alive, true);
+    assert.equal(run.update(.5).hits, 0);
+    assert.ok(agent.x < run.lanes[0]);
+    assert.ok(agent.progress > 5);
+    assert.equal(run.state.bonus, 0);
+    assert.equal(run.state.cleared, 0);
   }
 });
 
@@ -177,7 +183,7 @@ test('pooled cameo animates without new resources, keeps hit flashes local and r
     { id: 2, kind: 'bike', color: 'red', lane: 1, progress: 10, speed: 5 },
   ] };
   const resources = new Set();
-  root.traverse(node => { if (node.geometry) resources.add(node.geometry); if (node.material) resources.add(node.material); });
+  root.traverse(node => { if (node.geometry) resources.add(node.geometry); for (const material of [node.material].flat().filter(Boolean)) resources.add(material); });
   renderer.update(state);
   const slots = root.children.filter(node => node.name === 'Test traffic');
   const cameo = slots[0].children[0], leg = cameo.getObjectByName('Purra leg -1');
@@ -187,7 +193,7 @@ test('pooled cameo animates without new resources, keeps hit flashes local and r
   state.elapsed = .3; renderer.update(state);
   assert.notEqual(leg.rotation.x, originalRotation);
   assert.equal(slots[0].children[0], cameo);
-  root.traverse(node => { if (node.geometry) assert.ok(resources.has(node.geometry)); if (node.material) assert.ok(resources.has(node.material)); });
+  root.traverse(node => { if (node.geometry) assert.ok(resources.has(node.geometry)); for (const material of [node.material].flat().filter(Boolean)) assert.ok(resources.has(material)); });
   state.traffic[0].cleared = true; renderer.update(state); assert.equal(slots[0].visible, false);
   state.traffic[0] = { ...state.traffic[1], id: 3 }; renderer.update(state);
   assert.equal(slots[0].children[0].name, 'red bike');

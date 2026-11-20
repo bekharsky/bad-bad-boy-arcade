@@ -20,25 +20,26 @@ const { createCampaign, createWaveDirector } = await import('../waves.js');
 function fixture() {
   const scene = new THREE.Scene(), player = { x: 0, z: 0, hp: 5, radius: .7 };
   const world = { ...createNavigation({ bounds: { minX: -25, maxX: 25, minZ: -25, maxZ: 25 } }), mode: 'arena',
-    spawnPoint: (_player, index) => ({ x: (index - 6) * 4, z: -6 }) };
-  const cameos = createArenaCameos(scene, world); cameos.reset(player);
+    spawnPoint: (_player, index) => ({ x: (index - 1) * 4, z: -6 }) };
+  const cameos = createArenaCameos(scene, world, () => 0); cameos.reset(player);
   return { scene, world, player, cameos };
 }
 
-test('all four civilians flee from a nearby player without damage or combat objectives', () => {
+test('passers-by keep their distance and leave health and waves alone', () => {
   const { player, cameos } = fixture();
   assert.deepEqual(cameos.actors.map(actor => actor.kind), ['purra', 'orpo', 'marin', 'stubb']);
-  const distances = cameos.actors.map(actor => Math.hypot(actor.x, actor.z));
+  player.z = -4;
+  const distances = cameos.actors.map(actor => Math.hypot(actor.x - player.x, actor.z - player.z));
   const plans = [], enemies = [];
   const waves = createWaveDirector({ campaign: createCampaign(['harbor']), onWave: plan => plans.push(plan.number), onReinforcements() {} });
   waves.start();
   for (let i = 0; i < 120; i++) { cameos.update(1 / 60, player); waves.update(1 / 60, enemies.length); }
   for (const [index, actor] of cameos.actors.entries()) {
-    assert.ok(Math.hypot(actor.x, actor.z) > distances[index] + 3);
+    assert.ok(Math.hypot(actor.x - player.x, actor.z - player.z) >= distances[index] + (distances[index] < 3.5 ? 2 : 0));
     assert.equal(actor.civilian, true); assert.equal(actor.alive, true);
   }
   assert.equal(player.hp, 5); assert.deepEqual(plans, [1, 2]);
-  assert.equal(cameos.actors.length, CAMEO_KINDS.length, 'The next wave needs no civilian to be sprayed');
+  assert.equal(cameos.actors.length, 4, 'The next wave needs no civilian to be sprayed');
   cameos.dispose();
 });
 
@@ -51,7 +52,7 @@ test('splashing is optional and only triggers a temporary reaction, never a kill
   for (let i = 0; i < 240; i++) liquid.update(1 / 60, true, emitter, { dx: 0, dz: -1 }, [actor]);
   assert.ok(hits > 0); assert.ok(actor.panic > 0);
   for (let i = 0; i < 100; i++) cameos.splash(actor);
-  assert.equal(actor.alive, true); assert.equal(cameos.actors.length, CAMEO_KINDS.length); assert.equal(player.hp, 5);
+  assert.equal(actor.alive, true); assert.equal(cameos.actors.length, 4); assert.equal(player.hp, 5);
   cameos.update(2, { ...player, x: 20, z: 20 });
   assert.equal(actor.flash, 0); assert.equal(actor.panic, 0);
   liquid.clear(); cameos.dispose();
@@ -59,7 +60,7 @@ test('splashing is optional and only triggers a temporary reaction, never a kill
 
 test('pause, restart and switching to a runner reuse the pool without stale actors or resource leaks', () => {
   const { scene, world, player, cameos } = fixture(), resources = new Set();
-  scene.traverse(node => { if (node.geometry) resources.add(node.geometry); if (node.material) resources.add(node.material); });
+  scene.traverse(node => { if (node.geometry) resources.add(node.geometry); for (const material of [node.material].flat().filter(Boolean)) resources.add(material); });
   const actor = cameos.actors[0], before = [actor.x, actor.z, actor.gait];
   cameos.update(0, player); assert.deepEqual([actor.x, actor.z, actor.gait], before);
   cameos.splash(actor); actor.nextJetHit = 100;
@@ -67,24 +68,33 @@ test('pause, restart and switching to a runner reuse the pool without stale acto
   cameos.reset(player); assert.equal(cameos.actors[0], actor); assert.equal(actor.nextJetHit, 0); assert.equal(actor.panic, 0);
   world.mode = 'runner'; cameos.reset(player); assert.equal(cameos.actors.length, 0);
   world.mode = 'arena'; cameos.reset(player);
-  scene.traverse(node => { if (node.geometry) assert.ok(resources.has(node.geometry)); if (node.material) assert.ok(resources.has(node.material)); });
+  scene.traverse(node => { if (node.geometry) assert.ok(resources.has(node.geometry)); for (const material of [node.material].flat().filter(Boolean)) assert.ok(resources.has(material)); });
   const disposals = new Map();
   for (const resource of resources) resource.addEventListener('dispose', () => disposals.set(resource, (disposals.get(resource) ?? 0) + 1));
   cameos.dispose(); cameos.dispose();
   assert.equal(disposals.size, resources.size); assert.ok([...disposals.values()].every(count => count === 1));
 });
 
-test('every arena spawns the full roster on reachable ground and moving trams keep them clear', () => {
-  const scene = new THREE.Scene(), world = createMapManager(scene, maps), cameos = createArenaCameos(scene, world);
+test('each arena samples reachable passers-by and moving trams keep them clear', () => {
+  let seed = 819;
+  const random = () => (seed = seed * 16807 % 2147483647) / 2147483647;
+  const scene = new THREE.Scene(), world = createMapManager(scene, maps), cameos = createArenaCameos(scene, world, random);
   for (const definition of maps.filter(map => map.mode !== 'runner')) {
     world.activate(definition.id);
     const player = { ...world.spawn, hp: 5, radius: .74, root: new THREE.Group() };
-    cameos.reset(player); assert.equal(cameos.actors.length, CAMEO_KINDS.length, definition.id);
+    const seen = new Set();
+    for (let attempt = 0; attempt < 30; attempt++) {
+      cameos.reset(player);
+      assert.equal(cameos.actors.length, 4, definition.id);
+      assert.equal(new Set(cameos.actors.map(actor => actor.kind)).size, 4);
+      for (const actor of cameos.actors) seen.add(actor.kind);
+    }
+    for (const kind of CAMEO_KINDS) assert.ok(seen.has(kind), definition.id + ' ' + kind);
     let moved = 0;
     for (let frame = 0; frame < 900; frame++) {
       world.update(1 / 60, [player, ...cameos.actors]);
       if (frame % 240 === 0) {
-        const actor = cameos.actors[Math.floor(frame / 240) % CAMEO_KINDS.length];
+        const actor = cameos.actors[Math.floor(frame / 240) % cameos.actors.length];
         player.x = actor.x; player.z = actor.z;
       }
       const previous = cameos.actors.map(actor => [actor.x, actor.z]);
