@@ -14,8 +14,13 @@ const styles={
     width:.98, age:.81,
   },
   zelenskyy:{
-    palette:palette('#d2a587','#d8ae91','#bf9082','#a58979','#473b32','#95625e','#af7c6d','#665f4d'),
-    hair:['#322c29','#5e5249'], crown:.116, sweep:.025, depth:.36, width:.95, age:.68,
+    palette:{...palette('#cba485','#dab39a','#bb8e7d','#957f75','#4d4039','#865b55','#a77a71','#574b3d'),
+      browWidth:.015,irisScale:1.32,lowerLid:'#9b7f6d',lashWidth:.0044,lash:'#604c3e'},
+    hair:['#242022','#65534b'], crown:.129, sweep:.032, depth:.357, width:.93, age:.92,
+  },
+  kadyrov:{
+    palette:{...palette('#ddb49a','#e4b8a5','#cb9287','#b19388','#836455','#935f5a','#b27c72','#778886'),browWidth:.014},
+    hair:['#54392f','#ac8265'], crown:.148, sweep:.018, depth:.387, width:.99, age:.83,
   },
   stubb:{
     palette:palette('#e6b79c','#e7bca3','#ca9788','#bb9789','#756452','#9d635f','#ba8277','#607c89'),
@@ -53,7 +58,7 @@ function fittedPoints(kind, style) {
     const brow=g(eyeX,eyeY+.110,.122,.056), lid=g(eyeX,eyeY+.026,.094,.054);
     const cheek=g(.193,-.095,.093,.106);
     const top=smooth(y,.19,.385);
-    const drop=kind==='zelenskyy'?.048+.016*Math.cos(11*x):kind==='trump'?(.071+.035*Math.cos(12*x-1)):kind==='macron'?(.046+.023*Math.cos(18*x+.8)):kind==='stubb'?(.032+.019*Math.sin(12*x)) : 0;
+    const drop=kind==='kadyrov'?.047+.015*Math.sin(18*x):kind==='zelenskyy'?.023+.039*Math.sin(11*x-.45):kind==='trump'?(.071+.035*Math.cos(12*x-1)):kind==='macron'?(.046+.023*Math.cos(18*x+.8)):kind==='stubb'?(.032+.019*Math.sin(12*x)) : 0;
     y-=drop*top;
     const gap=source[13][1]-source[14][1];
     if(gap>.027) {
@@ -64,8 +69,18 @@ function fittedPoints(kind, style) {
     switch(kind) {
       case 'lepen': return new THREE.Vector3(x*(1+.035*smooth(-y,.16,.40)),
         y-.033*brow+.016*g(.13,mouthY,.053,.042),z+.028*cheek-.053*smooth(y,.26,.385));
-      case 'zelenskyy': return new THREE.Vector3(x*(1+.045*smooth(-y,.20,.42)),
-        y-.045*brow-.11*(y-eyeY)*lid,z+.023*cheek+.028*g(.06,-.37,.14,.088));
+      case 'zelenskyy': {
+        const innerBrow=g(.081,eyeY+.090,.061,.058);
+        const upperLid=g(.147,eyeY+.025,.077,.020);
+        return new THREE.Vector3(x*(1-.062*smooth(-y,.15,.43)),
+          y-.032*brow-.025*innerBrow+.005*upperLid,
+          z+.031*cheek+.013*innerBrow-.013*lid+.006*g(.012,-.068,.042,.061));
+      }
+      case 'kadyrov': {
+        const length=smooth(-y,.235,.472);
+        return new THREE.Vector3(x*(1+.068*cheek-.28*length),
+          y-.033*brow-.16*length,z+.058*cheek+.035*length);
+      }
       case 'stubb': return new THREE.Vector3(x*(1+.10*lip), y-.021*brow+.009*cheek, z+.032*cheek+.017*g(.035,-.385,.10,.08));
       case 'trump': return new THREE.Vector3(x*(1+.082*smooth(-y,.12,.33)-.22*lip),
         y-.032*brow-.13*(y-eyeY)*lid-.009*g(.11,mouthY,.045,.055)+.28*(mouthY-y)*lip,
@@ -94,6 +109,9 @@ function scalp(head,oval,kind,style) {
   const skin=new THREE.Color(style.palette.base), shadow=new THREE.Color(style.hair[0]);
   const highlight=new THREE.Color(style.hair[1]);
   const bald=kind==='putin'||kind==='merz';
+  const cropped=kind==='zelenskyy'||kind==='kadyrov';
+  const sideburn=new THREE.Color(kind==='kadyrov'?'#79583f':'#62534a');
+  const mouthY=head.userData.animatedFace.geometry.attributes.position.getY(13);
   const borderCurve=new THREE.CatmullRomCurve3(oval,true);
   const cap=grid(56,oval.length*4,(u,v)=>{
     const f=u*oval.length,i=Math.floor(f)%oval.length;
@@ -123,14 +141,24 @@ function scalp(head,oval,kind,style) {
       cover*=smooth(v,0,.12)*THREE.MathUtils.clamp((temples*.96+rear*.90+(.075+.13*ridge)*crown)
         *smooth(-z,-.067,.062),0,1);
     }
-    const relief=cover*(.0037*ridge+.0095*wave+.012*lock*upper)*bow;
+    // At the back the locks descend to the nape instead of converging on
+    // the polar vertex of the scalp grid.
+    const comb=kind==='zelenskyy'
+      ? 22*x-14*v+2.1*Math.sin(9*x-4*v)
+      : 38*x-9*v+1.2*Math.sin(10*x+6*v);
+    const grain=.5+.5*Math.cos(tau*comb+1.4*Math.sin(27*x+13*v))*Math.cos(6*v-11*x);
+    const lay=lerp(cropped?grain:ridge,.5+.5*Math.sin(x*174+.8*Math.sin(21*y+8*x)+7*y),back);
+    const relief=cover*((cropped?.008:.0033)*lay+.0095*wave+.012*lock*upper)*(1-.8*back)*bow;
     const complexion=skin.clone();
-    if(kind==='zelenskyy') {
-      const mouthY=head.userData.animatedFace.geometry.attributes.position.getY(13);
-      const coverage=beardCoverage(Math.abs(x),y,mouthY)* (1-smooth(v,.02,.40));
-      complexion.lerp(new THREE.Color('#594a40'),coverage*.9);
+    if(cropped) {
+      const coverage=beardCoverage(Math.abs(x),y,mouthY,kind)* (1-smooth(v,.02,.40));
+      complexion.lerp(sideburn,coverage*.82);
     }
-    const tint=complexion.lerp(shadow.clone().lerp(highlight,.21+.19*ridge+.14*temple+.15*upper+.065*lock),cover);
+    if(kind==='zelenskyy'){
+      const templeFade=smooth(Math.abs(x),.20,.32)*(1-smooth(y,-.012,.23));
+      cover*=1-.44*templeFade;
+    }
+    const tint=complexion.lerp(shadow.clone().lerp(highlight,(cropped?.12:.21)+(cropped?.24:.17)*lay+.14*temple+.15*upper+.065*lock),cover);
     return [new THREE.Vector3(x+side*relief,y+upper*relief,z-back*relief),tint];
   });
   const shell=surface(head,'Continuous scalp and hair',cap.positions,cap.indices,colored(),cap.colors);
@@ -161,7 +189,7 @@ function ears(head,points,kind,style) {
       const a=tau*u,r=Math.sin(v*Math.PI/2),h=Math.cos(a)*r;
       const ridge=Math.exp(-(((r-.78)/.16)**2));
       return [new THREE.Vector3(edge.x+side*(-.025+.070*(1-r*r)+.029*ridge+.012*h),
-        edge.y+.087*large*h,edge.z+.037+.044*Math.sin(a)*r-.020*h),
+        edge.y+.087*large*h,edge.z+(kind==='zelenskyy'||kind==='kadyrov'?.093:.037)+.044*Math.sin(a)*r-.020*h),
         dark.clone().lerp(light,.27+.65*ridge)];
     });
     surface(head,'Ear',ear.positions,ear.indices,colored(),ear.colors);
@@ -229,32 +257,40 @@ function smile(head,points,coverage) {
   surface(head,'Upper teeth within smile',teeth.positions,teeth.indices,colored(),teeth.colors);
 }
 
-function beardCoverage(x,y,mouthY) {
-  const cheekLine=mouthY-.084+.247*smooth(x,.045,.36);
-  return 1-smooth(y,cheekLine-.021,cheekLine+.018);
+function beardCoverage(x,y,mouthY,kind) {
+  const long=kind==='kadyrov';
+  const cheekLine=long?mouthY-.027+.250*smooth(x,.085,.38)
+    :mouthY-.101+.259*smooth(x,.103,.384);
+  return 1-smooth(y,cheekLine-(long?.018:.042),cheekLine+(long?.017:.049));
 }
 
 // Shade and raise the short beard directly on the moving face surface.
-function addCroppedBeard(mesh,points) {
+function sculptBeard(mesh,points,kind) {
+  const long=kind==='kadyrov';
   const geometry=mesh.geometry, p=geometry.attributes.position, color=geometry.attributes.color;
   const jaw=geometry.morphAttributes.position[0],normal=geometry.attributes.normal;
   const mouthY=points[13].y, halfMouth=Math.abs(points[291].x-points[61].x)/2;
-  const dark=new THREE.Color('#483c34'), grey=new THREE.Color('#8a7969');
+  const dark=new THREE.Color(long?'#583f33':'#382e29'), grey=new THREE.Color(long?'#ae8c68':'#91857a');
   const tint=new THREE.Color(),original=new THREE.Color();
   for(let i=0;i<p.count;i++) {
     const x=Math.abs(p.getX(i)),y=p.getY(i),z=p.getZ(i);
-    const beard=beardCoverage(x,y,mouthY);
-    const moustache=(1-smooth(x,halfMouth*.83,halfMouth*1.10))*
-      (1-smooth(Math.abs(y-mouthY-.043+.12*x),.010,.027));
+    const beard=beardCoverage(x,y,mouthY,kind);
+    const moustacheCenter=long?.045:.051;
+    const moustache=(1-smooth(x,halfMouth*.82,halfMouth*1.16))*
+      (1-smooth(Math.abs(y-mouthY-moustacheCenter+.17*x),long?.020:.012,long?.042:.029));
     const lipClear=smooth(Math.abs(y-mouthY)+.33*Math.max(0,x-halfMouth*.83),.026,.052);
     const corner=.64*Math.exp(-(((x-halfMouth*.94)/.024)**2+((y-mouthY+.024)/.056)**2));
-    const density=Math.max(beard*lipClear,moustache*.92,corner);
+    const patch=.72*Math.exp(-((x/.049)**2+((y-mouthY+.067)/.025)**2));
+    const sideFade=long?1:.97-.28*smooth(x,.16,.30)*smooth(y,mouthY-.01,mouthY+.12);
+    const density=Math.max(beard*lipClear*sideFade,moustache,corner,patch);
     if(density===0) continue;
     const fleck=.5+.5*Math.sin(x*563+y*257)*Math.cos(z*327-y*417);
-    tint.copy(dark).lerp(grey,.10+.27*fleck);
-    original.fromBufferAttribute(color,i).lerp(tint,density*(.82+.16*fleck));
+    const locks=.5+.5*Math.cos(x*211+12*y+2.5*Math.sin(35*x+9*y)+1.7*Math.sin(y*46+21*x));
+    const chin=smooth(-y,.23,.60);
+    tint.copy(dark).lerp(grey,long?.07+.39*chin+.15*locks+.14*fleck:.035+.26*fleck+.06*chin);
+    original.fromBufferAttribute(color,i).lerp(tint,Math.sqrt(density)*(.93+.07*fleck));
     color.setXYZ(i,original.r,original.g,original.b);
-    const rise=.006*density*(.75+.25*fleck)*smooth(z,-.08,.09);
+    const rise=(long?.010+.0045*locks:.004+.003*fleck)*density*smooth(z,-.09,.075);
     for(const attr of [p,jaw]) attr.setXYZ(i,attr.getX(i)+rise*normal.getX(i),
       attr.getY(i)+rise*normal.getY(i),attr.getZ(i)+rise*normal.getZ(i));
   }
@@ -262,7 +298,7 @@ function addCroppedBeard(mesh,points) {
 
 export function createStatesmanPortrait(kind) {
   const style=styles[kind], points=fittedPoints(kind,style),head=new THREE.Group();
-  head.position.y=2.77;
+  head.position.y=kind==='zelenskyy'?2.714:2.77;
   const makeScalp=kind==='lepen'?undefined:(parent,oval)=>scalp(parent,oval,kind,style);
   addPortraitFace(head,points,style.palette,makeScalp);
   const mouth=points[61],yEye=(points[33].y+points[133].y)*.5;
@@ -275,16 +311,21 @@ export function createStatesmanPortrait(kind) {
     const lineY=.208+.026*Math.cos(x*13);
     const forehead=g(.075,lineY,.13,.012)+.67*g(.085,lineY+.038,.13,.011);
     const age=style.age;
+    const nostril=kind==='zelenskyy'||kind==='kadyrov' ? g(Math.abs(points[75].x),points[75].y,.021,.010) : 0;
     const bag=g(.14,yEye-.036,.072,.022);
     const browFurrow=g(.028,yEye+.086,.010,.032);
+    const socket=kind==='zelenskyy'?g(.154,yEye+.040,.095,.036):0;
+    const eyeCorner=kind==='zelenskyy'?g(.082,yEye-.004,.030,.027):0;
     const chin=g(.054,mouth.y-.08,.087,.015);
-    return {shape:age*(.015*g(foldX+.028,-.15,.047,.084)-.008*fold-.005*lid-.0014*forehead+.013*bag-.006*browFurrow-.007*chin),
-      shadow:age*(.14*fold+.115*lid+.064*temple+.066*forehead+.07*browFurrow+.06*chin),
+    const knit=kind==='zelenskyy'?g(.030,yEye+.092,.010,.048):0;
+    const eyeFold=kind==='zelenskyy'?g(.153,yEye-.042+.13*(x-.15),.081,.014):0;
+    return {shape:age*(.015*g(foldX+.028,-.15,.047,.084)-.008*fold-.005*lid-.0014*forehead+.013*bag-.006*browFurrow-.007*chin-.009*knit-.007*eyeFold-.014*nostril-.012*socket),
+      shadow:age*(.14*fold+.115*lid+.064*temple+.066*forehead+.07*browFurrow+.06*chin+.20*knit+.14*eyeFold+.54*nostril+.39*socket+.19*eyeCorner),
       beard:.35*g(.11,-.34,.19,.10)};
   });
   if(kind==='lepen') addLePenHair(head);
   else ears(head,points,kind,style);
-  if(kind==='zelenskyy') addCroppedBeard(head.userData.animatedFace,points);
+  if(kind==='zelenskyy'||kind==='kadyrov') sculptBeard(head.userData.animatedFace,points,kind);
   if(kind==='stubb'||kind==='merz'||kind==='macron') frames(head,points,kind);
   if(kind==='stubb'||kind==='merz') {
     smile(head,points,kind==='stubb'?.73:.62);

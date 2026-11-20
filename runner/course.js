@@ -75,7 +75,7 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
   const crossings = crossingPoints.map((progress, i) => ({ progress, side: i % 2 ? 1 : -1, phase: 'approach', launched: 0, launchAt: Infinity, nextLaunchAt: Infinity }));
   const maxSpeed = speedLimit * RUNNER_BOOST;
   const state = { distance: 0, elapsed: 0, speed: startSpeed, cruiseSpeed: startSpeed, throttle: 0, x: lanes[startLane], lane: startLane, invulnerable: 0, passed: 0, cleared: 0, bonus: 0, finished: false, traffic: [], crossings };
-  let nextSpawn = 0, nextId = 0, safeLane = startLane, nextCameo = 0, cameoIndex = 0;
+  let nextSpawn = 0, nextId = 0, safeLane = startLane, nextCameo = 0;
   const oldPose = {}, pose = {};
   function arrivalTime(distance) {
     if (distance <= 0) return 0;
@@ -97,6 +97,9 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
     return false;
   }
   const choose = count => Math.min(count - 1, Math.max(0, Math.floor(random() * count)));
+  // Short courses only have room for part of the roster. Vary the first cameo each run.
+  const firstCameo = () => cameoRiders.length > 1 ? choose(cameoRiders.length) : 0;
+  let cameoIndex = firstCameo();
   function resetCrossings() {
     const sides = [];
     for (const [index, crossing] of crossings.entries()) {
@@ -108,7 +111,7 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
   function reset() {
     Object.assign(state, { distance: 0, elapsed: 0, speed: startSpeed, cruiseSpeed: startSpeed, throttle: 0, x: lanes[startLane], lane: startLane, invulnerable: 0, passed: 0, cleared: 0, bonus: 0, finished: false });
     encounters.reset(); resetCrossings();
-    state.traffic.length = 0; nextSpawn = 0; nextId = 0; safeLane = startLane; nextCameo = 0; cameoIndex = 0;
+    state.traffic.length = 0; nextSpawn = 0; nextId = 0; safeLane = startLane; nextCameo = 0; cameoIndex = firstCameo();
   }
   function row() {
     const encounter = encounters.row();

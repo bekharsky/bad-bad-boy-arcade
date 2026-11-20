@@ -69,6 +69,11 @@ function body(model, look, kind) {
   model.geometry(look.jacket, new THREE.CylinderGeometry(shoulders, waist, height, sides)
     .scale(1, 1, depth).translate(0, bottom + height / 2, 0));
   oval(model, look.trousers, 0, 1.19, 0, .255, .16, .18);
+  if (look.standCollar) {
+    model.geometry(look.lapel,new THREE.CylinderGeometry(.133,.168,.115,24).translate(0,2.202,0));
+    jacketPanel(model, '#242123', [[-.008,2.15],[.008,2.15],[.008,1.18],[-.008,1.18]],.002);
+    return;
+  }
   if (look.shortSleeves) {
     oval(model, '#454834', 0, 2.17, 0, .157, .031, .133);
     return;

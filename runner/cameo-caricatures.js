@@ -8,7 +8,7 @@ import { createStatesmanPortrait } from './statesmen-portraits.js';
 const portraits = {
   purra: createPurraPortrait, orpo: createOrpoPortrait, marin: createMarinPortrait,
   stubb: createStatesmanPortrait, trump: createStatesmanPortrait, putin: createStatesmanPortrait,
-  lepen: createStatesmanPortrait, zelenskyy: createStatesmanPortrait,
+  kadyrov: createStatesmanPortrait, lepen: createStatesmanPortrait, zelenskyy: createStatesmanPortrait,
   macron: createStatesmanPortrait, merz: createStatesmanPortrait,
 };
 
