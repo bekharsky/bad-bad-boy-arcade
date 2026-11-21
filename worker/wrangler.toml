@@ -1,10 +1,10 @@
-name = "piss-deal-leaderboard"
+name = "bad-bad-boy-arcade-leaderboard"
 main = "index.js"
 compatibility_date = "2026-11-21"
 workers_dev = true
 
 [[d1_databases]]
 binding = "DB"
-database_name = "piss-deal-leaderboard"
+database_name = "bad-bad-boy-arcade-leaderboard"
 # Replace after creating the D1 database in the Cloudflare account.
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "71ac1a27-c00d-46f2-a222-5d81ae62f8fd"
