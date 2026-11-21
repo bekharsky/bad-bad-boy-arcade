@@ -32,7 +32,7 @@ test('switching between actual districts preserves hero size, screen position an
     const scene = new THREE.Scene(), world = createMapManager(scene, maps, .736), rig = createGameCamera();
     rig.resize(width, height, touch);
     let previous;
-    for (const id of ['harbor', 'baana', 'kamppi', 'aleksanterinkatu', 'senate-square', 'harbor']) {
+    for (const id of ['harbor', 'baana', 'kamppi', 'central-station', 'aleksanterinkatu', 'senate-square', 'harbor']) {
       world.activate(id);
       rig.frame(world.spawn.x, world.spawn.z, 0, true);
       const next = heroProjection(rig.camera, world.spawn);
@@ -110,14 +110,15 @@ test('mobile lens shift keeps aiming aligned and resizing back restores the desk
   assert.deepEqual(rig.camera.projectionMatrix.elements, desktop.elements);
 });
 
-test('Senate Square is the fifth district and direct links preserve the new campaign order', () => {
+test('Senate Square is the sixth district and direct links preserve the new campaign order', () => {
   const campaign = createCampaign(maps.map(map => map.id));
   assert.equal(campaign.plan(1).mapId, 'harbor');
   assert.equal(campaign.plan(3).mapId, 'baana');
   assert.equal(campaign.plan(5).mapId, 'kamppi');
-  assert.equal(campaign.plan(7).mapId, 'aleksanterinkatu');
-  assert.equal(campaign.plan(9).mapId, 'senate-square');
-  assert.deepEqual(mapOrder('senate-square').map(map => map.id), ['senate-square', 'harbor', 'baana', 'kamppi', 'aleksanterinkatu']);
+  assert.equal(campaign.plan(7).mapId, 'central-station');
+  assert.equal(campaign.plan(9).mapId, 'aleksanterinkatu');
+  assert.equal(campaign.plan(11).mapId, 'senate-square');
+  assert.deepEqual(mapOrder('senate-square').map(map => map.id), ['senate-square', 'harbor', 'baana', 'kamppi', 'central-station', 'aleksanterinkatu']);
   assert.deepEqual(mapOrder('unknown'), maps);
   assert.equal(maps[0].id, 'harbor', 'Previewing never mutates the campaign registry');
 });

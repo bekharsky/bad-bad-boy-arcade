@@ -21,19 +21,19 @@ const { CAMEO_KINDS, isCameo } = await import('../runner/cameo-roster.js');
 const { createRunnerRun, TRAFFIC_CAPACITY, TRAM_LANES, trafficProfile } = await import('../runner/course.js');
 const seeded = seed => () => ((seed = seed * 16807 % 2147483647) - 1) / 2147483646;
 
-test('Aleksanterinkatu replaces Esplanadi between Kamppi and Senate Square, retaining old preview links', () => {
-  assert.deepEqual(maps.map(map => map.id), ['harbor', 'baana', 'kamppi', 'aleksanterinkatu', 'senate-square']);
+test('Aleksanterinkatu replaces Esplanadi between Central Station and Senate Square, retaining old preview links', () => {
+  assert.deepEqual(maps.map(map => map.id), ['harbor', 'baana', 'kamppi', 'central-station', 'aleksanterinkatu', 'senate-square']);
   assert.equal(mapOrder('esplanadi')[0].id, 'aleksanterinkatu');
-  assert.deepEqual(mapOrder('aleksanterinkatu').map(map => map.id), ['aleksanterinkatu', 'senate-square', 'harbor', 'baana', 'kamppi']);
+  assert.deepEqual(mapOrder('aleksanterinkatu').map(map => map.id), ['aleksanterinkatu', 'senate-square', 'harbor', 'baana', 'kamppi', 'central-station']);
   const campaign = createCampaign(maps.map(map => map.id)), entered = [];
   const waves = createWaveDirector({ campaign, onWave: plan => entered.push(plan), onReinforcements() {} });
   waves.start();
   for (let wave = 2; wave <= 3; wave++) waves.update(1.4, 0);
   waves.completeMap();
-  for (let wave = 6; wave <= 7; wave++) waves.update(1.4, 0);
+  for (let wave = 6; wave <= 9; wave++) waves.update(1.4, 0);
   assert.equal(entered.at(-1).mapId, 'aleksanterinkatu');
   waves.completeMap();
-  assert.equal(entered.at(-1).number, 9);
+  assert.equal(entered.at(-1).number, 11);
   assert.equal(entered.at(-1).mapId, 'senate-square');
 });
 
@@ -105,7 +105,7 @@ test('both runners leave a safe path at full brake, boost and changing pace betw
 });
 
 test('trams collide along their full length and cannot be destroyed by spray', () => {
-  const run = createRunnerRun({ ...aleksanterinkatuMap.runner, tramChance: 1, crossingPoints: [], random: () => .2 });
+  const run = createRunnerRun({ ...aleksanterinkatuMap.runner, riderKinds: ['bike'], tramChance: 1, crossingPoints: [], random: () => .2 });
   run.update(.01);
   const tram = run.state.traffic[0]; assert.equal(tram.kind, 'tram');
   Object.assign(tram, { lane: run.state.lane, x: run.state.x, progress: run.state.distance + 8.1 });
@@ -144,10 +144,17 @@ test('facades frame real cross-street openings; traffic geometry and material co
   assert.ok(lamps.length > 20);
   assert.equal(new Set(lamps.map(node => node.geometry)).size, 1);
   assert.ok(lamps.filter(node => node.position.z >= 0).every(node => !node.visible), 'Foreground lamps do not hide gameplay');
-  const resources = new Set(); map.root.traverse(node => { if (node.geometry) resources.add(node.geometry); if (node.material) resources.add(node.material); });
+  function collectResources() {
+    const resources = new Set();
+    map.root.traverse(node => {
+      if (node.geometry) resources.add(node.geometry);
+      if (node.material) for (const material of [node.material].flat()) resources.add(material);
+    });
+    return resources;
+  }
+  const resources = collectResources();
   for (let i = 0; i < 100; i++) { steer(run); run.update(.5); map.updateRunner(run.state); }
-  const after = new Set(); map.root.traverse(node => { if (node.geometry) after.add(node.geometry); if (node.material) after.add(node.material); });
-  assert.deepEqual(after, resources);
+  assert.deepEqual(collectResources(), resources);
   const pool = map.root.children.filter(node => node.name === 'Aleksanterinkatu traffic');
   assert.equal(pool.length, TRAFFIC_CAPACITY);
   assert.ok(map.root.getObjectByName('Aleksanterinkatu traffic templates').children.some(variant => variant.name === 'tram tram'));

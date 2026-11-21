@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import { enemyHealth } from './waves.js';
 import { createGooseModel, gooseRig, animateGoose } from './goose.js';
+import { paintFigure } from './world/painted-material.js';
 
 const templates = new Map();
 const SLUG_MODEL_URL = new URL('./assets/enemies/slug.glb', import.meta.url).href;
@@ -30,6 +31,7 @@ export function createEnemy(kind, level) {
       if (!materials.has(original)) {
         const material = original.clone();
         material.metalness = 0;
+        paintFigure(material);
         materials.set(original, material);
       }
       return materials.get(original);

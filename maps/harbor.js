@@ -110,22 +110,6 @@ function buildHarbor(scene) {
     if (Math.abs(Math.abs(x) - 10) < 2.4) continue;
     part('box', '#e2ddc7', x, .009, BOULEVARD_Z + side * 1.65, 1.6, .012, .07);
   }
-  function sign(text, x, y, z, width, color = '#254e50') {
-    const c = document.createElement('canvas'); c.width = 512; c.height = 96;
-    const g = c.getContext('2d');
-    g.fillStyle = color; g.fillRect(0, 0, 512, 96);
-    g.strokeStyle = '#dcd2ac'; g.lineWidth = 4; g.strokeRect(7, 7, 498, 82);
-    g.fillStyle = '#fff0c2'; g.font = 'bold 43px sans-serif';
-    const textWidth = g.measureText(text).width;
-    const maxTextWidth = c.width - 48;
-    if (textWidth > maxTextWidth) g.font = `bold ${Math.floor(43 * maxTextWidth / textWidth)}px sans-serif`;
-    g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, 256, 50);
-    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, width * 96 / 512), new THREE.MeshStandardMaterial({ map: t, roughness: 0.8 }));
-    mesh.position.set(x - (activeBuilding?.x ?? 0), y, z - (activeBuilding?.z ?? 0));
-    (activeBuilding?.group ?? scene).add(mesh);
-    return mesh;
-  }
   function shopLogo(d, h) {
     const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 256;
     const context = canvas.getContext('2d');
@@ -333,8 +317,6 @@ function buildHarbor(scene) {
     }
     part('box', '#52625e', x, 4.25, -4.85, .025, .025, 11.5);
   }
-  const squareSign = sign('BAD BAD BOY / HELSINKI', 0, .025, 14.5, 5.5, '#4b6267');
-  squareSign.rotation.x = -Math.PI / 2;
   // Physical bollards and painted edges communicate the playable boundary.
   for (let n = -26; n <= 26; n += 2) for (const s of [-1, 1]) {
     part('cylinder', '#697c7d', n, 0.28, s * 28.2, 0.13, 0.56, 0.13);
@@ -378,7 +360,7 @@ function buildHarbor(scene) {
       const departed = tram.update(dt, entities, navigation);
       const occupiedCell = tram.root.visible ? Math.floor(tram.root.position.x) : null;
       if (occupiedCell !== tramCell) { tramCell = occupiedCell; navigation.refresh(); }
-      return departed ? 'TRAM 9 · JÄTKÄSAARI' : null;
+      return departed ? 'TRAM APPROACHING' : null;
     },
   };
 }

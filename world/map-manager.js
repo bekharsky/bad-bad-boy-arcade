@@ -7,6 +7,7 @@ export function createMapManager(scene, definitions, playerRadius = .4) {
   const defaultBackground = scene.background, defaultFog = scene.fog;
   const manager = {
     get id() { return active?.id; },
+    get root() { return active?.root; },
     get name() { return active?.name; },
     get mode() { return active?.mode ?? 'arena'; },
     get runner() { return active?.runner; },

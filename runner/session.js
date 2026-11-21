@@ -24,7 +24,7 @@ export function createRunnerSession({
     baseScore = score;
     player.invulnerable = 0;
     steering.reset();
-    onProgress(0);
+    onProgress(0, run.state.traffic);
     world.updateRunner(run.state, cameraRig.camera?.position);
   }
 
@@ -52,7 +52,7 @@ export function createRunnerSession({
     onSpray(dt, firing, state.traffic);
     // Settle after spray damage so a hit on the finishing frame is counted.
     syncScore();
-    onProgress(state.distance / run.length);
+    onProgress(state.distance / run.length, state.traffic);
     medkits.update(dt, player, onCollect, state);
     player.invulnerable = state.invulnerable;
     player.model.material.opacity = state.invulnerable > 0 && Math.floor(state.elapsed * 18) % 2 === 0 ? .4 : 1;

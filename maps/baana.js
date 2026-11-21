@@ -67,8 +67,20 @@ function buildBaana(root) {
       scenery.geometry('#435f59', new THREE.CylinderGeometry(.05, .08, 3.8, 7).translate(x, 1.9, 0));
       box('#e8dcb4', x, 3.85, 0, .65, .1, .65);
     }
-    // Bright murals break the stone rhythm at intervals, like Baana's art areas.
-    if (section % 2 === 0) for (let stripe = 0; stripe < 6; stripe++) box(['#ae6f57', '#7c9b8d', '#d0ad6a'][stripe % 3], -6.52, 1.5, -3 + stripe * .85, .025, 1.8, .7);
+    // A painted Baltic ferry on the cutting wall, all in the scenery batch.
+    if (section === 0 || section === 3) {
+      box('#17483e', -6.20, 2.5, -5, .06, 3.2, 10);
+      const paint = (color, shape, layer) => scenery.geometry(color,
+        shape.rotateY(Math.PI / 2).translate(-6.16 + layer * .012, 2.5, -5));
+      paint('#eeb946', new THREE.CircleGeometry(.9, 32).translate(2.6, .41, 0), 0);
+      const hull = new THREE.Shape();
+      hull.moveTo(-3.65, -.05); hull.lineTo(2.75, -.05); hull.lineTo(2.05, -.78); hull.lineTo(-2.95, -.78);
+      paint('#f6e6b9', new THREE.ShapeGeometry(hull), 1);
+      box('#f6e6b9', -6.14, 2.76, -4.6, .025, .55, 3.55);
+      box('#cc7954', -6.13, 3.27, -4, .025, .52, .52);
+      for (let z = -5.9; z < -3.1; z += .49) box('#17483e', -6.115, 2.79, z, .012, .2, .32);
+      for (const z of [-8, -5.1, -2]) box('#80b8a9', -6.14, 1.39, z, .02, .12, 2.1);
+    }
     const group = scenery.finish({ vertexColors: true }); root.add(group); sections.push(group);
     if (section === 1 || section === 4) {
       const bridge = createSceneryModel('Baana road bridge');
@@ -79,7 +91,8 @@ function buildBaana(root) {
         for (let x = -8; x <= 8; x += 1.4) bridge.box('#73867e', x, 8.15, side * 2.3, .045, 1.15, .045);
         bridge.box('#73867e', 0, 8.7, side * 2.3, 19, .06, .06);
       }
-      const object = bridge.finish({ vertexColors: true }); group.add(object);
+      const object = bridge.finish({ vertexColors: true });
+      group.add(object);
       const building = registerBuilding(object);
       buildings.push({ ...building, section: group, baseBounds: building.bounds.clone() });
     }

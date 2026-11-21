@@ -17,6 +17,7 @@ export const TRAM_LANES = Object.freeze([-2.2, 2.2]);
 export const TRAFFIC_COLORS = Object.freeze(['green', 'blue', 'red']);
 export const TRAFFIC_CAPACITY = 24;
 const PASSERBY_LANE_OFFSET = .85;
+const CAMEO_JOG_SPEED = 2.8;
 
 export const ROADWORK_TYPES = Object.freeze(['cone', 'tractor', 'barrier', 'trench']);
 const PROFILES = {
@@ -79,7 +80,7 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
   const crossings = crossingPoints.map((progress, i) => ({ progress, side: i % 2 ? 1 : -1, phase: 'approach', launched: 0, launchAt: Infinity, nextLaunchAt: Infinity }));
   const maxSpeed = speedLimit * RUNNER_BOOST;
   const state = { distance: 0, elapsed: 0, speed: startSpeed, cruiseSpeed: startSpeed, throttle: 0, x: lanes[startLane], lane: startLane, invulnerable: 0, passed: 0, cleared: 0, bonus: 0, finished: false, traffic: [], crossings };
-  let nextSpawn = 0, nextId = 0, safeLane = startLane, nextCameo = 12;
+  let nextSpawn = 0, nextId = 0, safeLane = startLane, nextCameo = 0, lastCameoSide = 0;
   const oldPose = {}, pose = {};
   function arrivalTime(distance) {
     if (distance <= 0) return 0;
@@ -106,11 +107,20 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
     const active = state.traffic.find(agent => isCameo(agent.kind));
     if (active) return !active.passed && Math.abs(active.x) < cameoShoulder - .05;
     if (state.distance < nextCameo) return false;
+    // Once a cameo is due, let the last crossing scooter leave before
+    // scheduling another row into the clear stretch beyond the junction.
+    if (crossings.some(entry => entry.phase === 'warning' || entry.phase === 'crossing')) return true;
     const approachSpeed = Math.max(state.speed, state.cruiseSpeed * .75);
-    const crossing = crossings.find(entry => entry.phase !== 'clear' && entry.progress >= state.distance - 14);
-    const room = crossing ? crossing.progress - state.distance - Math.max(24, approachSpeed * 1.55) : Infinity;
-    const lead = Math.min(room, approachSpeed * 3.2 + 7);
-    if (lead < approachSpeed * 2 + 4 || state.distance + lead >= length) return false;
+    const crossing = crossings.find(entry => entry.phase === 'approach');
+    // Allow a switch from braking to full boost during the reveal. Leave
+    // the crossing warning its own time on screen after the jogger passes.
+    const boostSpeed = Math.min(speedLimit, state.cruiseSpeed + 5 * acceleration) * RUNNER_BOOST;
+    const distanceBeforeWarning = crossing ? crossing.progress - state.distance - boostSpeed * 2.5 - 2 : Infinity;
+    const room = distanceBeforeWarning * (1 + CAMEO_JOG_SPEED / boostSpeed);
+    const closingSpeed = approachSpeed + CAMEO_JOG_SPEED;
+    const minimumLead = (boostSpeed + CAMEO_JOG_SPEED) * 2.2;
+    const lead = Math.min(room, length - state.distance - 1, Math.max(minimumLead, closingSpeed * 3.4));
+    if (lead < minimumLead) return false;
     const progress = state.distance + lead;
     // Let the previous row pass through before granting the player an open
     // stretch. Ordinary rows resume after the cameo has passed or run off.
@@ -120,13 +130,15 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
     const [kind] = availableCameos.splice(choose(availableCameos.length), 1);
     const profile = trafficProfile(kind);
     // The shoulder starts within reach of a ground splash from the outer lane.
-    const x = choose(2) ? lanes.at(-1) + PASSERBY_LANE_OFFSET : lanes[0] - PASSERBY_LANE_OFFSET;
+    lastCameoSide = lastCameoSide ? -lastCameoSide : choose(2) ? 1 : -1;
+    const x = lastCameoSide > 0 ? lanes.at(-1) + PASSERBY_LANE_OFFSET : lanes[0] - PASSERBY_LANE_OFFSET;
     state.traffic.push({
-      id: nextId++, kind, progress, speed: 1.8, x,
+      id: nextId++, kind, progress, speed: CAMEO_JOG_SPEED, x, heading: 0,
       z: state.distance - progress, size: profile.size, hitHeight: profile.hitHeight,
       hp: riderHealth(kind), alive: true, passed: false, hitUntil: 0, age: 0, gait: 0,
     });
-    nextCameo = state.distance + 90 + 20 * random();
+    // On streets with cross traffic, leave a longer stretch for ordinary traffic.
+    nextCameo = state.distance + (crossings.length ? 56 : 40) + 10 * random();
     return true;
   }
   function resetCrossings() {
@@ -140,7 +152,7 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
   function reset() {
     Object.assign(state, { distance: 0, elapsed: 0, speed: startSpeed, cruiseSpeed: startSpeed, throttle: 0, x: lanes[startLane], lane: startLane, invulnerable: 0, passed: 0, cleared: 0, bonus: 0, finished: false });
     encounters.reset(); resetCrossings();
-    state.traffic.length = 0; nextSpawn = 0; nextId = 0; safeLane = startLane; nextCameo = 12;
+    state.traffic.length = 0; nextSpawn = 0; nextId = 0; safeLane = startLane; nextCameo = 0; lastCameoSide = 0;
     availableCameos.splice(0, availableCameos.length, ...cameoRiders);
   }
   function row() {
@@ -274,7 +286,8 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
             const profile = trafficProfile('scooter');
             state.traffic.push({ id: nextId++, kind: 'scooter', color: TRAFFIC_COLORS[choose(3)], crossing: true, vx: -crossing.side * pass.speed, x: crossing.side * 14, z: state.distance - progress, progress, speed: 0, size: profile.size, hitHeight: profile.hitHeight, hp: SCOOTER_HEALTH, alive: true, hit: false, passed: false, hitUntil: 0, spawnTime: state.elapsed });
           }
-          if (crossing.launched === 2 && state.elapsed > crossing.nextLaunchAt + 2.2 && gap < -10) crossing.phase = 'clear';
+          if (crossing.phase === 'crossing' && crossing.launched === 2 && gap < -10 &&
+              !state.traffic.some(agent => agent.crossing && !agent.passed)) crossing.phase = 'clear';
         }
         for (const traffic of state.traffic) {
           if (isCameo(traffic.kind)) {
@@ -283,14 +296,17 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
             if (traffic.panicSide !== undefined) {
               const edge = cameoShoulder;
               traffic.x += traffic.panicSide * Math.min(4.4 * step, Math.max(0, edge - traffic.panicSide * oldLateral));
-              traffic.heading = Math.atan2(traffic.x - oldLateral, traffic.speed * step);
+              const targetHeading = Math.atan2(traffic.x - oldLateral, traffic.speed * step);
+              const heading = traffic.heading ?? 0;
+              const turn = targetHeading - heading;
+              traffic.heading = heading + Math.atan2(Math.sin(turn), Math.cos(turn)) * (1 - Math.exp(-10 * step));
             }
             traffic.progress -= traffic.speed * step;
             traffic.z = state.distance - traffic.progress;
             traffic.passed = traffic.z > 2;
             traffic.age = (traffic.age ?? 1.2) + step;
             traffic.gait = (traffic.gait ?? 0) + cameoGaitForDistance(
-              Math.hypot(traffic.x - oldLateral, traffic.speed * step), traffic.panicSide !== undefined);
+              Math.hypot(traffic.x - oldLateral, traffic.speed * step), true);
             continue;
           }
           const oldProgress = traffic.progress;

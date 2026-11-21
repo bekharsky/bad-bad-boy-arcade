@@ -8,6 +8,7 @@ import { createFrameClock } from './world/frame-clock.js';
 import { prepareScene } from './world/render-preparation.js';
 import { createMapManager } from './world/map-manager.js';
 import { createGameCamera } from './world/game-camera.js';
+import { chooseWeather, createWeather } from './world/weather.js';
 import { createMapTransition } from './world/map-transition.js';
 import { createTransitionRenderer } from './world/transition-renderer.js';
 import { createCampaign, createWaveDirector } from './waves.js';
@@ -25,6 +26,7 @@ import { bindGameInput } from './game-input.js';
 import { preventGameZoom } from './gesture-guard.js';
 import { bindRunnerInput } from './runner/runner-input.js';
 import { createRunnerSession } from './runner/session.js';
+import { CAMEO_KINDS, isCameo } from './runner/cameo-roster.js';
 import { createSeagulls } from './seagulls.js';
 import { aimingUp, createSprayAim } from './spray-aim.js';
 
@@ -59,6 +61,8 @@ const heroHpFill = document.querySelector('#hero-hp-fill');
 const heroHeadPosition = new THREE.Vector3();
 const scoreLabel = document.querySelector('#score');
 const waveLabel = document.querySelector('#wave');
+const passerbyCard = document.querySelector('.passerby');
+let shownCameo = null;
 const toast = document.querySelector('#toast');
 const sprayButton = document.querySelector('#mobile-fire');
 const sprayGauges = document.querySelectorAll('[data-spray-gauge-fill]');
@@ -127,7 +131,8 @@ const cameraRig = createGameCamera();
 const { camera } = cameraRig;
 cameraRig.frame(world.spawn.x, world.spawn.z, 0, true);
 
-scene.add(new THREE.HemisphereLight(0xd8e9ff, 0x757264, 2.3));
+const skyLight = new THREE.HemisphereLight();
+scene.add(skyLight);
 const keyLight = new THREE.DirectionalLight(0xffdfad, 2.6);
 keyLight.position.set(-12, 25, 10);
 keyLight.castShadow = true;
@@ -138,8 +143,17 @@ keyLight.shadow.camera.right = 38;
 keyLight.shadow.camera.top = 38;
 keyLight.shadow.camera.bottom = -38;
 keyLight.shadow.normalBias = 0.035;
+keyLight.shadow.intensity = .85;
 keyLight.shadow.camera.far = 100;
 scene.add(keyLight);
+const weather = createWeather(scene, skyLight, keyLight, { compact: coarsePointer || reducedMotion.matches });
+const previewWeather = query.get('weather');
+function setDistrictWeather() {
+  const kind = ['clear', 'rain', 'snow'].includes(previewWeather) ? previewWeather : chooseWeather(Math.random());
+  weather.enter(kind, world.root);
+}
+setDistrictWeather();
+let firstRound = true;
 
 const player = {
   root: new THREE.Group(),
@@ -204,7 +218,7 @@ const waves = createWaveDirector({
   campaign,
   onWave: spawnWave,
   onReinforcements(count, plan) {
-    spawnEnemies(count, plan.number);
+    spawnEnemies(count, plan.combatWave);
     showToast(`REINFORCEMENTS +${count} · KEEP FIGHTING!`);
   },
 });
@@ -255,9 +269,11 @@ const runnerSession = createRunnerSession({
   onSpray(dt, firing, traffic) { updateSprayGauge(updateSpray(dt, firing, traffic)); },
   onCollect: collectMedkit,
   onScore(value) { score = value; scoreLabel.textContent = String(score).padStart(4, '0'); },
-  onProgress(fraction) {
+  onProgress(fraction, traffic) {
     runnerProgress.firstElementChild.style.transform = `scaleX(${fraction})`;
     runnerProgress.setAttribute('aria-valuenow', String(Math.round(fraction * 100)));
+    const passerby = traffic.find(agent => isCameo(agent.kind) && agent.age >= .3 && !agent.passed && agent.panicSide === undefined);
+    showCameo(passerby?.kind ?? null);
   },
   onFinish() {
     score += 500; scoreLabel.textContent = String(score).padStart(4, '0');
@@ -294,8 +310,26 @@ async function prepareGraphics() {
   renderingReady = true;
 }
 
+function showCameo(kind) {
+  if (kind === shownCameo) return;
+  shownCameo = kind;
+  passerbyCard.hidden = !kind;
+  if (kind) {
+    // The portrait strip follows the roster, one square frame per model.
+    passerbyCard.style.setProperty('--portrait-x', `${CAMEO_KINDS.indexOf(kind) * 100 / (CAMEO_KINDS.length - 1)}%`);
+  }
+}
+
 function syncLevelUI() {
   const runner = isRunner();
+  showCameo(null);
+  const stops = document.querySelector('.route-stops');
+  stops.setAttribute('aria-label', world.name);
+  stops.replaceChildren(...maps.map(map => {
+    const stop = document.createElement('i');
+    stop.classList.toggle('current', map.id === world.id);
+    return stop;
+  }));
   toast.hidden = runner;
   if (runner) { clearTimeout(showToast.timer); toast.classList.remove('visible'); }
   desktopSpray.hidden = !playing;
@@ -407,6 +441,8 @@ function spawnWave(plan) {
 function applyWave(plan) {
   const changedMap = world.activate(plan.mapId);
   if (changedMap || plan.number === 1) {
+    if (changedMap || !firstRound) setDistrictWeather();
+    firstRound = false;
     // Keep score, but begin every district at full health with no old attacks.
     // Reset also rebuilds navigation before placing pickups.
     clearArena();
@@ -419,14 +455,16 @@ function applyWave(plan) {
     seagulls.reset(player, isRunner());
     medkits.reset(player);
     if (!isRunner()) batteries.reset(player);
+  } else if (!isRunner()) {
+    arenaCameos.nextWave(camera.position);
   }
   syncLevelUI();
   if (isRunner()) {
     runnerSession.start(world.runner, score);
   } else {
-    waveLabel.textContent = String(plan.number).padStart(2, '0');
-    spawnEnemies(plan.enemyCount, plan.number);
-    if (plan.number > 1) showToast(`WAVE ${plan.number}`);
+    waveLabel.textContent = String(plan.combatWave).padStart(2, '0');
+    spawnEnemies(plan.enemyCount, plan.combatWave);
+    if (plan.combatWave > 1) showToast(`WAVE ${plan.combatWave}`);
   }
   if (changedMap && renderingReady) {
     prepareGraphics().catch(error => {
@@ -745,6 +783,7 @@ function clearArena() {
 }
 
 function endGame() {
+  showCameo(null);
   if (isRunner()) runnerSession.syncScore();
   playing = false;
   desktopSpray.hidden = true;
@@ -781,6 +820,7 @@ function animate(now) {
     return !controlsDialog.open && renderingReady;
   });
   if (!renderingReady) return;
+  if (!controlsDialog.open && !mapTransition.active) weather.update(dt, isRunner() ? runnerSession.state.distance : 0);
   if (player.model) world.updateVisibility(camera, player.root, HERO_HEIGHT, dt);
   if (mapTransition.active) {
     transitionRenderer.render(scene, camera, mapTransition.progress, reducedMotion.matches);

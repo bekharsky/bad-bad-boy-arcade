@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { paintFigure } from './world/painted-material.js';
 
 // The prepared GLB is 1.5 units tall: +Z is forward, X separates the legs,
 // and Y is up. Its original UVs and colour material stay on the skinned mesh.
@@ -52,6 +53,8 @@ export function createHero(scene) {
   geometry.setAttribute('skinWeight', new THREE.Float32BufferAttribute(weights, 4));
 
   const mesh = new THREE.SkinnedMesh(geometry, original.material);
+  mesh.material.defines = { ...mesh.material.defines, PAINTED_CLAY: 1 };
+  paintFigure(mesh.material);
   mesh.add(root);
   mesh.bind(new THREE.Skeleton(bones));
   mesh.castShadow = true;

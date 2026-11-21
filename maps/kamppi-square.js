@@ -252,7 +252,7 @@ function buildKamppi(root) {
       const departed = tram.update(dt, actors, navigation);
       const occupied = tram.root.visible ? Math.floor(tram.root.position.x) : null;
       if (occupied !== tramCell) { tramCell = occupied; navigation.refresh(); }
-      return departed ? 'KAMPPI · MANNERHEIMINTIE' : null;
+      return departed ? 'TRAM APPROACHING' : null;
     },
   };
 }
