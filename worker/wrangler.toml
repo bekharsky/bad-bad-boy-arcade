@@ -1,0 +1,10 @@
+name = "piss-deal-leaderboard"
+main = "index.js"
+compatibility_date = "2026-11-21"
+workers_dev = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "piss-deal-leaderboard"
+# Replace after creating the D1 database in the Cloudflare account.
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
