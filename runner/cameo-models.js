@@ -84,8 +84,10 @@ function body(model, look, kind) {
       [[side*.14, 2.16], [side*.27, 2.06], [side*.08, 1.68], [side*.19, 1.94], [side*.10, 2.02]], .002);
   }
   if (suit) {
+    const tieTip = kind === 'trump' ? 1.38 : 1.65;
     jacketPanel(model, look.tie,
-      [[0, 2.10], [-.039, 2.03], [-.045, 1.69], [0, 1.65], [.045, 1.69], [.039, 2.03]], .003);
+      [[0, 2.10], [-.039, 2.03], [-.045, tieTip + .04], [0, tieTip], [.045, tieTip + .04], [.039, 2.03]], .003);
+    jacketPanel(model, look.lapel, [[.16,1.92],[.27,1.95],[.27,1.925],[.16,1.895]], .003);
   }
   jacketPanel(model, INK, [[-.004, 1.65], [.004, 1.65], [.004, 1.17], [-.004, 1.17]], .001);
   for (const y of [1.55, 1.39]) {
@@ -98,16 +100,25 @@ function body(model, look, kind) {
 }
 
 function limbs(root, look, shoulderDrop = 0) {
+  const sole = look.formal || look.standCollar ? '#383331' : '#c9c5ad';
   for (const side of [-1, 1]) {
     const leg = createSceneryModel(`${look.name} leg ${side}`);
-    rod(leg, look.trousers, [0, .02, 0], [0, -.55, 0], .126, .10);
+    // Broad thigh, tucked knee and trouser hem give a running leg a distinct silhouette.
+    leg.geometry(look.trousers, new THREE.LatheGeometry([
+      new THREE.Vector2(.095, -.55), new THREE.Vector2(.116, -.34),
+      new THREE.Vector2(.149, -.10), new THREE.Vector2(.13, .02),
+    ], 10).scale(1, 1, .92));
     const legRoot = leg.finish({ vertexColors: true });
     legRoot.position.set(side * .16, 1.21, 0);
     legRoot.userData.stride = side;
     const shin = createSceneryModel(`${look.name} knee ${side}`);
     oval(shin, look.trousers, 0, 0, 0, .10, .11, .105);
-    rod(shin, look.trousers, [0, 0, 0], [0, -.50, 0], .10, .075);
-    oval(shin, INK, 0, -.52, .08, .115, .08, .225);
+    shin.geometry(look.trousers, new THREE.LatheGeometry([
+      new THREE.Vector2(.095, -.50), new THREE.Vector2(.083, -.45),
+      new THREE.Vector2(.113, -.17), new THREE.Vector2(.096, 0),
+    ], 10).scale(1, 1, .95));
+    oval(shin, INK, 0, -.515, .075, .118, .087, .215);
+    oval(shin, sole, 0, -.565, .08, .119, .029, .213, 0, 12);
     const knee = shin.finish({ vertexColors: true });
     knee.position.y = -.55;
     knee.userData.knee = side;
@@ -127,6 +138,7 @@ function limbs(root, look, shoulderDrop = 0) {
     armRoot.userData.swing = -side;
     const forearm = createSceneryModel(`${look.name} elbow ${side}`);
     rod(forearm, look.shortSleeves ? look.skin : look.jacket, [0, 0, 0], [0, -.30, 0], .085, .067);
+    if (look.formal) rod(forearm, look.shirt, [0,-.285,0], [0,-.325,0], .070, .066);
     oval(forearm, look.skin, 0, -.35, 0, .077, .10, .068);
     const elbow = forearm.finish({ vertexColors: true });
     elbow.position.y = -.37;
@@ -160,7 +172,7 @@ export function createCameoModel(kind) {
   return root;
 }
 
-export function animateCameo(root, time, moving = true, viewerYaw = 0, walking = false) {
+export function animateCameo(root, time, moving = true, viewerYaw = 0, walking = false, chinLift = 0) {
   const phase = time * (walking ? 5.9 : 9), stride = moving ? Math.sin(phase) * (walking ? .85 : 1) : 0;
   const running = moving && !walking;
   root.position.y = moving ? Math.abs(Math.cos(phase)) * (walking ? .018 : .035) : 0;
@@ -178,6 +190,11 @@ export function animateCameo(root, time, moving = true, viewerYaw = 0, walking =
       part.children.find(child => child.userData.elbow).rotation.x = running ? -.92 + Math.min(0, swing) * .24 : -.18;
     }
   }
-  animateCameoHead(root.getObjectByName('3D head'), time, running);
+  const head = root.getObjectByName('3D head');
+  // A natural glance to either side. Ease back to straight ahead as the
+  // viewer passes behind the actor, without snapping across the +/-pi seam.
+  head.rotation.y = Math.atan2(Math.sin(viewerYaw), Math.max(.8, Math.cos(viewerYaw)));
+  head.rotation.x = -chinLift;
+  animateCameoHead(head, time, running);
   return 'sculpted-3d';
 }

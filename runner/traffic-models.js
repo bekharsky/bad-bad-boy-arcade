@@ -3,8 +3,9 @@ import { createSceneryModel } from '../maps/scenery-model.js';
 import { TRAM_CAR_OFFSET } from './tram-route.js';
 import { createCameoModel, animateCameo } from './cameo-models.js';
 import { isCameo } from './cameo-roster.js';
+import { paintFigure } from '../world/painted-material.js';
 
-export const TRAFFIC_PALETTE = { green: '#64c94c', blue: '#51bde0', red: '#e45c5c' };
+export const TRAFFIC_PALETTE = { green: '#358966', blue: '#36899b', red: '#cf5847' };
 
 // This bounded set of procedural templates stays in CPU memory.
 // They never enter a scene or allocate GPU buffers. Each map receives owned
@@ -23,7 +24,7 @@ export function createTrafficModel(kind, color) {
     const ownMaterial = original => {
       if (!materials.has(original)) {
         const material = original.clone();
-        material.onBeforeCompile = original.onBeforeCompile;
+        paintFigure(material);
         if (original.map) {
           if (!textures.has(original.map)) textures.set(original.map, original.map.clone());
           material.map = textures.get(original.map);
@@ -131,9 +132,26 @@ function buildTrafficModel(kind, color) {
   }
   // Helmet, jacket and hands distinguish live riders from parked vehicles.
   const lean = kind === 'bike' ? .25 : 0;
-  model.geometry(paint, new THREE.BoxGeometry(.64, .85, .4).rotateX(lean).translate(0, 1.95, -.26));
+  const coat = new THREE.LatheGeometry([
+    new THREE.Vector2(.28,-.43), new THREE.Vector2(.29,-.34),
+    new THREE.Vector2(.34,.23), new THREE.Vector2(.31,.34), new THREE.Vector2(.13,.42),
+  ], 10);
+  model.geometry(paint, coat.scale(1,.99,.77).rotateX(lean).translate(0, 1.95, -.26));
+  // Cream yoke, stand collar and a helmet peak make riders readable head-on.
+  model.geometry('#efd7a1', new THREE.CylinderGeometry(.295,.33,.095,10).scale(1,1,.79).rotateX(lean).translate(0,2.22,-.26+lean*.27));
+  model.geometry('#324f52', new THREE.CylinderGeometry(.15,.17,.19,10).translate(0,2.38,-.18));
   model.geometry('#c8a387', new THREE.SphereGeometry(.25, 12, 8).translate(0, 2.64, -.1));
   model.geometry('#e6dfc4', new THREE.SphereGeometry(.28, 12, 6, 0, Math.PI * 2, 0, Math.PI * .55).translate(0, 2.7, -.1));
+  model.geometry(paint, new THREE.SphereGeometry(1,10,6).scale(.245,.034,.17).translate(0,2.69,.068));
+  model.geometry('#bd886d', new THREE.SphereGeometry(1,8,5).scale(.056,.063,.069).translate(0,2.60,.145));
+  for (const side of [-1,1]) box('#403d37', side*.095,2.65,.129,.04,.026,.027);
+  if (kind === 'bike') {
+    box('#ad683b', .25,.88,-.81,.26,.43,.54);
+    box('#e7c88a', .25,1.09,-.81,.28,.08,.57);
+  } else {
+    rod('#dfb66c', [-.21,2.21,-.025], [.20,1.66,-.02], .035);
+    box('#263f48', .25,1.63,-.19,.24,.29,.40);
+  }
   for (const side of [-1, 1]) {
     rod(paint, [side * .3, 2.2, -.2], [side * .39, 1.88, .25], .09);
     rod('#c8a387', [side * .39, 1.88, .25], [side * .43, kind === 'bike' ? 1.7 : 1.88, .6], .07);

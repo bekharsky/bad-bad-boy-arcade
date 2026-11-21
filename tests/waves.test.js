@@ -63,6 +63,25 @@ function setup() {
   return { director, started, reinforcements };
 }
 
+test('only cleared combat waves raise the next crowd size and enemy health', () => {
+  const campaign = createCampaign(['harbor', 'baana', 'kamppi', 'aleksi', 'senate']);
+  const director = createWaveDirector({ campaign, onWave() {}, onReinforcements() {} });
+  director.start();
+  for (const [district, wave, count, hpBonus] of [['harbor', 1, 8, 0], ['kamppi', 3, 14, 0], ['senate', 5, 20, 1]]) {
+    assert.equal(director.current.mapId, district);
+    assert.equal(director.current.combatWave, wave);
+    assert.equal(director.current.enemyCount, count);
+    assert.equal(director.current.healthBonus, hpBonus);
+    if (district === 'senate') break;
+    director.update(1.4, 0); director.update(1.4, 0); director.completeMap();
+  }
+  campaign.setStartingMap('baana');
+  director.start(); director.completeMap();
+  assert.equal(director.current.mapId, 'kamppi');
+  assert.equal(director.current.combatWave, 1);
+  assert.equal(director.current.enemyCount, 8);
+});
+
 test('wave transitions run once after the clear delay, without wall-clock timers', () => {
   for (const fps of [30, 60, 120]) {
     const { director, started } = setup();

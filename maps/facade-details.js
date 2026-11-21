@@ -5,6 +5,17 @@ import * as THREE from 'three';
 export function addFacadeDetails(model, { width, depth, height, baseY = 0, storey = 1.55, windowBase = 1.25, windowHeight = 1.22, variant = 0, flowers = true, balcony = false }) {
   const { box } = model, front = depth / 2;
   const metal = '#536c66', stone = '#dcd1b5';
+  // Stepped end gable and copper oculus on an occasional street front.
+  if (width > 5 && width < 18 && variant % 3 === 0) {
+    const crest = baseY + height + .32;
+    for (let step = 0; step < 3; step++) {
+      const span = 2.7 - step * .68;
+      box(stone, 0, crest + step * .32, front, span, .37, .30);
+      box('#698782', 0, crest + step * .32 + .18, front, span + .1, .075, .36);
+    }
+    model.geometry('#426368', new THREE.CircleGeometry(.215, 12).translate(0, crest + .38, front + .158));
+    model.geometry('#bc9b67', new THREE.RingGeometry(.16, .215, 12).translate(0, crest + .38, front + .164));
+  }
   const sillLevel = baseY + Math.min(height - 1.25, windowBase + storey * 2 - windowHeight / 2 - .2);
   for (const side of [-1, 1]) {
     const face = side * (front + .18);

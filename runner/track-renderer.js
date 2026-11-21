@@ -4,6 +4,7 @@ import { createTrafficModel, animateTraffic } from './traffic-models.js';
 import { RUN_LANES, TRAFFIC_COLORS, TRAFFIC_CAPACITY, ROADWORK_TYPES } from './course.js';
 import { isCameo } from './cameo-roster.js';
 import { animateCameo } from './cameo-models.js';
+import { paintFigure } from '../world/painted-material.js';
 import { prepareFadingMaterials, setModelAppearance } from './model-appearance.js';
 
 // Geometry is shared within this map; hit-flash materials belong to each slot.
@@ -17,6 +18,7 @@ export function createRunnerTraffic(root, name, { riderKinds = ['bike', 'scooter
   const templateRoot = new THREE.Group();
   templateRoot.name = `${name} traffic templates`;
   templateRoot.visible = false;
+  templateRoot.userData.runnerTraffic = true;
   root.add(templateRoot);
   function addTemplate(kind, color) {
     const template = createTrafficModel(kind, color);
@@ -32,9 +34,11 @@ export function createRunnerTraffic(root, name, { riderKinds = ['bike', 'scooter
   emptyGeometry.setAttribute('position', new THREE.Float32BufferAttribute([], 3));
   for (let i = 0; i < TRAFFIC_CAPACITY; i++) {
     const object = new THREE.Group(); object.name = `${name} traffic`; object.visible = false;
+    object.userData.runnerTraffic = true;
     // One material per traffic slot keeps hit flashes local, while all colour
     // variants and wheels within that slot share the vertex-coloured material.
     const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .65, alphaHash: true });
+    paintFigure(material);
     trafficMaterials.push(material);
     templateRoot.add(new THREE.Mesh(emptyGeometry, material));
     root.add(object); trafficPool.push(object);
@@ -97,13 +101,13 @@ export function createRunnerTraffic(root, name, { riderKinds = ['bike', 'scooter
         : 0;
       // Crossing scooters have less time before reaching a lane than
       // oncoming rows. Keep their fade brief so the warning remains useful.
-      const fadeTime = cameo ? 1.2 : agent.crossing ? .24 : .7;
+      const fadeTime = cameo ? .5 : agent.crossing ? .24 : .7;
       const age = cameo ? agent.age : state.elapsed - (agent.spawnTime ?? state.elapsed - fadeTime);
       const opacity = THREE.MathUtils.smoothstep(age ?? fadeTime, 0, fadeTime);
       setModelAppearance(variant, slotAppearance[i], opacity, agent.hitUntil > state.elapsed ? .7 : 0);
       if (cameo) {
-        const walking = agent.panicSide === undefined;
-        animateCameo(variant, (agent.gait ?? state.elapsed) + agent.id, true, viewerYaw, walking);
+        const approaching = agent.panicSide === undefined;
+        animateCameo(variant, (agent.gait ?? state.elapsed) + agent.id, true, approaching ? viewerYaw : 0, false, approaching ? .18 : 0);
       } else {
         animateTraffic(variant, state.elapsed + agent.id, agent.crossing ? Math.abs(agent.vx) : agent.speed + state.speed, viewerYaw);
       }

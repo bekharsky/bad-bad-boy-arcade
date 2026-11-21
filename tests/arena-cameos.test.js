@@ -48,6 +48,20 @@ test('passers-by walk towards the square and stay calm close to the player', () 
   cameos.dispose();
 });
 
+test('the second arena wave brings fresh guests through clear entrances', () => {
+  const { cameos, player } = fixture();
+  const first = [...cameos.actors];
+  cameos.nextWave();
+  assert.equal(cameos.actors.length, 4, 'Occupied entrances are skipped');
+  for (let frame = 0; frame < 240; frame++) cameos.update(1 / 60, player);
+  cameos.nextWave();
+  assert.deepEqual(cameos.actors.slice(0, 4), first);
+  assert.equal(new Set(cameos.actors.map(actor => actor.kind)).size, 6);
+  cameos.nextWave();
+  assert.equal(cameos.actors.length, 6);
+  cameos.dispose();
+});
+
 test('splashing is optional and only triggers a temporary reaction, never a kill', () => {
   const { scene, world, player, cameos } = fixture();
   const actor = cameos.actors[1], emitter = new THREE.Object3D();
@@ -115,21 +129,27 @@ test('each arena samples reachable passers-by and moving trams keep them clear',
       for (const actor of cameos.actors) seen.add(actor.kind);
     }
     for (const kind of CAMEO_KINDS) assert.ok(seen.has(kind), definition.id + ' ' + kind);
-    let moved = 0;
-    for (let frame = 0; frame < 900; frame++) {
+    let moved = 0, arrivals = 0, departures = 0;
+    for (let frame = 0; frame < 3900; frame++) {
       world.update(1 / 60, [player, ...cameos.actors]);
       if (frame % 240 === 0) {
         const actor = cameos.actors[Math.floor(frame / 240) % cameos.actors.length];
         player.x = actor.x; player.z = actor.z;
       }
-      const previous = cameos.actors.map(actor => [actor.x, actor.z]);
+      const previous = new Map(cameos.actors.map(actor => [actor, [actor.x, actor.z]]));
       cameos.update(1 / 60, player);
-      for (const [index, actor] of cameos.actors.entries()) {
+      for (const actor of cameos.actors) {
         assert.equal(world.canStandAt(actor.x, actor.z, actor.size), true, `${definition.id}, ${actor.kind}, frame ${frame}`);
-        moved += Math.hypot(actor.x - previous[index][0], actor.z - previous[index][1]);
+        const position = previous.get(actor);
+        if (position) moved += Math.hypot(actor.x - position[0], actor.z - position[1]);
+        else arrivals++;
       }
+      departures += [...previous.keys()].filter(actor => !actor.alive).length;
+      assert.ok(cameos.actors.length <= 8);
+      if (frame === 899) assert.ok(arrivals >= 2, definition.id + ' brings in guests during the first wave');
     }
     assert.ok(moved > 20, `${definition.id}: civilians can move through the district`);
+    assert.ok(departures > 0 && arrivals > 4, definition.id + ' keeps welcoming guests as others leave');
     assert.equal(player.hp, 5);
   }
   cameos.dispose(); world.dispose();

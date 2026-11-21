@@ -27,9 +27,9 @@ export function createCampaign(mapIds, { wavesPerMap = 2 } = {}) {
       waveStats(number);
       return (Math.floor((number - 1) / wavesPerMap) + 1) * wavesPerMap + 1;
     },
-    plan(number) {
-      const stats = waveStats(number);
-      return { ...stats, mapId: order[(startingMap + Math.floor((number - 1) / wavesPerMap)) % order.length] };
+    plan(number, combatWave = number) {
+      const stats = waveStats(combatWave);
+      return { ...stats, number, mapId: order[(startingMap + Math.floor((number - 1) / wavesPerMap)) % order.length] };
     },
   };
 }
@@ -39,8 +39,8 @@ export function createCampaign(mapIds, { wavesPerMap = 2 } = {}) {
 export function createWaveDirector({ campaign, onWave, onReinforcements }) {
   const pressure = createEnemyPressure();
   let current = null, clearTime = 0;
-  function begin(number) {
-    const next = campaign.plan(number);
+  function begin(number, combatWave) {
+    const next = { ...campaign.plan(number, combatWave), combatWave };
     onWave(next);
     current = next;
     clearTime = 0;
@@ -48,14 +48,15 @@ export function createWaveDirector({ campaign, onWave, onReinforcements }) {
   }
   return {
     get current() { return current; },
-    start() { begin(1); },
-    completeMap() { if (current) begin(campaign.nextMapWave(current.number)); },
+    start() { begin(1, 1); },
+    // A running district advances the itinerary without consuming a combat wave.
+    completeMap() { if (current) begin(campaign.nextMapWave(current.number), current.combatWave); },
     onKill: pressure.onKill,
     update(dt, livingEnemies) {
       if (!current) return;
       if (livingEnemies === 0) {
         clearTime += dt;
-        if (clearTime + 1e-8 >= 1.4) begin(current.number + 1);
+        if (clearTime + 1e-8 >= 1.4) begin(current.number + 1, current.combatWave + 1);
       } else {
         clearTime = 0;
         const count = pressure.update(dt, livingEnemies);

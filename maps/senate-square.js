@@ -243,7 +243,7 @@ function buildSenateSquare(root) {
   root.add(boundary.finish({ vertexColors: true }));
   root.add(street.finish());
 
-  const tram = createTram(root, { z: TRAM_Z, display: '7  SENAATINTORI', extent: 44, initialWait: 6 });
+  const tram = createTram(root, { z: TRAM_Z, display: '7', extent: 44, initialWait: 6 });
   let tramCell = null;
   return {
     colliders, buildings,
@@ -253,7 +253,7 @@ function buildSenateSquare(root) {
       const departed = tram.update(dt, actors, navigation);
       const occupied = tram.root.visible ? Math.floor(tram.root.position.x) : null;
       if (occupied !== tramCell) { tramCell = occupied; navigation.refresh(); }
-      return departed ? 'TRAM 7 · SENAATINTORI' : null;
+      return departed ? 'TRAM APPROACHING' : null;
     },
   };
 }

@@ -35,7 +35,7 @@ export function createMap(definition, build) {
       },
       updateVisibility: visibility.update,
       update: (dt, actors) => content.update?.(dt, actors, navigation),
-      updateRunner: state => content.updateRunner?.(state),
+      updateRunner: (state, viewPosition) => content.updateRunner?.(state, viewPosition),
       reset() {
         content.reset?.();
         visibility.reset();

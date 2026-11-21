@@ -20,7 +20,8 @@ const seeded = seed => () => ((seed = seed * 16807 % 2147483647) - 1) / 21474836
 test('both runner maps vary the roadside roster across seeds and agree across frame rates', () => {
   for (const map of [baanaMap, aleksanterinkatuMap]) {
     const kinds = new Set(), firstKinds = new Set();
-    for (const seed of [1, 42, 819, 113, 17, 234, 718, 2001, 5003, 9871, 16729, 50123]) {
+    for (let sample = 0; sample < 48; sample++) {
+      const seed = 1 + 65537 * sample;
       const sequences = [];
       for (const fps of [30, 60]) {
         const run = createRunnerRun({ ...map.runner, random: seeded(seed) });
@@ -35,13 +36,15 @@ test('both runner maps vary the roadside roster across seeds and agree across fr
           }
           for (const agent of cameos) if (!seen.has(agent.id)) {
             seen.add(agent.id); appearances.push([agent.id, agent.x, agent.kind]);
+            if (appearances.length > 1) assert.ok(agent.x * appearances.at(-2)[1] < 0, 'The next jogger uses the other shoulder');
+            else assert.equal(agent.id, 0, 'The first encounter introduces a jogger before traffic');
             assert.equal(agent.alive, true);
             assert.equal(Math.abs(agent.x), Math.abs(run.lanes[0]) + .85);
             assert.ok(agent.age < .08);
             assert.ok(agent.progress - run.state.distance > (run.state.speed + agent.speed) * 1.7);
           }
         }
-        assert.ok(appearances.length > 1);
+        assert.ok(appearances.length >= (map === baanaMap ? 7 : 5), map.id + ' regularly introduces a new guest');
         assert.equal(new Set(appearances.map(a => a[2])).size, appearances.length);
         firstKinds.add(appearances[0][2]);
         for (const [, , kind] of appearances) kinds.add(kind);
@@ -52,6 +55,23 @@ test('both runner maps vary the roadside roster across seeds and agree across fr
     }
     assert.ok(firstKinds.size > 1);
     assert.deepEqual([...kinds].sort(), [...CAMEO_KINDS].sort(), map.id);
+  }
+});
+
+test('changing throttle leaves time to see each approaching face before a crossing warning', () => {
+  for (const map of [baanaMap, aleksanterinkatuMap]) {
+    const run = createRunnerRun({ ...map.runner, random: seeded(1729) });
+    const started = new Map();
+    while (!run.state.finished) {
+      run.setThrottle(Math.floor(run.state.elapsed / 1.8) % 2 ? 1 : -1);
+      run.update(1 / 30);
+      const actor = run.state.traffic.find(agent => isCameo(agent.kind) && !agent.passed);
+      if (!actor) continue;
+      if (!started.has(actor.id)) started.set(actor.id, run.state.elapsed);
+      if (actor.z >= 0) assert.ok(run.state.elapsed - started.get(actor.id) >= 2.15);
+      assert.ok(run.state.crossings.every(c => c.phase === 'clear' || c.phase === 'approach'));
+    }
+    assert.ok(started.size >= 2);
   }
 });
 
@@ -210,7 +230,13 @@ test('pooled cameo animates without new resources, keeps hit flashes local and r
   assert.equal(coat.emissiveIntensity, .7);
   assert.equal(coat.opacity, 0);
   assert.equal(slots[1].children[0].children[0].children[0].material.emissiveIntensity, 0);
-  state.elapsed = .3; state.traffic[0].age = .6; renderer.update(state);
+  const head = cameo.getObjectByName('3D head');
+  state.elapsed = .3; state.traffic[0].age = .25;
+  renderer.update(state, { x: 0, z: 15 });
+  assert.ok(head.rotation.y > 0 && head.rotation.x < 0, 'The approaching face looks inwards and up towards the camera');
+  state.traffic[0].lane = 2;
+  renderer.update(state, { x: 0, z: 15 });
+  assert.ok(head.rotation.y < 0, 'The other shoulder faces back towards the viewer');
   assert.equal(coat.opacity, .5);
   assert.equal(slots[1].children[0].children[0].children[0].material.opacity, 1);
   assert.notEqual(leg.rotation.x, originalRotation);
