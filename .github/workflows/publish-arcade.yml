@@ -36,6 +36,8 @@ jobs:
 
       - name: Build
         run: npm run build
+        env:
+          VITE_LEADERBOARD_API_URL: ${{ vars.LEADERBOARD_API_URL }}
 
       - name: Update built arcade branch
         run: |

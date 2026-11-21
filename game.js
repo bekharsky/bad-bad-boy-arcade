@@ -29,6 +29,7 @@ import { createRunnerSession } from './runner/session.js';
 import { CAMEO_KINDS, isCameo } from './runner/cameo-roster.js';
 import { createSeagulls } from './seagulls.js';
 import { aimingUp, createSprayAim } from './spray-aim.js';
+import { createLeaderboard } from './leaderboard.js';
 
 // World metres; the hero keeps the same physical size across every map.
 const HERO_HEIGHT = 3.45;
@@ -55,6 +56,13 @@ const startScreen = document.querySelector('#start-screen');
 const endScreen = document.querySelector('#end-screen');
 const startButton = document.querySelector('#start');
 const restartButton = document.querySelector('#restart');
+const leaderboard = createLeaderboard({
+  nameInput: document.querySelector('#player-name'),
+  lists: [document.querySelector('#leaderboard-list'), document.querySelector('#end-leaderboard-list')],
+  startStatus: document.querySelector('#leaderboard-status'),
+  endStatus: document.querySelector('#score-submit-status'),
+  retryButton: document.querySelector('#retry-score'),
+});
 const heroHud = document.querySelector('#hero-hud');
 const heroPower = document.querySelector('#hero-power');
 const heroHpFill = document.querySelector('#hero-hp-fill');
@@ -799,6 +807,7 @@ function endGame() {
   endScreen.classList.remove('hidden');
   document.querySelector('#end-title').textContent = 'WASTED';
   restartButton.textContent = 'PLAY AGAIN';
+  leaderboard.submit(score, waves.current?.combatWave ?? 1);
   player.model.material.opacity = 1;
   player.model.material.transparent = false;
   blip(80, 0.25);
