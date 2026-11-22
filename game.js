@@ -11,7 +11,7 @@ import { createGameCamera } from './world/game-camera.js';
 import { chooseWeather, createWeather } from './world/weather.js';
 import { createMapTransition } from './world/map-transition.js';
 import { createTransitionRenderer } from './world/transition-renderer.js';
-import { createCampaign, createWaveDirector } from './waves.js';
+import { createCampaign, createWaveDirector, WAVES_PER_MAP } from './waves.js';
 import { createBatteries } from './batteries.js';
 import { loadEnemyModels, createEnemy, animateEnemy, disposeEnemy } from './enemies.js';
 import { createSpraySystem } from './spray-system.js';
@@ -65,25 +65,19 @@ const leaderboard = createLeaderboard({
 });
 const heroHud = document.querySelector('#hero-hud');
 const heroPower = document.querySelector('#hero-power');
-const heroHpFill = document.querySelector('#hero-hp-fill');
 const heroHeadPosition = new THREE.Vector3();
 const scoreLabel = document.querySelector('#score');
-const waveLabel = document.querySelector('#wave');
-const waveRemaining = document.querySelector('#wave-remaining');
-let lastEnemyCount = -1;
+const levelDial = document.querySelector('#level-dial');
+const levelProgressArc = document.querySelector('#level-progress-arc');
+const healthProgressArc = document.querySelector('#health-progress-arc');
 const passerbyCard = document.querySelector('.passerby');
 let shownCameo = null;
 const toast = document.querySelector('#toast');
 const sprayButton = document.querySelector('#mobile-fire');
-const sprayGauges = document.querySelectorAll('[data-spray-gauge-fill]');
-const desktopSpray = document.querySelector('#desktop-spray');
-const sprayRange = document.querySelector('#spray-range');
 const controlsDialog = document.querySelector('#controls-dialog');
 const settingsButton = document.querySelector('#open-settings');
 const settingsDone = document.querySelector('#settings-done');
 const soundSetting = document.querySelector('#sound-setting');
-const waveStatLabel = document.querySelector('#wave-stat-label');
-const runnerProgress = document.querySelector('#runner-progress');
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const query = new URLSearchParams(window.location.search);
 const debugMaps = query.get('debug') === 'maps';
@@ -226,7 +220,8 @@ const waves = createWaveDirector({
   campaign,
   onWave: spawnWave,
   onReinforcements(count, plan) {
-    spawnEnemies(count, plan.combatWave);
+    levelEnemiesTotal += spawnEnemies(count, plan.combatWave);
+    updateArenaLevelProgress();
     showToast(`REINFORCEMENTS +${count} · KEEP FIGHTING!`);
   },
 });
@@ -260,6 +255,10 @@ const POWER_TIME = 8;
 let playing = false;
 let gameTime = 0;
 let score = 0;
+let levelProgress = 0;
+let levelNumber = 1;
+let levelEnemiesCleared = 0;
+let levelEnemiesTotal = 0;
 let audioContext = null;
 let renderingReady = false;
 const frameClock = createFrameClock();
@@ -274,17 +273,16 @@ const runnerSession = createRunnerSession({
     if (player.hp === 0) { endGame(); return false; }
     return true;
   },
-  onSpray(dt, firing, traffic) { updateSprayGauge(updateSpray(dt, firing, traffic)); },
+  onSpray(dt, firing, traffic) { updateSprayFeedback(updateSpray(dt, firing, traffic)); },
   onCollect: collectMedkit,
-  onScore(value) { score = value; scoreLabel.textContent = String(score).padStart(4, '0'); },
+  onScore(value) { score = value; updateScore(); },
   onProgress(fraction, traffic) {
-    runnerProgress.firstElementChild.style.transform = `scaleX(${fraction})`;
-    runnerProgress.setAttribute('aria-valuenow', String(Math.round(fraction * 100)));
+    setLevelProgress(fraction);
     const passerby = traffic.find(agent => isCameo(agent.kind) && agent.age >= .3 && !agent.passed && agent.panicSide === undefined);
     showCameo(passerby?.kind ?? null);
   },
   onFinish() {
-    score += 500; scoreLabel.textContent = String(score).padStart(4, '0');
+    score += 500; updateScore();
     waves.completeMap();
   },
 });
@@ -340,12 +338,8 @@ function syncLevelUI() {
   }));
   toast.hidden = runner;
   if (runner) { clearTimeout(showToast.timer); toast.classList.remove('visible'); }
-  desktopSpray.hidden = !playing;
   document.querySelector('.game-shell').classList.toggle('runner-mode', runner);
-  waveStatLabel.parentElement.hidden = runner;
   document.querySelector('#joystick-zone').setAttribute('aria-label', runner ? 'Left/right to dodge; up to accelerate, down to brake' : 'Drag to move and aim');
-  runnerProgress.hidden = !runner || !playing;
-  runnerProgress.setAttribute('aria-label', `${world.name} progress`);
 }
 
 if (debugMaps) {
@@ -428,10 +422,15 @@ function removeEnemyByTram(enemy) {
 
 function spawnEnemies(count, level) {
   world.routeTo(player.x, player.z);
+  let spawned = 0;
   for (let i = 0; i < count; i++) {
     const point = world.spawnPoint(player, i, count);
-    if (point) makeEnemy(point.x, point.z, level, i % 3 === 0 ? 'slug' : 'goose');
+    if (point) {
+      makeEnemy(point.x, point.z, level, i % 3 === 0 ? 'slug' : 'goose');
+      spawned++;
+    }
   }
+  return spawned;
 }
 
 function spawnWave(plan) {
@@ -448,6 +447,10 @@ function spawnWave(plan) {
 
 function applyWave(plan) {
   const changedMap = world.activate(plan.mapId);
+  levelNumber = plan.number;
+  levelEnemiesCleared = 0;
+  levelEnemiesTotal = 0;
+  setLevelProgress(0);
   if (changedMap || plan.number === 1) {
     if (changedMap || !firstRound) setDistrictWeather();
     firstRound = false;
@@ -470,8 +473,8 @@ function applyWave(plan) {
   if (isRunner()) {
     runnerSession.start(world.runner, score);
   } else {
-    waveLabel.textContent = String(plan.combatWave).padStart(2, '0');
-    spawnEnemies(plan.enemyCount, plan.combatWave);
+    levelEnemiesTotal = spawnEnemies(plan.enemyCount, plan.combatWave);
+    updateArenaLevelProgress();
     if (plan.combatWave > 1) showToast(`WAVE ${plan.combatWave}`);
   }
   if (changedMap && renderingReady) {
@@ -489,7 +492,11 @@ function removeEnemy(enemy, pop = false) {
   if (pop) {
     score += 150;
     waves.onKill();
-    scoreLabel.textContent = String(score).padStart(4, '0');
+    updateScore();
+    if (!isRunner()) {
+      levelEnemiesCleared++;
+      updateArenaLevelProgress();
+    }
     burst(enemy.x, enemy.hitHeight, enemy.z, 0xffd34e, 10);
     blip(440 + Math.random() * 280, 0.045);
   }
@@ -638,7 +645,7 @@ function update(dt) {
   if (!playing) return;
   const spray = updateSpray(dt, firing, enemies, player.powerTimer > 0);
   player.powerTimer = Math.max(0, player.powerTimer - dt);
-  updateSprayGauge(spray);
+  updateSprayFeedback(spray);
   player.fireTimer -= dt;
   if (firing && player.fireTimer <= 0) {
     blip(180 + Math.random() * 35, 0.035);
@@ -653,10 +660,6 @@ function update(dt) {
 
   for (let i = enemies.length - 1; i >= 0; i--) {
     if (!enemies[i].alive) enemies.splice(i, 1);
-  }
-  if (playing && enemies.length !== lastEnemyCount) {
-    lastEnemyCount = enemies.length;
-    waveRemaining.textContent = lastEnemyCount ? `${lastEnemyCount} LEFT` : 'CLEAR';
   }
   if (playing) waves.update(dt, enemies.length);
 
@@ -681,36 +684,56 @@ function updateSpray(dt, firing, groundTargets, powered = false) {
   return stream.update(dt, firing, player.rig.emitter, direction, sprayTargets, powered);
 }
 
-function updateSprayGauge(spray) {
-  const offset = String(100 * (1 - spray.charge));
-  for (const gauge of sprayGauges) gauge.style.strokeDashoffset = offset;
+function updateSprayFeedback(spray) {
   const range = spray.range.toFixed(1);
-  if (sprayRange.textContent !== range) sprayRange.textContent = range;
-  const pressure = String(Math.round(spray.charge * 100));
-  if (desktopSpray.getAttribute('aria-valuenow') !== pressure) desktopSpray.setAttribute('aria-valuenow', pressure);
-  const description = `${spray.airborne ? 'Aiming upwards, range' : 'Range'} ${range} metres${spray.blocked ? ', blocked' : ''}`;
-  if (desktopSpray.getAttribute('aria-valuetext') !== description) desktopSpray.setAttribute('aria-valuetext', description);
-  desktopSpray.dataset.blocked = String(spray.blocked);
-  desktopSpray.dataset.airborne = String(spray.airborne);
+  const mode = spray.airborne ? 'Spraying upwards; drag back to lower' : `Fire spray, range ${range} metres; drag up to aim at birds`;
+  const label = `${mode}${spray.blocked ? ', blocked' : ''}`;
   sprayButton.dataset.blocked = String(spray.blocked);
-  sprayButton.setAttribute('aria-label', spray.airborne ? 'Spraying upwards; drag back to lower' : `Fire spray, range ${range} metres; drag up to aim at birds`);
+  if (sprayButton.getAttribute('aria-label') !== label) sprayButton.setAttribute('aria-label', label);
 }
 
 function updateHealth() {
   const ratio = Math.max(0, player.hp / player.maxHp);
-  heroHpFill.style.width = `${ratio * 100}%`;
-  heroHpFill.style.background = ratio < 0.4 ? 'linear-gradient(90deg, #f04559, #ff7952)' : 'linear-gradient(90deg, #ff8b54, #ffd34e)';
-  heroHpFill.parentElement.setAttribute('aria-valuenow', String(player.hp));
+  healthProgressArc.setAttribute('stroke-dasharray', `${ratio * 100} 100`);
+  updateDialLabel();
 }
 
-// Keeps the hero's HP bar above his head on screen. Hidden when he is off screen.
+function setLevelProgress(fraction) {
+  levelProgress = THREE.MathUtils.clamp(fraction, 0, 1);
+  levelProgressArc.setAttribute('stroke-dasharray', `${levelProgress * 100} 100`);
+  updateDialLabel();
+}
+
+function updateArenaLevelProgress() {
+  const waveInMap = (levelNumber - 1) % WAVES_PER_MAP;
+  const waveProgress = levelEnemiesTotal > 0
+    ? THREE.MathUtils.clamp(levelEnemiesCleared / levelEnemiesTotal, 0, 1)
+    : 0;
+  setLevelProgress((waveInMap + waveProgress) / WAVES_PER_MAP);
+}
+
+function updateScore() {
+  const text = String(score).padStart(4, '0');
+  if (scoreLabel.textContent !== text) scoreLabel.textContent = text;
+  const fontSize = `${Math.max(9, Math.min(18, 58 / (text.length * 0.5)))}px`;
+  if (scoreLabel.style.fontSize !== fontSize) scoreLabel.style.fontSize = fontSize;
+  updateDialLabel();
+}
+
+function updateDialLabel() {
+  const label = `Score ${score.toLocaleString()}, level progress ${Math.round(levelProgress * 100)} percent, health ${player.hp} of ${player.maxHp}`;
+  if (levelDial.getAttribute('aria-label') !== label) levelDial.setAttribute('aria-label', label);
+}
+
+// Keeps the temporary power label above the hero while a battery boost is active.
 function updateHeroHp() {
   const powered = player.powerTimer > 0;
   const label = powered ? `BATTERY ${Math.ceil(player.powerTimer)}s` : '';
   if (heroPower.textContent !== label) heroPower.textContent = label;
   heroPower.hidden = !powered;
+  if (!playing || !powered) { heroHud.hidden = true; return; }
   heroHeadPosition.set(player.x, HERO_HEIGHT + 0.5, player.z).project(camera);
-  const onScreen = playing && heroHeadPosition.z < 1;
+  const onScreen = heroHeadPosition.z < 1;
   heroHud.hidden = !onScreen;
   if (!onScreen) return;
   const shell = heroHud.offsetParent.getBoundingClientRect();
@@ -765,7 +788,7 @@ function startGame() {
   player.invulnerable = 0;
   player.model.material.opacity = 1;
   player.model.material.transparent = false;
-  scoreLabel.textContent = '0000';
+  updateScore();
   updateHealth();
   waves.start();
   playing = true;
@@ -799,10 +822,8 @@ function endGame() {
   showCameo(null);
   if (isRunner()) runnerSession.syncScore();
   playing = false;
-  desktopSpray.hidden = true;
   syncMouseAim();
   resetAimAssist();
-  runnerProgress.hidden = true;
   touchControls.setEnabled(false);
   stream.clear();
   seagulls.clear();

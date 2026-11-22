@@ -48,23 +48,18 @@ button { font: inherit; }
 #game { display: block; width: 100%; height: 100%; outline: 0; touch-action: none; }
 .hero-hud { position: absolute; left: 0; top: 0; width: 64px; height: 7px; pointer-events: none; }
 .hero-power { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 4px; font-size: 13px; font-weight: 800; white-space: nowrap; color: #39ff14; text-shadow: 0 0 6px #39ff14aa; }
-.hero-hp { position: absolute; left: 0; top: 0; width: 64px; height: 7px; overflow: hidden; border-radius: 9px; pointer-events: none; background: rgba(0,0,0,.5); box-shadow: 0 0 0 1px #ffffff40; }
-.hero-hp span { display: block; width: 100%; height: 100%; background: linear-gradient(90deg, #ff8b54, #ffd34e); transition: width .2s, background .2s; }
 
-.hud { position: absolute; z-index: 2; top: 0; left: 0; right: 0; display: flex; justify-content: flex-end; align-items: center; gap: clamp(12px, 2.4vw, 32px); padding: 20px clamp(16px, 4vw, 54px); pointer-events: none; background: linear-gradient(180deg, rgba(10, 11, 17, .68), transparent); }
+.hud { position: absolute; z-index: 2; top: 0; left: 0; right: 0; display: flex; justify-content: flex-end; align-items: center; gap: clamp(10px, 1.2vw, 16px); padding: 10px clamp(16px, 4vw, 54px) 0; pointer-events: none; }
 .passerby { flex: 0 0 auto; width: 56px; height: 56px; margin-right: auto; border: 2px solid #173d35; border-radius: 4px; background: #e7d8aa url('./assets/cameo-portraits.webp') var(--portrait-x) center / auto 100% no-repeat; box-shadow: 0 0 0 1px #ecdeb57a; }
-.stat { display: grid; gap: 3px; text-align: center; min-width: 50px; }
-.stat-label { color: #aaa7b3; font: 700 10px/1 "Barlow Condensed", sans-serif; letter-spacing: .16em; }
-.stat strong { color: var(--ink); font: 800 21px/1 "Barlow Condensed", sans-serif; }
-.desktop-spray { position: relative; display: grid; place-items: center; flex: 0 0 52px; width: 52px; height: 52px; color: var(--ink); }
-.desktop-spray .spray-gauge { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
-.desktop-spray .spray-gauge-track { stroke: #f5f3ed40; }
-.spray-range { display: grid; justify-items: center; gap: 1px; font-variant-numeric: tabular-nums; }
-.spray-range strong { font: 800 20px/1 "Barlow Condensed", sans-serif; }
-.spray-range > span { color: #f5f3edaa; font: 700 9px/1 "Barlow Condensed", sans-serif; }
-.desktop-spray[data-blocked="true"] { color: #ff7952; }
-.desktop-spray[data-blocked="true"] .spray-gauge-track { stroke: #ff795250; }
-.desktop-spray[data-blocked="true"] .spray-gauge-fill { stroke: #ff7952; }
+.level-dial { position: relative; flex: 0 0 72px; width: 72px; height: 72px; display: grid; place-items: center; }
+.level-dial svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.level-arc-track, .health-arc-track, .level-progress-arc, .health-progress-arc { fill: none; stroke-linecap: round; stroke-width: 5; }
+.health-arc-track { stroke: #586573b5; }
+.level-arc-track { stroke: #9d865099; }
+.level-progress-arc { stroke: var(--gold); filter: drop-shadow(0 0 2px #ffd34e72); transition: stroke-dasharray .18s linear; }
+.health-progress-arc { transition: stroke-dasharray .18s ease-out; }
+.level-dial strong { color: var(--ink); font: 800 18px/1 "Barlow Condensed", sans-serif; font-variant-numeric: tabular-nums; letter-spacing: -.02em; text-shadow: 0 1px 5px #000e; }
+.level-dial strong { position: relative; width: 100%; text-align: center; }
 
 /* One primary action; preferences stay behind a secondary, labelled gear. */
 .settings-button { position: absolute; top: 16px; right: 16px; display: grid; place-items: center; width: 44px; height: 44px; padding: 10px; border: 1px solid #ffffff25; border-radius: 50%; color: #b9b6c1; background: #ffffff06; cursor: pointer; }
@@ -139,8 +134,6 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 900 clamp(52px, 8vw, 78px
 .runner-start-hint kbd { padding: 4px 8px; border: 1px solid #ffffff40; border-radius: 5px; font: 700 20px/1 sans-serif; }
 .runner-mode .start-controls, .runner-mode .control-setting, .runner-mode .assist-setting:has([data-aim-assist]), .runner-mode .assist-setting:has([data-mouse-aim]) { display: none !important; }
 .runner-mode #start-screen.map-debug .runner-start-hint { display: none; }
-.runner-progress { position: absolute; z-index: 2; top: 76px; left: 50%; width: min(160px, 32vw); height: 4px; border-radius: 3px; overflow: hidden; background: #132a3c66; pointer-events: none; transform: translateX(-50%); }
-.runner-progress span { display: block; height: 100%; background: var(--gold); transform-origin: left; transform: scaleX(0); }
 #start-screen .card, .end-card, .scores-card { border: 1px solid #e3cfa2; border-radius: 5px; background: #173d35; box-shadow: inset 0 0 0 4px #173d35, inset 0 0 0 5px #e3cfa257, 0 14px 44px #071b1890; backdrop-filter: none; }
 #start-screen .card { position: relative; width: min(360px, 100%); margin: 0; padding: 32px; }
 #start-screen .player-profile { display: grid; gap: 7px; margin: -4px 0 14px; color: #d1d8c3; text-align: left; }
@@ -164,7 +157,6 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 900 clamp(52px, 8vw, 78px
 .leaderboard-status { margin-top: 5px; color: #d1d8c3; font: 500 12px/1.4 Inter, sans-serif; }
 .leaderboard-status:empty { margin-top: 0; }
 .leaderboard-end { margin: -8px 0 18px; text-align: left; }
-.wave-remaining { color: #ffe3a1; font: 700 11px/1 "Barlow Condensed", sans-serif; letter-spacing: .08em; }
 .end-result { display: grid; gap: 4px; margin: 0 0 24px; padding: 14px 0; border-block: 1px dashed #e3cfa27d; }
 .end-result span { color: #d1d8c3; font: 700 12px/1 "Barlow Condensed", sans-serif; letter-spacing: .14em; }
 .end-result strong { color: var(--gold); font: 800 40px/1 "Barlow Condensed", sans-serif; font-variant-numeric: tabular-nums; }
@@ -194,10 +186,8 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 900 clamp(52px, 8vw, 78px
 .start-control-label { color: #aaa6b5; font: 700 10px/1 "Barlow Condensed", sans-serif; letter-spacing: .18em; }
 
 @media (max-width: 680px) {
-  .hud { gap: 8px; padding: max(14px, env(safe-area-inset-top)) 14px 14px; }
+  .hud { gap: 8px; padding: max(14px, env(safe-area-inset-top)) 14px 0; }
   .passerby { width: 48px; height: 48px; }
-  .stat { min-width: 35px; }
-  .stat strong { font-size: 18px; }
   .card { margin: 0; padding: 27px; }
   .controls-card { margin: auto; width: calc(100% - 32px); }
   h1 { font-size: 60px; }
@@ -219,16 +209,8 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 900 clamp(52px, 8vw, 78px
 .spray-up-cue { position: absolute; top: -34px; left: 0; right: 0; color: #fff0beaa; font: 26px/1 sans-serif; pointer-events: none; }
 .fire-button.aiming-up { border-color: #e7f5ff; background: #dcefff; }
 .fire-button.aiming-up .spray-up-cue { color: #e7f5ff; }
-.desktop-spray[data-airborne="true"]::after { content: '↑'; position: absolute; top: -17px; left: 0; right: 0; text-align: center; color: #e7f5ff; font: 18px/1 sans-serif; }
-.desktop-spray[data-airborne="true"] .spray-gauge-fill { stroke: #c5e9ff; }
+.fire-button[data-blocked="true"] { border-color: #ff7952; color: #763b32; }
 .fire-button.pressed { background: #fff0ab; box-shadow: 0 0 28px #ffd34e66, inset 0 2px 8px #a5762455; transform: scale(.94); }
-
-.fire-button .spray-gauge { position: absolute; inset: -11px; width: calc(100% + 22px); height: calc(100% + 22px); overflow: visible; transform: rotate(-90deg); pointer-events: none; }
-.spray-gauge circle { fill: none; stroke-width: 5; }
-.spray-gauge-track { stroke: #15202a99; }
-.spray-gauge-fill { stroke: var(--gold); stroke-linecap: round; stroke-dasharray: 100; stroke-dashoffset: 100; transition: stroke-dashoffset .12s linear; filter: drop-shadow(0 0 3px #ffd34e66); }
-.fire-button[data-blocked="true"] .spray-gauge-track { stroke: #fa7456bb; }
-.fire-button[data-blocked="true"] .spray-gauge-fill { stroke: #ff7952; }
 
 @media (any-pointer: coarse), (max-width: 680px) {
   .joystick-zone { display: block; }
@@ -236,7 +218,6 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 900 clamp(52px, 8vw, 78px
 
 @media (any-pointer: coarse) {
   .mobile-controls.enabled { display: block; }
-  .desktop-spray { display: none; }
 }
 
 @media (pointer: coarse) {
@@ -276,5 +257,5 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 900 clamp(52px, 8vw, 78px
 }
 
 /* The GPU transition owns the scene while gameplay controls stay hidden. */
-.map-changing .hud, .map-changing .hero-hud, .map-changing .mobile-controls, .map-changing .runner-progress, .map-changing .toast { opacity: 0; pointer-events: none; }
+.map-changing .hud, .map-changing .hero-hud, .map-changing .mobile-controls, .map-changing .toast { opacity: 0; pointer-events: none; }
 .map-changing .mobile-controls { visibility: hidden; }

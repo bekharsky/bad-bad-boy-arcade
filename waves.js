@@ -1,6 +1,7 @@
 import { createEnemyPressure } from './enemy-pressure.js';
 
 export const ENEMY_HEALTH = Object.freeze({ goose: 2, slug: 1 });
+export const WAVES_PER_MAP = 2;
 
 export function waveStats(number) {
   if (!Number.isSafeInteger(number) || number < 1) throw new Error('Wave number must be a positive integer');
@@ -12,7 +13,7 @@ export function enemyHealth(kind, wave) {
   return ENEMY_HEALTH[kind] + waveStats(wave).healthBonus;
 }
 
-export function createCampaign(mapIds, { wavesPerMap = 2 } = {}) {
+export function createCampaign(mapIds, { wavesPerMap = WAVES_PER_MAP } = {}) {
   if (!mapIds.length || mapIds.some(id => typeof id !== 'string' || !id)) throw new Error('Campaign requires map IDs');
   if (!Number.isSafeInteger(wavesPerMap) || wavesPerMap < 1) throw new Error('Waves per map must be a positive integer');
   const order = [...mapIds];

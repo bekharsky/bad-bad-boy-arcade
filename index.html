@@ -14,19 +14,27 @@
   <body>
     <main class="game-shell">
       <canvas id="game" tabindex="0" aria-label="Piss Deal game"></canvas>
-      <div id="hero-hud" class="hero-hud" hidden><div id="hero-power" class="hero-power" hidden></div><div class="hero-hp" role="meter" aria-label="Health" aria-valuemin="0" aria-valuemax="5" aria-valuenow="5"><span id="hero-hp-fill"></span></div></div>
+      <div id="hero-hud" class="hero-hud" hidden><div id="hero-power" class="hero-power" hidden></div></div>
 
       <header class="hud">
         <div class="passerby" aria-hidden="true" hidden></div>
-        <div id="desktop-spray" class="desktop-spray" role="meter" aria-label="Spray pressure" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="Range 0.9 metres" hidden>
-          <svg class="spray-gauge" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
-            <circle class="spray-gauge-track" cx="50" cy="50" r="46" />
-            <circle class="spray-gauge-fill" cx="50" cy="50" r="46" pathLength="100" data-spray-gauge-fill />
+        <div id="level-dial" class="level-dial" role="group" aria-label="Score 0000, level progress 0 percent, health 5 of 5">
+          <svg viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+            <defs>
+              <linearGradient id="health-gradient" x1="17.1" y1="31" x2="82.9" y2="31" gradientUnits="userSpaceOnUse">
+                <stop offset="0" stop-color="#56d58d" />
+                <stop offset="0.38" stop-color="#f0d75c" />
+                <stop offset="0.70" stop-color="#f59b4d" />
+                <stop offset="1" stop-color="#ed5157" />
+              </linearGradient>
+            </defs>
+            <path class="health-arc-track" d="M 82.9 31 A 38 38 0 0 0 17.1 31" />
+            <path id="health-progress-arc" class="health-progress-arc" d="M 82.9 31 A 38 38 0 0 0 17.1 31" pathLength="100" stroke="url(#health-gradient)" stroke-dasharray="100 100" />
+            <path class="level-arc-track" d="M 12 50 A 38 38 0 0 0 88 50" />
+            <path id="level-progress-arc" class="level-progress-arc" d="M 12 50 A 38 38 0 0 0 88 50" pathLength="100" stroke-dasharray="0 100" />
           </svg>
-          <span class="spray-range" aria-hidden="true"><strong id="spray-range">0.9</strong><span>m</span></span>
+          <strong id="score">0000</strong>
         </div>
-        <div class="stat"><span class="stat-label" id="wave-stat-label">WAVE</span><strong id="wave">1</strong><span id="wave-remaining" class="wave-remaining"></span></div>
-        <div class="stat"><span class="stat-label">SCORE</span><strong id="score">0000</strong></div>
       </header>
 
       <section id="start-screen" class="overlay">
@@ -107,10 +115,6 @@
         </div>
         <button id="mobile-fire" class="fire-button touch-control" type="button" aria-label="Fire spray">
           <span class="spray-up-cue" aria-hidden="true">⌃</span>
-          <svg class="spray-gauge" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
-            <circle class="spray-gauge-track" cx="50" cy="50" r="46" />
-            <circle id="spray-gauge-fill" class="spray-gauge-fill" cx="50" cy="50" r="46" pathLength="100" data-spray-gauge-fill />
-          </svg>
           <svg class="spray-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true" focusable="false">
             <circle cx="24" cy="24" r="15" />
             <path d="M24 4v9m0 22v9M4 24h9m22 0h9" />
@@ -119,7 +123,6 @@
         </button>
       </div>
       <div id="toast" class="toast" aria-live="polite"></div>
-      <div id="runner-progress" class="runner-progress" role="progressbar" aria-label="Runner progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden><span></span></div>
     </main>
   </body>
 </html>
