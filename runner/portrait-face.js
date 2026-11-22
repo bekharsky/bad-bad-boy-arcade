@@ -52,7 +52,7 @@ function addEye(head,points,{upper,lower,brow}, palette) {
   const lid=curve(upper), rim=curve(lower);
   const irisCenter=lid.getPoint(.49).lerp(rim.getPoint(.49),.43);
   const white=color('#ece2d9'), iris=color(palette.iris ?? '#587482'), ring=color('#394b54'), pupil=color('#22252b');
-  const eye=grid(22,54,(u,v)=>{
+  const eye=grid(12,32,(u,v)=>{
     const p=lid.getPoint(u).lerp(rim.getPoint(u),v);
     p.z+=.013*Math.sin(Math.PI*u)*Math.sin(Math.PI*v);
     const dx=p.x-irisCenter.x, dy=p.y-irisCenter.y, r=Math.hypot(dx,dy)/(palette.irisScale ?? 1);
@@ -67,7 +67,7 @@ function addEye(head,points,{upper,lower,brow}, palette) {
     ...(palette.sculptedBrows ? [] : [['Eyebrow',curve(brow),palette.browWidth ?? .009,palette.brow]]),
     ...(palette.lowerLid ? [['Lower lid',rim,.0018,palette.lowerLid]] : [])
   ]) {
-    const band=grid(6,30,(u,v)=>{
+    const band=grid(4,20,(u,v)=>{
       const p=path.getPoint(u);
       const taper=(name==='Eyebrow' && palette.browTaper)
         ? Math.sin(Math.PI*u)**.55*(.38+.94*u)

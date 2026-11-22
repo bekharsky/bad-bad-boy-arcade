@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CAMEO_KINDS, cameoGaitForDistance } from './runner/cameo-roster.js';
+import { CAMEO_KINDS, cameoGaitForDistance, STUMBLE_DURATION } from './runner/cameo-roster.js';
 import { prepareFadingMaterials, setModelAppearance } from './runner/model-appearance.js';
 import { createTrafficModel } from './runner/traffic-models.js';
 import { animateCameo } from './runner/cameo-models.js';
@@ -34,7 +34,8 @@ export function createArenaCameos(scene, world, random = Math.random) {
     const viewerYaw = lookAt
       ? Math.atan2(lookAt.x - actor.x, lookAt.z - actor.z) - actor.heading
       : 0;
-    animateCameo(actor.model, actor.gait, moving, viewerYaw, moving && !running);
+    const stumbleTime = actor.phase === 'stumble' ? actor.phaseTime : 0;
+    animateCameo(actor.model, actor.gait, moving, viewerYaw, moving && !running, 0, stumbleTime);
   }
 
   function welcomeGuests(limit, viewPosition, player) {
@@ -50,7 +51,8 @@ export function createArenaCameos(scene, world, random = Math.random) {
       const [[x, z], [nextX, nextZ]] = route;
       const heading = Math.atan2(nextX - x, nextZ - z);
       Object.assign(actor, { x, z, alive: true, fleeing: false, panic: 0, flash: 0, decision: 0, gait: index * .7, nextJetHit: 0,
-        age: -index * .6, heading, route, waypoint: 1, phase: 'arrival', phaseTime: 0, leaveAt: Infinity, escapeFrom: null });
+        age: -index * .6, heading, route, waypoint: 1, phase: 'arrival', phaseTime: 0, leaveAt: Infinity, escapeFrom: null,
+        runUntilTrip: 3 + (1 - random()) * 26 });
       actor.root.position.set(actor.x, 0, actor.z); actor.root.rotation.y = actor.heading;
       setModelAppearance(actor.model, actor.materials, 0, 0);
       pose(actor, false, false, viewPosition);
@@ -155,8 +157,11 @@ export function createArenaCameos(scene, world, random = Math.random) {
         if (distance < 2.2 || actor.phaseTime >= actor.glance) changePhase(actor, 'retreat');
         break;
       case 'retreat':
-        if (actor.phaseTime >= 1.35 || distance > 10) changePhase(actor, 'lookout');
+        if (actor.phaseTime >= 1.35 || (distance > 10 && actor.phaseTime >= .7)) changePhase(actor, 'lookout');
         else retreat(actor, player, dt);
+        break;
+      case 'stumble':
+        if (actor.phaseTime >= STUMBLE_DURATION) changePhase(actor, 'retreat');
         break;
       case 'departure':
         if (walkRoute(actor, player, dt)) actor.waypoint--;
@@ -191,6 +196,20 @@ export function createArenaCameos(scene, world, random = Math.random) {
         const heading = Math.atan2(actor.x - oldX, actor.z - oldZ);
         actor.heading += Math.atan2(Math.sin(heading - actor.heading), Math.cos(heading - actor.heading)) * (1 - Math.exp(-12 * dt));
         actor.gait += cameoGaitForDistance(moved, scurrying);
+        if (scurrying && !actor.fleeing && phase === actor.phase) {
+          actor.runUntilTrip -= moved;
+          if (actor.runUntilTrip <= 0) {
+            actor.runUntilTrip = 8 + random() * 22;
+            const endX = actor.x + Math.sin(actor.heading) * 3.4;
+            const endZ = actor.z + Math.cos(actor.heading) * 3.4;
+            if (world.lineClear(actor.x, actor.z, endX, endZ, actor.size)
+              && Math.hypot(endX - player.x, endZ - player.z) > player.radius + actor.size
+              && !actors.some(guest => guest.phase === 'stumble')) {
+              changePhase(actor, 'stumble');
+              actor.leaveAt = Math.max(actor.leaveAt, actor.age + 10);
+            }
+          }
+        }
       } else if (!actor.fleeing && watching) {
         const turn = Math.atan2(lookAt.x - actor.x, lookAt.z - actor.z) - actor.heading;
         actor.heading += Math.atan2(Math.sin(turn), Math.cos(turn)) * (1 - Math.exp(-6 * dt));
@@ -212,6 +231,7 @@ export function createArenaCameos(scene, world, random = Math.random) {
     nextWave(viewPosition) { welcomeGuests(Math.min(2, 6 - actors.length), viewPosition); },
     splash(actor, direction) {
       if (!actor.alive || !actors.includes(actor)) return false;
+      if (actor.phase === 'stumble') { actor.flash = .18; return true; }
       const heading = direction && Math.hypot(direction.x, direction.z) > .01
         ? Math.atan2(direction.x, direction.z) : actor.heading;
       actor.escapeFrom = { x: actor.x - 4 * Math.sin(heading), z: actor.z - 4 * Math.cos(heading) };

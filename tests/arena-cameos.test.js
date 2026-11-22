@@ -84,6 +84,31 @@ test('a politician repeatedly runs up, watches the hero, and backs off without c
   cameos.dispose();
 });
 
+test('a running guest falls flat, gets up, retreats, and comes back to the hero', () => {
+  const { player, cameos } = fixture();
+  player.z = 6;
+  const guest = cameos.actors[1];
+  const advanceTo = phase => {
+    for (let i = 0; i < 1200 && guest.phase !== phase; i++) cameos.update(1 / 60, player);
+    assert.equal(guest.phase, phase);
+  };
+  advanceTo('retreat');
+  guest.runUntilTrip = 0;
+  advanceTo('stumble');
+  const landing = [guest.x, guest.z];
+  cameos.splash(guest, { x: 0, z: 1 });
+  for (let i = 0; i < 42; i++) cameos.update(1 / 60, player);
+  assert.ok(guest.model.rotation.x > 1.5);
+  assert.deepEqual([guest.x, guest.z], landing);
+  advanceTo('retreat');
+  assert.equal(guest.model.rotation.x, 0);
+  advanceTo('lookout');
+  assert.ok(Math.hypot(guest.x - landing[0], guest.z - landing[1]) > 1);
+  advanceTo('approach');
+  assert.equal(player.hp, 5);
+  cameos.dispose();
+});
+
 test('Central Station guests can repeat the approach from their routes while the hero stays at spawn', () => {
   const scene = new THREE.Scene(), world = createMapManager(scene, maps);
   world.activate('central-station');

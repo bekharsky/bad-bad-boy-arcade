@@ -31,7 +31,7 @@ function fittedFace() {
 
 function addEars(head) {
   for(const side of [-1,1]) {
-    const ear=grid(16,48,(u,v)=>{
+    const ear=grid(10,28,(u,v)=>{
       const a=u*tau, r=Math.sin(v*Math.PI/2), upper=Math.cos(a);
       const helix=Math.exp(-(((r-.78)/.17)**2));
       const inner=Math.exp(-(((r-.39)/.18)**2))*Math.max(0,Math.sin(a+.6));
@@ -66,7 +66,7 @@ function addHair(head) {
   }
   const brown=new THREE.Color('#47443f'), ash=new THREE.Color('#928c84');
   const silver=new THREE.Color('#bbb5aa');
-  const rows=58, columns=190;
+  const rows=30, columns=112;
   // Fit the roots to the sculpt. A separate cap on an ellipsoid leaves a
   // ledge in profile, especially above the temples.
   const scalp=[head.getObjectByName('Continuous face and lips'),head.getObjectByName('Back of head')];

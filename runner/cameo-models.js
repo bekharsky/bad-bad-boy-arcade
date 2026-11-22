@@ -2,13 +2,13 @@ import * as THREE from 'three';
 import { createSceneryModel } from '../maps/scenery-model.js';
 import { animateCameoHead, createCameoHead, createCameoNeck } from './cameo-caricatures.js';
 
-import { CAMEO_LOOKS as LOOKS } from './cameo-roster.js';
+import { CAMEO_LOOKS as LOOKS, STUMBLE_DURATION } from './cameo-roster.js';
 
 const INK = '#29282c';
 const JACKET = { bottom: 1.145, height: 1.03, waist: .28, shoulders: .33, depth: .7, sides: 20 };
 
-function oval(model, color, x, y, z, sx, sy, sz, rotation = 0, segments = 20) {
-  model.geometry(color, new THREE.SphereGeometry(1, segments, 12).scale(sx, sy, sz).rotateZ(rotation).translate(x, y, z));
+function oval(model, color, x, y, z, sx, sy, sz, rotation = 0, segments = 14) {
+  model.geometry(color, new THREE.SphereGeometry(1, segments, 8).scale(sx, sy, sz).rotateZ(rotation).translate(x, y, z));
 }
 
 function rod(model, color, a, b, radius, endRadius = radius) {
@@ -172,29 +172,36 @@ export function createCameoModel(kind) {
   return root;
 }
 
-export function animateCameo(root, time, moving = true, viewerYaw = 0, walking = false, chinLift = 0) {
+export function animateCameo(root, time, moving = true, viewerYaw = 0, walking = false, chinLift = 0, stumbleTime = 0) {
+  // Pitch towards +Z around the feet. Lift the torso by its thickness at impact.
+  const down = THREE.MathUtils.smoothstep(stumbleTime, 0, .38)
+    * (1 - THREE.MathUtils.smoothstep(stumbleTime, 1.02, STUMBLE_DURATION));
+  const kick = down * Math.sin(stumbleTime * 21) * Math.max(0, 1 - stumbleTime);
+  root.rotation.x = down * Math.PI * .48;
   const phase = time * (walking ? 5.9 : 9), stride = moving ? Math.sin(phase) * (walking ? .85 : 1) : 0;
   const running = moving && !walking;
-  root.position.y = moving ? Math.abs(Math.cos(phase)) * (walking ? .018 : .035) : 0;
+  root.position.y = down * .16 + (moving ? Math.abs(Math.cos(phase)) * (walking ? .018 : .035) : 0);
   for (const part of root.children) {
     if (part.userData.stride) {
       const side = part.userData.stride;
       const swing = stride * side;
       part.position.z = moving ? 0 : side * .045;
-      part.rotation.x = swing * .65;
+      part.rotation.x = swing * .65 + side * kick * .45;
+      part.rotation.z = side * down * .26;
       part.children.find(child => child.userData.knee).rotation.x = Math.max(0, -swing) * 1.05;
     }
     if (part.userData.swing) {
       const swing = stride * part.userData.swing;
-      part.rotation.x = moving ? swing * .58 : part.userData.swing * .055;
+      part.rotation.x = (moving ? swing * .58 : part.userData.swing * .055) - down * 2.72;
+      part.rotation.z = -part.userData.swing * down * .65;
       part.children.find(child => child.userData.elbow).rotation.x = running ? -.92 + Math.min(0, swing) * .24 : -.18;
     }
   }
   const head = root.getObjectByName('3D head');
   // A natural glance to either side. Ease back to straight ahead as the
   // viewer passes behind the actor, without snapping across the +/-pi seam.
-  head.rotation.y = Math.atan2(Math.sin(viewerYaw), Math.max(.8, Math.cos(viewerYaw)));
-  head.rotation.x = -chinLift;
+  head.rotation.y = Math.atan2(Math.sin(viewerYaw), Math.max(.8, Math.cos(viewerYaw))) + down * .42;
+  head.rotation.x = -chinLift - down * .1;
   animateCameoHead(head, time, running);
   return 'sculpted-3d';
 }

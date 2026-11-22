@@ -14,5 +14,6 @@ export const CAMEO_LOOKS = {
 export const CAMEO_KINDS = Object.freeze(Object.keys(CAMEO_LOOKS));
 export const isCameo = kind => CAMEO_KINDS.includes(kind);
 export const CAMEO_HEALTH = .9;
+export const STUMBLE_DURATION = 1.65;
 
 export const cameoGaitForDistance = (distance, running) => distance * (running ? .34 : .5);

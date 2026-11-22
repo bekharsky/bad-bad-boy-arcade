@@ -16,7 +16,7 @@ export function addCroppedLocks(head,kind) {
     const read=index=>new THREE.Vector3().fromBufferAttribute(attribute,index);
     return read(i).lerp(read(i+1),x%1).lerp(read(j).lerp(read(j+1),x%1),y%1);
   }
-  const front=grid(32,196,(u,v)=>{
+  const front=grid(18,116,(u,v)=>{
     const a=(u-.5)*(swept?.36:.46);
     const taper=Math.sin(Math.PI*u)**.65;
     const grain=(swept?26:49)*u+(swept?2.6:-.75)*v+.55*Math.sin(19*u+3*v)+.24*Math.sin(53*u-7*v);
@@ -40,7 +40,7 @@ export function addPortraitEars(head,points,skin) {
   const base=new THREE.Color(skin), inside=new THREE.Color('#ab7461');
   for(const side of [-1,1]) {
     const cheek=points[side<0?234:454];
-    const ear=grid(36,64,(u,t)=>{
+    const ear=grid(18,36,(u,t)=>{
       const v=Math.sin(Math.PI*t), outside=Math.cos(Math.PI*t);
       const a=u*2*Math.PI, y=Math.cos(a)*v, across=Math.sin(a)*v;
       const rim=Math.exp(-(((v-.80)/.14)**2));

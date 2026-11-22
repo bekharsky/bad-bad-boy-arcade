@@ -121,7 +121,7 @@ function scalp(head,oval,kind,style) {
   const sideburn=new THREE.Color(kind==='kadyrov'?'#79583f':'#62534a');
   const mouthY=head.getObjectByName('Continuous face and lips').geometry.attributes.position.getY(13);
   const borderCurve=new THREE.CatmullRomCurve3(oval,true);
-  const cap=grid(56,oval.length*4,(u,v)=>{
+  const cap=grid(32,oval.length*4,(u,v)=>{
     const f=u*oval.length,i=Math.floor(f)%oval.length;
     const edge=oval[i].clone().lerp(oval[(i+1)%oval.length],f-Math.floor(f));
     edge.lerp(borderCurve.getPoint(u),smooth(v,0,.16));
@@ -183,9 +183,9 @@ function scalp(head,oval,kind,style) {
   for(let col=0;col<=columns;col++){
     const k=Math.floor(col/4)%oval.length;
     const edgeNormal=border[k].clone().lerp(border[(k+1)%oval.length],(col%4)/4).normalize().negate();
-    for(let row=0;row<11;row++) {
+    for(let row=0;row<7;row++) {
       const idx=row*(columns+1)+col;
-      const n=new THREE.Vector3().fromBufferAttribute(normals,idx).lerp(edgeNormal,1-smooth(row,0,bald?11:2)).normalize();
+      const n=new THREE.Vector3().fromBufferAttribute(normals,idx).lerp(edgeNormal,1-smooth(row,0,bald?7:2)).normalize();
       normals.setXYZ(idx,n.x,n.y,n.z);
     }
   }
@@ -195,7 +195,7 @@ function ears(head,points,kind,style) {
   const light=new THREE.Color(style.palette.skin), dark=new THREE.Color(style.palette.rose);
   for(const side of [-1,1]) {
     const edge=points[side<0?234:454], large=kind==='merz'?1.18:1;
-    const ear=grid(14,40,(u,v)=>{
+    const ear=grid(10,28,(u,v)=>{
       const a=tau*u,r=Math.sin(v*Math.PI/2),h=Math.cos(a)*r;
       const ridge=Math.exp(-(((r-.78)/.16)**2));
       return [new THREE.Vector3(edge.x+side*(-.025+.070*(1-r*r)+.029*ridge+.012*h),
@@ -236,7 +236,7 @@ function frames(head,points,kind) {
     const rim=Array.from({length:40},(_,i)=>lensPoint(tau*i/40));
     if(aviator) {
       const sky=new THREE.Color('#526579'), shade=new THREE.Color('#14212e');
-      const lens=grid(9,80,(u,r)=>{
+      const lens=grid(6,40,(u,r)=>{
         const phi=u*tau, p=lensPoint(phi,r);
         return [p,shade.clone().lerp(sky,smooth(Math.sin(phi)*r,.05,.87)*.85)];
       });

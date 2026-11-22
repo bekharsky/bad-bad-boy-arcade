@@ -172,6 +172,22 @@ test('runner passers-by are harmless and run away from the first splash', () => 
   }
 });
 
+test('a stumbling jogger stays on the ground as the road scrolls, then runs to the shoulder', () => {
+  const { run, agent } = encounter('purra', 0);
+  agent.progress = 48;
+  agent.age = 0;
+  agent.tripAt = .1;
+  run.update(.25);
+  const landing = agent.progress;
+  run.update(.5);
+  assert.equal(agent.progress, landing);
+  assert.ok(agent.stumbleTime > .5);
+  for (let i = 0; i < 90; i++) run.update(1 / 60);
+  assert.equal(agent.stumbleTime, undefined);
+  assert.ok(agent.x < run.lanes[0] && agent.progress > landing);
+  assert.equal(run.state.bonus, 0);
+});
+
 test('harmless runner cameos cannot absorb the damage from a bicycle in the same frame', () => {
   const { run } = encounter('purra');
   run.state.traffic.push({ id: -2, kind: 'bike', lane: 1, progress: 5, speed: 5.2, alive: true, hit: false, passed: false });

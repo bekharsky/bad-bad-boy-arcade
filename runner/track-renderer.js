@@ -107,7 +107,8 @@ export function createRunnerTraffic(root, name, { riderKinds = ['bike', 'scooter
       setModelAppearance(variant, slotAppearance[i], opacity, agent.hitUntil > state.elapsed ? .7 : 0);
       if (cameo) {
         const approaching = agent.panicSide === undefined;
-        animateCameo(variant, (agent.gait ?? state.elapsed) + agent.id, true, approaching ? viewerYaw : 0, false, approaching ? .18 : 0);
+        animateCameo(variant, (agent.gait ?? state.elapsed) + agent.id, agent.stumbleTime === undefined,
+          approaching ? viewerYaw : 0, false, approaching ? .18 : 0, agent.stumbleTime);
       } else {
         animateTraffic(variant, state.elapsed + agent.id, agent.crossing ? Math.abs(agent.vx) : agent.speed + state.speed, viewerYaw);
       }

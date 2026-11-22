@@ -60,7 +60,7 @@ const tucked = [
   [[.143,.406,-.226],[.251,.285,-.258],[.29,.107,-.266],[.294,-.11,-.273],[.285,-.316,-.286],[.31,-.55,-.257],[.27,-.741,-.183]],
   outer[4],
 ];
-const hairRows=62, hairColumns=90;
+const hairRows=32, hairColumns=56;
 const curve = controls => new THREE.CatmullRomCurve3(controls.map(p=>new THREE.Vector3(...p)));
 
 function addHairBank(head, sections) {

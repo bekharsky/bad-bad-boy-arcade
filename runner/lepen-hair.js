@@ -3,7 +3,7 @@ import { colored, grid, surface } from './portrait-face.js';
 
 export function addLePenHair(head) {
   const root=new THREE.Color('#a28b71'), gold=new THREE.Color('#dcc598'), tip=new THREE.Color('#e9d8b5');
-  const rows=60,columns=156;
+  const rows=32,columns=96;
   const smoothCrown=y=>THREE.MathUtils.smoothstep(y,.17,.32);
   const cap=grid(rows,columns,(u,v)=>{
     const a=(u-.5)*2*Math.PI;

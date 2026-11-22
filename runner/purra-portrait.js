@@ -10,7 +10,8 @@ function addBob(head) {
   // The part opens onto the forehead. Past each temple the same shell falls
   // nearly vertically, ending below the jaw in the blunt outline of the bob.
   const root=color('#b39a75'), blonde=color('#f2dfc0');
-  const {positions,indices,colors}=grid(54,160,(u,v)=>{
+  const rows=30, columns=96;
+  const {positions,indices,colors}=grid(rows,columns,(u,v)=>{
     const a=(u-.5)*2*Math.PI, front=Math.cos(a);
     const temple=smooth(Math.abs(a),.18,1.60);
     const partDistance=Math.abs(a-.10);
@@ -32,11 +33,11 @@ function addBob(head) {
     return [p,tint];
   });
   // Turn the edge inwards so the cut has thickness, even from below.
-  for(let i=0;i<=160;i++) {
-    const a=54*161+i, b=55*161+i;
+  for(let i=0;i<=columns;i++) {
+    const a=rows*(columns+1)+i, b=a+columns+1;
     positions.push(positions[a*3]*.91,positions[a*3+1]+.007,positions[a*3+2]*.89);
     colors.push(root.r,root.g,root.b);
-    if(i<160) indices.push(a,b,a+1,a+1,b,b+1);
+    if(i<columns) indices.push(a,b,a+1,a+1,b,b+1);
   }
   surface(head,'Centre-parted blonde bob',positions,indices,colored(),colors);
 }
