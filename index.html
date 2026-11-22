@@ -8,8 +8,9 @@
     <!-- Cloudflare Web Analytics -->
     <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "48491b7e51fb426c8073f7b32b32b500"}'></script>
     <!-- End Cloudflare Web Analytics -->
-    <script type="module" crossorigin src="./assets/game-C6TF_QKg.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/game-NSUCHlA6.css">
+    <script type="module" crossorigin src="./assets/game-Bir_odwY.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/style-Bapb5B14.js">
+    <link rel="stylesheet" crossorigin href="./assets/style-C1bGsyZg.css">
   </head>
   <body>
     <main class="game-shell">
@@ -25,7 +26,7 @@
           </svg>
           <span class="spray-range" aria-hidden="true"><strong id="spray-range">0.9</strong><span>m</span></span>
         </div>
-        <div class="stat"><span class="stat-label" id="wave-stat-label">WAVE</span><strong id="wave">1</strong></div>
+        <div class="stat"><span class="stat-label" id="wave-stat-label">WAVE</span><strong id="wave">1</strong><span id="wave-remaining" class="wave-remaining"></span></div>
         <div class="stat"><span class="stat-label">SCORE</span><strong id="score">0000</strong></div>
       </header>
 
@@ -41,11 +42,7 @@
           <div id="load-status" class="load-status" role="status">Loading models…</div>
           <button id="start" class="primary-button" type="button" disabled>LOADING…</button>
           <button id="retry-load" class="primary-button" type="button" hidden>RETRY LOADING</button>
-          <section class="leaderboard" aria-labelledby="leaderboard-title">
-            <div class="leaderboard-heading"><h2 id="leaderboard-title">HIGH SCORES</h2><span>TOP 5</span></div>
-            <ol id="leaderboard-list" class="leaderboard-list" aria-live="polite"><li class="leaderboard-empty">Loading scores…</li></ol>
-            <div id="leaderboard-status" class="leaderboard-status" role="status"></div>
-          </section>
+          <a class="leaderboard-link" href="./leaderboard.html">Leaderboard</a>
           <section class="debug-maps" data-debug-maps aria-label="Maps" hidden></section>
           <div class="start-controls" role="group" aria-label="Quick controls">
             <div class="start-control">
@@ -75,11 +72,13 @@
       <section id="end-screen" class="overlay hidden">
         <div class="card end-card">
           <h2 id="end-title">WASTED</h2>
+          <div class="end-result"><span>YOUR SCORE</span><strong id="end-score">0</strong></div>
           <div id="score-submit-status" class="score-submit-status" role="status"></div>
           <button id="retry-score" class="secondary-button" type="button" hidden>RETRY SCORE</button>
           <section class="leaderboard leaderboard-end" aria-labelledby="end-leaderboard-title">
             <div class="leaderboard-heading"><h3 id="end-leaderboard-title">HIGH SCORES</h3><span>TOP 5</span></div>
-            <ol id="end-leaderboard-list" class="leaderboard-list" aria-live="polite"><li class="leaderboard-empty">Loading scores…</li></ol>
+            <ol id="end-leaderboard-list" class="leaderboard-list" aria-live="polite"></ol>
+            <div id="end-leaderboard-status" class="leaderboard-status" role="status"></div>
           </section>
           <button id="restart" class="primary-button" type="button">PLAY AGAIN</button>
           <section class="debug-maps" data-debug-maps aria-label="Maps" hidden></section>
