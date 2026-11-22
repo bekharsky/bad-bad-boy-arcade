@@ -1,6 +1,6 @@
 # Рабочие заметки об игре
 
-[Играть](https://bekharsky.github.io/bad-bad-boy-arcade/) · [Описание и управление](../README.md) · [Модели и лицензии](../CREDITS.md)
+[Играть](https://bekharsky.github.io/piss-deal/) · [Описание и управление](../README.md) · [Модели и лицензии](../CREDITS.md)
 
 ## Текущее устройство
 
