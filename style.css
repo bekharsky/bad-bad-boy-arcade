@@ -90,7 +90,7 @@ button { font: inherit; }
 #start-screen.map-debug #start, #start-screen.map-debug .start-controls { display: none; }
 .overlay { position: absolute; z-index: 4; inset: 0; display: grid; place-items: safe center; padding: 24px; overflow-y: auto; touch-action: pan-y; background: linear-gradient(90deg, #11131bcc, #11131b44 75%); transition: opacity .25s; }
 .overlay.hidden { display: none; }
-.card { width: min(430px, 100%); margin-right: auto; margin-left: clamp(0px, 8vw, 120px); padding: clamp(24px, 4vw, 42px); border: 1px solid #ffffff20; border-radius: 20px; background: linear-gradient(145deg, rgba(32,31,45,.94), rgba(18,19,29,.94)); box-shadow: 0 24px 90px #0008; backdrop-filter: blur(14px); }
+.card { --card-padding: clamp(24px, 4vw, 42px); width: min(430px, 100%); margin-right: auto; margin-left: clamp(0px, 8vw, 120px); padding: var(--card-padding); border: 1px solid #ffffff20; border-radius: 20px; background: linear-gradient(145deg, rgba(32,31,45,.94), rgba(18,19,29,.94)); box-shadow: 0 24px 90px #0008; backdrop-filter: blur(14px); }
 h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 900 clamp(52px, 8vw, 78px)/.82 "Barlow Condensed", Impact, sans-serif; letter-spacing: -.025em; }
 .title-accent { color: var(--gold); }
 .card p { max-width: 310px; margin: 22px 0; color: #c5c2ce; font-size: 14px; line-height: 1.6; }
@@ -99,22 +99,17 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 900 clamp(52px, 8vw, 78px
 .primary-button:hover:not(:disabled) { transform: translateY(-2px); filter: brightness(1.06); }
 .primary-button:disabled { opacity: .55; cursor: wait; }
 .card small { display: block; margin-top: 13px; color: #888594; text-align: center; font-size: 10px; }
-.credits-link { display: block; width: fit-content; margin: 18px auto 0; color: #b9b6c1; font-size: 10px; text-decoration: none; }
+.credits-link { display: block; width: fit-content; margin: 12px auto 0; color: #b9b6c1; font-size: 10px; text-decoration: none; }
 .credits-link:hover { color: var(--gold); text-decoration: underline; }
-.control-setting { min-width: 0; margin: 0 0 20px; padding: 0; border: 0; }
+.control-setting { min-width: 0; margin: 0 0 10px; padding: 0; border: 0; }
 .control-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .control-option { position: relative; cursor: pointer; }
-.control-option input { position: absolute; z-index: 1; top: 15px; right: 12px; width: 16px; height: 16px; margin: 0; appearance: none; -webkit-appearance: none; border: 1px solid #ffffff55; border-radius: 50%; cursor: pointer; }
-.control-choice { display: grid; align-content: center; gap: 5px; height: 100%; min-height: 70px; padding: 12px; border-radius: 8px; background: #17172487; transition: background .15s; }
-.control-choice strong { padding-right: 20px; color: var(--ink); font-size: 14px; }
-.control-choice > span { color: #aaa7b3; font-size: 11px; line-height: 1.5; }
+.control-option input { position: absolute; z-index: 1; top: 50%; right: 12px; transform: translateY(-50%); width: 16px; height: 16px; margin: 0; appearance: none; -webkit-appearance: none; border: 1px solid #ffffff55; border-radius: 50%; cursor: pointer; }
+.control-choice { display: grid; align-content: center; min-height: 44px; padding: 8px 36px 8px 12px; border-radius: 8px; background: #17172487; color: var(--ink); font-size: 14px; font-weight: 700; transition: background .15s; }
 .control-option input:checked { border-color: var(--gold); background: radial-gradient(circle, var(--gold) 0 4px, transparent 5px); }
-.control-option input:checked + .control-choice { background: #eaae5729; }
-.control-option input:checked + .control-choice strong { color: var(--gold); }
-.control-option input:checked + .control-choice > span { color: #e3d9bc; }
-.control-option input:focus-visible { outline: none; }
-.control-option input:focus-visible + .control-choice { outline: 2px solid var(--ink); outline-offset: 3px; }
-.control-toggles { display: grid; gap: 2px; margin-bottom: 18px; }
+.control-option input:checked + .control-choice { background: #eaae5729; color: var(--gold); }
+.control-option input:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.control-toggles { display: grid; margin-bottom: 12px; }
 .assist-setting { position: relative; display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 6px 0; cursor: pointer; }
 .assist-setting input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .assist-switch { position: relative; flex: 0 0 34px; height: 20px; border: 1px solid #ffffff40; border-radius: 12px; background: #ffffff0a; transition: background .15s, border-color .15s; }
@@ -126,16 +121,15 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 900 clamp(52px, 8vw, 78px
 .assist-setting input:checked + .assist-switch::after { transform: translateX(14px); background: var(--gold); }
 .assist-setting input:focus-visible + .assist-switch { outline: 2px solid var(--ink); outline-offset: 3px; }
 .assist-setting:has(input:disabled) { opacity: .45; cursor: default; }
-.controls-card { margin: auto; max-height: calc(100dvh - 32px); overflow: auto; touch-action: pan-y; }
-.controls-card h2 { margin: 0 0 20px; font-size: 36px; }
-.controls-card .control-setting { margin-bottom: 16px; }
-.controls-card .menu-header { margin: -21px 0 5px; }
-.controls-actions { display: grid; gap: 5px; }
-.text-button { justify-self: center; min-height: 38px; padding: 6px 12px; border: 0; border-radius: 5px; background: transparent; color: #ffe0af; font: 800 12px/1 "Barlow Condensed", sans-serif; letter-spacing: .09em; cursor: pointer; }
-.text-button:hover { background: #ffd34e13; }
+.controls-dialog { width: min(420px, 100%); max-width: none; max-height: 100dvh; margin: auto; padding: 24px 30px; overflow: auto; border: 0; background: transparent; touch-action: pan-y; overscroll-behavior: contain; }
+.controls-dialog .controls-card { --card-padding: clamp(18px, 4vw, 30px); width: 100%; margin: 0; }
+.controls-card h2 { margin: 0 0 15px; font-size: 36px; line-height: .9; }
+.controls-actions { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 10px; }
+.text-button { min-height: 44px; padding: 6px 10px; border: 0; border-radius: 6px; background: #fff1cf0d; color: #ffe0af; font: 800 14px/1 "Barlow Condensed", sans-serif; letter-spacing: .09em; cursor: pointer; }
+.text-button:hover { background: #ffd34e23; }
 .text-button:focus-visible { outline: 2px solid var(--gold); }
 .text-button:disabled { opacity: .45; cursor: wait; }
-.controls-card::backdrop { background: #11131bd9; }
+.controls-dialog::backdrop { background: #11131bd9; }
 .end-card { margin-right: 0; margin-left: 0; text-align: center; }
 .end-card h2 { margin: 0 0 28px; font-size: 58px; }
 .runner-mode .end-card h2 { font-size: clamp(28px, 4.5vw, 48px); line-height: 1; }
@@ -150,15 +144,12 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 900 clamp(52px, 8vw, 78px
 .runner-mode #start-screen.map-debug .runner-start-hint { display: none; }
 .holiday-card { border: 0; border-radius: 15px; background: radial-gradient(ellipse at 77% 0%, #50252d 0%, #50252d00 65%), linear-gradient(150deg, #302332, #171e2c 86%); box-shadow: 0 20px 68px #0a0e1ac7; backdrop-filter: none; }
 .menu-symbols { position: absolute; width: 0; height: 0; }
-.menu-sleigh { display: block; width: 88px; height: 45px; color: #f3cd8f; }
-.menu-header { display: flex; align-items: center; justify-content: space-between; height: 44px; margin: 0 0 12px; }
-#start-screen .menu-header { margin: -17px -16px 10px; }
-#start-screen .menu-sleigh { width: 165px; height: 84px; margin-left: -48px; overflow: visible; transform: rotate(-10deg); filter: drop-shadow(0 4px 10px #0e111ad9); }
-.end-card .menu-header, .mission-card .menu-header { justify-content: center; }
+.menu-header { display: flex; align-items: center; justify-content: space-between; height: 44px; margin: calc(15px - var(--card-padding)) -16px 16px calc(16px - var(--card-padding)); }
+.menu-sleigh { display: block; flex: none; width: 165px; height: 84px; margin-left: -48px; overflow: visible; color: #f3cd8f; transform: rotate(-10deg); filter: drop-shadow(0 4px 10px #0e111ad9); }
 .mission-card { width: min(430px, 100%); margin: 0; text-align: center; }
 .mission-card h2 { margin: 0 0 26px; font-size: clamp(35px, 8vw, 50px); line-height: .97; text-wrap: balance; }
 .scores-card { border: 1px solid #e3cfa2; border-radius: 5px; background: #173d35; box-shadow: inset 0 0 0 4px #173d35, inset 0 0 0 5px #e3cfa257, 0 14px 44px #071b1890; backdrop-filter: none; }
-#start-screen .card { position: relative; width: min(360px, 100%); margin: 0; padding: 32px; }
+#start-screen .card { --card-padding: 32px; position: relative; width: min(360px, 100%); margin: 0; }
 @media (min-width: 900px) {
   #start-screen .card { justify-self: start; margin-left: clamp(32px, 8vw, 125px); }
 }
@@ -214,8 +205,7 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 900 clamp(52px, 8vw, 78px
 @media (max-width: 680px) {
   .hud { gap: 8px; padding: max(14px, env(safe-area-inset-top)) 14px 0; }
   .passerby { width: 48px; height: 48px; }
-  .card { margin: 0; padding: 27px; }
-  .controls-card { margin: auto; width: calc(100% - 32px); }
+  .card { --card-padding: 27px; margin: 0; }
   h1 { font-size: 60px; }
 }
 
@@ -251,7 +241,7 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 900 clamp(52px, 8vw, 78px
 }
 
 @media (max-width: 380px) {
-  #start-screen .menu-sleigh { margin-left: -43px; }
+  .menu-sleigh { margin-left: -43px; }
   .start-controls, .runner-mode .runner-start-hint { gap: 8px; }
   .start-controls kbd { padding: 0 4px; font-size: 10px; }
   .start-controls .start-space-key { min-width: 60px; }
@@ -260,23 +250,16 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 900 clamp(52px, 8vw, 78px
 }
 
 @media (max-height: 560px) and (min-width: 681px) {
-  .card { padding: 24px; }
+  .card { --card-padding: 24px; }
   h1 { font-size: 52px; }
   .card p { margin: 15px 0; }
 }
 
 @media (max-height: 560px) {
   #start-screen { padding: 12px; }
-  #start-screen .card { width: min(440px, 100%); padding: 20px; }
+  #start-screen .card { --card-padding: 20px; width: min(440px, 100%); }
   #start-screen h1 { margin: 20px 0 0; }
-  .controls-card { padding: 18px; }
-  .controls-card .menu-header { margin: -5px 0 0; }
-  .controls-card h2 { margin: 8px 0 12px; font-size: 36px; }
-  .controls-card .control-setting { margin-bottom: 12px; }
-  .controls-card .control-choice { min-height: 80px; gap: 5px; padding: 10px 12px; }
-  .controls-card .control-option input { top: 11px; }
-  .controls-card .control-toggles { margin-bottom: 12px; }
-  .controls-card small { margin-top: 10px; }
+  .controls-dialog .controls-card { --card-padding: 18px; }
 }
 
 @media (pointer: coarse) {
