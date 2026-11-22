@@ -14,16 +14,6 @@
 - File: `assets/enemies/snail.glb`.
 - Retained in the repository for attribution and asset history; replaced by barnacle geese in gameplay. The geometry and texture in the GLB are unchanged.
 
-## Slug
-
-- **Slug** by **Poly by Google**.
-- Source: https://poly.pizza/m/6EajmlUIlza
-- Licence: **Creative Commons Attribution 3.0 Unported (CC BY 3.0)**, https://creativecommons.org/licenses/by/3.0/
-- File: `assets/enemies/slug.glb`.
-- In-game changes: scale, position, material settings, and a procedural crawling sway. The geometry and texture in the GLB are unchanged.
-
-Retain each enemy model's attribution and licence when distributing the game. These licences apply to the respective enemy models, not to the entire project.
-
 ## Hero and environment
 
 ### 3D cameo reference photographs
@@ -43,7 +33,7 @@ These photographs are retained as likeness references for the fully sculpted 3D 
 - **Volodymyr Zelenskyy**. Geometry fitted from the [April 2025 front view](https://commons.wikimedia.org/wiki/File:President_of_Ukraine_Volodymyr_Zelenskyy_on_20_April_2025_%28cropped%29.jpg) and a [three-quarter view](https://commons.wikimedia.org/wiki/File:%D0%92%D0%BB%D0%B0%D0%B4%D0%B8%D0%BC%D0%B8%D1%80_%D0%97%D0%B5%D0%BB%D0%B5%D0%BD%D1%81%D0%BA%D0%B8%D0%B9_%2853353728357%29.jpg). The [June 2025 profile](https://commons.wikimedia.org/wiki/File:President_Donald_Trump_participates_in_a_bilateral_meeting_with_Ukrainian_president_Volodymyr_Zelenskyy_P20250625DT-0743.jpg) provided the nose and chin depths.
 - **Ramzan Kadyrov**. The [May 2024 portrait](https://commons.wikimedia.org/wiki/File:Ramzan_Kadyrov_May_2024.jpg) provided the facial proportions, haircut and beard silhouette.
 
-Bad Bad Boy is a sculpture by Tommi Toija in Helsinki. The game character was prepared from the user-provided `bc222867938641be8050f747614e5d34.glb`; it is not covered by the snail and slug licences above.
+Bad Bad Boy is a sculpture by Tommi Toija in Helsinki. The game character was prepared from the user-provided `bc222867938641be8050f747614e5d34.glb`.
 
 The city environment is generated in `maps/harbor.js` and `maps/harbor-scenery.js`. Three.js: https://threejs.org/ (MIT).
 

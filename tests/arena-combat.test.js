@@ -19,8 +19,10 @@ test('a pack can bite only once per invulnerability window and dead enemies are 
   assert.equal(f.combat.update(1 / 60, 1), true);
   assert.equal(f.player.hp, 4); assert.equal(f.bites.length, 1);
   assert.equal(f.animated.length, 2); assert.equal(dead.attack, 0);
-  f.combat.update(.1, 1.1);
+  f.player.invulnerable -= 1;
+  f.combat.update(1, 2);
   assert.equal(f.player.hp, 4);
+  assert.ok(f.player.invulnerable > 0, 'A full second passes before the pack can land another hit');
 });
 
 test('a fatal bite stops the step before later enemies can move or animate', () => {
@@ -48,34 +50,32 @@ test('nearby enemies still separate while distant enemies leave steering unchang
   assert.equal(distant.z, 8, 'A distant actor does not add separation');
 });
 
-test('geese and slugs pick up their pace during a retreat and turn faster around a corner', () => {
-  for (const [kind, baseSpeed] of [['goose', .65], ['slug', .75]]) {
-    const actor = { ...enemy(-6), kind, speed: baseSpeed };
-    const { combat, player, world } = fixture([actor]);
-    player.speed = 3.6;
-    world.chase = (x, z, tx, tz) => ({ x: tx - x, z: tz - z });
-    const dt = 1 / 60;
-    for (let frame = 0; frame < 60; frame++) {
-      player.x += player.speed * dt;
-      combat.update(dt, frame * dt, player.speed * dt, 0);
-    }
-    assert.ok(actor.x > -4 && actor.x < -2.4, kind + ' runs slower than the hero');
-
-    player.z += player.speed * dt;
-    world.chase = () => ({ x: 0, z: 1 }); // The next waypoint is around the corner.
-    const sprintHeading = actor.root.rotation.y;
-    combat.update(dt, 1, 0, player.speed * dt);
-    const sprintTurn = Math.abs(actor.root.rotation.y - sprintHeading);
-    assert.ok(actor.z > 2 * baseSpeed * dt, kind + ' keeps running through the turn');
-
-    const oldZ = actor.z, walkHeading = actor.root.rotation.y;
-    combat.update(dt, 1 + dt);
-    assert.ok(Math.abs(actor.z - oldZ - baseSpeed * dt) < 1e-9, kind + ' returns to a walk');
-    assert.ok(sprintTurn > 2 * Math.abs(actor.root.rotation.y - walkHeading));
+test('geese sprint after a retreating hero and turn quickly around a corner', () => {
+  const actor = { ...enemy(-6), speed: 1.2 };
+  const { combat, player, world } = fixture([actor]);
+  player.speed = 3.6;
+  world.chase = (x, z, tx, tz) => ({ x: tx - x, z: tz - z });
+  const dt = 1 / 60;
+  for (let frame = 0; frame < 60; frame++) {
+    player.x += player.speed * dt;
+    combat.update(dt, frame * dt, player.speed * dt, 0);
   }
+  assert.ok(actor.x > -3.5 && actor.x < -2.9);
+
+  player.z += player.speed * dt;
+  world.chase = () => ({ x: 0, z: 1 });
+  const sprintHeading = actor.root.rotation.y;
+  combat.update(dt, 1, 0, player.speed * dt);
+  const sprintTurn = Math.abs(actor.root.rotation.y - sprintHeading);
+  assert.ok(actor.z > 2 * actor.speed * dt);
+
+  const oldZ = actor.z, walkHeading = actor.root.rotation.y;
+  combat.update(dt, 1 + dt);
+  assert.ok(Math.abs(actor.z - oldZ - actor.speed * dt) < 1e-9);
+  assert.ok(sprintTurn > 2 * Math.abs(actor.root.rotation.y - walkHeading));
 });
 
-test('a sprinting pursuer keeps its gap until the hero stops', () => {
+test('geese can nip a retreating hero at close range and a head start allows escape', () => {
   const actor = enemy(-1.2);
   const { combat, player, world } = fixture([actor]);
   player.speed = 3.6;
@@ -83,7 +83,7 @@ test('a sprinting pursuer keeps its gap until the hero stops', () => {
   const dt = 1 / 60;
   player.x += player.speed * dt;
   combat.update(dt, 0, player.speed * dt, 0);
-  assert.equal(player.hp, 5);
+  assert.equal(player.hp, 4);
   assert.equal(actor.x, -1.2);
 
   actor.x = -4;
@@ -92,7 +92,5 @@ test('a sprinting pursuer keeps its gap until the hero stops', () => {
     combat.update(dt, frame * dt, 0, player.speed * dt);
     assert.ok(Math.hypot(player.x - actor.x, player.z - actor.z) >= 2.6 - 1e-9);
   }
-  assert.equal(player.hp, 5);
-  for (let frame = 0; frame < 480 && player.hp === 5; frame++) combat.update(dt, frame * dt);
-  assert.equal(player.hp, 4, 'The ordinary bite still applies after the hero stops');
+  assert.equal(player.hp, 4);
 });

@@ -3,6 +3,7 @@ export function disposeObject(root) {
   const resources = new Set();
   root.traverse(node => {
     if (node.isInstancedMesh) node.dispose();
+    if (node.isSkinnedMesh && node.skeleton) resources.add(node.skeleton);
     if (node.geometry) resources.add(node.geometry);
     for (const material of (Array.isArray(node.material) ? node.material : [node.material])) {
       if (!material) continue;

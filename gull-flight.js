@@ -1,5 +1,6 @@
-// Independent ambient hazards. All timing uses the game clock; birds never
-// enter the wave director or the runner's traffic/score accounting.
+// Independent ambient hazards. One bird attacks at a time while the flock orbits.
+export const GULL_COUNT = 4;
+export const RUNNER_GULL_COUNT = 6;
 const STEP = 1 / 120;
 const WINDUP = 1.6;
 const STRIKE_TIME = .9;
@@ -9,28 +10,32 @@ const SETTLE_TIME = 1.8;
 const GRAVITY = 9;
 const smooth = t => t * t * (3 - 2 * t);
 
-export function createGullFlight({ random = Math.random, canStandAt = () => true, lineClear3D = () => true, onImpact = () => {}, onRepel = () => {} } = {}) {
-  const birds = Array.from({ length: 2 }, (_, id) => ({
+export function createGullFlight({ random = Math.random, canStandAt = () => true, lineClear3D = () => true, onImpact = () => {}, onRepel = () => {}, runnerGullCount = GULL_COUNT } = {}) {
+  const flock = Array.from({ length: Math.max(GULL_COUNT, runnerGullCount) }, (_, id) => ({
     id, kind: 'gull', airborne: true, size: .62, alive: false,
     x: 0, z: 0, hitHeight: 6, vx: 0, vy: 0, vz: 0,
     phase: 'waiting', age: 0, nextJetHit: 0, target: null, drop: null,
   }));
+  const birds = flock.slice(0, GULL_COUNT);
   let time = 0, accumulator = 0, nextAttack = 6, nextBird = 0, runner = false;
   const previous = { x: 0, z: 0 };
 
   function reset(player, running = false) {
-    time = accumulator = nextBird = 0; nextAttack = 9 + random() * 2; runner = running;
+    runner = running;
+    birds.splice(0, birds.length, ...flock.slice(0, runner ? runnerGullCount : GULL_COUNT));
+    const biggerFlock = birds.length > GULL_COUNT;
+    time = accumulator = nextBird = 0; nextAttack = (biggerFlock ? 8 : 9) + random() * 2;
     previous.x = player.x; previous.z = player.z;
     for (const bird of birds) {
       Object.assign(bird, { phase: 'waiting', age: 0, alive: false, nextJetHit: 0, target: null, drop: null, start: null, vx: 0, vy: 0, vz: 0,
-        orbitScale: 1, nextOrbitCheck: 0, entryDelay: 2 + bird.id * 5 + random(), returnAfter: 0, goal: {} });
+        orbitScale: 1, nextOrbitCheck: 0, entryDelay: 2 + bird.id * (biggerFlock ? 1.55 : 2.45) + random(), returnAfter: 0, goal: {} });
       bird.x = player.x; bird.z = player.z - 90; bird.hitHeight = 10;
     }
   }
 
   function orbitGoal(bird, player) {
-    const angle = time * .65 + bird.id * Math.PI;
-    const height = 6.3 + Math.sin(angle * 1.3) * .65;
+    const angle = time * .65 + bird.id * Math.PI * 2 / birds.length;
+    const height = 6.1 + bird.id * .48 + Math.sin(angle * 1.3) * .5;
     const dx = Math.cos(angle) * (runner ? 3.6 : 6), dz = -5 + Math.sin(angle) * 3.5;
     if (time >= bird.nextOrbitCheck) {
       bird.nextOrbitCheck = time + .15;
@@ -55,7 +60,7 @@ export function createGullFlight({ random = Math.random, canStandAt = () => true
 
   function approach(bird, player) {
     bird.phase = 'approach'; bird.age = 0; bird.alive = true; bird.nextJetHit = 0;
-    bird.x = player.x + (bird.id ? -1 : 1) * (runner ? 1.2 : 8);
+    bird.x = player.x + (bird.id % 2 ? -1 : 1) * (runner ? 1.2 : 8);
     bird.z = player.z - 90; bird.hitHeight = (runner ? 12 : 15) + bird.id;
     bird.start = { x: bird.x, y: bird.hitHeight, z: bird.z };
   }
@@ -93,7 +98,7 @@ export function createGullFlight({ random = Math.random, canStandAt = () => true
     bird.phase = 'recover'; bird.age = 0; bird.target = null;
     bird.start = { x: bird.x, y: bird.hitHeight, z: bird.z };
     if (!bird.alive) leave(bird);
-    nextAttack = time + 6 + random() * 4;
+    nextAttack = time + (runner && birds.length === GULL_COUNT ? 6 + random() * 4 : 4.5 + random() * 3);
   }
 
   function impact(bird, player, type) {
@@ -157,7 +162,7 @@ export function createGullFlight({ random = Math.random, canStandAt = () => true
         const from = { x: drop.x, y: drop.y, z: drop.z };
         drop.x += drop.vx * STEP; drop.z += drop.vz * STEP;
         drop.y += drop.vy * STEP - .5 * GRAVITY * STEP ** 2; drop.vy -= GRAVITY * STEP;
-        if (bird.alive) bird.x += (bird.id ? -1 : 1) * STEP * 3;
+        if (bird.alive) bird.x += (bird.id % 2 ? -1 : 1) * STEP * 3;
         else { bird.hitHeight += STEP * 5; bird.z -= STEP * 7; }
         if (!lineClear3D(from, drop, .12)) { bird.drop = null; finish(bird); }
         else if (bird.age >= STRIKE_TIME) { impact(bird, player, 'drop'); bird.drop = null; }
@@ -166,7 +171,7 @@ export function createGullFlight({ random = Math.random, canStandAt = () => true
         blend(bird, orbitGoal(bird, player), t);
         if (bird.age > 1.3) { bird.phase = 'orbit'; bird.age = 0; }
       } else if (bird.phase === 'flee') {
-        blend(bird, { x: player.x + (bird.id ? -1 : 1) * 35, y: 35, z: player.z - 25 }, smooth(Math.min(1, bird.age / EXIT_TIME)));
+        blend(bird, { x: player.x + (bird.id % 2 ? -1 : 1) * 35, y: 35, z: player.z - 25 }, smooth(Math.min(1, bird.age / EXIT_TIME)));
         if (bird.age >= EXIT_TIME) { bird.phase = 'away'; bird.age = 0; }
       } else if (bird.phase === 'away' && bird.age >= bird.returnAfter - EXIT_TIME) {
         approach(bird, player);

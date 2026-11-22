@@ -11,7 +11,10 @@ import { createGameCamera } from './world/game-camera.js';
 import { chooseWeather, createWeather } from './world/weather.js';
 import { createMapTransition } from './world/map-transition.js';
 import { createTransitionRenderer } from './world/transition-renderer.js';
-import { createCampaign, createWaveDirector, WAVES_PER_MAP } from './waves.js';
+import { createSleighParts } from './models/sleigh.js';
+import { createSleighAssembly } from './sleigh-assembly.js';
+import { createSleighIntro } from './sleigh-intro.js';
+import { createSleighCache, sleighGuardPosts } from './sleigh-search.js';
 import { createBatteries } from './batteries.js';
 import { loadEnemyModels, createEnemy, animateEnemy, disposeEnemy } from './enemies.js';
 import { createSpraySystem } from './spray-system.js';
@@ -26,10 +29,13 @@ import { bindGameInput } from './game-input.js';
 import { preventGameZoom } from './gesture-guard.js';
 import { bindRunnerInput } from './runner/runner-input.js';
 import { createRunnerSession } from './runner/session.js';
+import { createRunnerFinishReward } from './runner/finish-reward.js';
 import { CAMEO_KINDS, isCameo } from './runner/cameo-roster.js';
 import { createSeagulls } from './seagulls.js';
 import { aimingUp, createSprayAim } from './spray-aim.js';
 import { createLeaderboard } from './leaderboard.js';
+import { calculateDistrictScore, districtPaceSeconds } from './campaign-score.js';
+import { mountHolidayScreens } from './screen-ui.js';
 
 // World metres; the hero keeps the same physical size across every map.
 const HERO_HEIGHT = 3.45;
@@ -50,6 +56,8 @@ try {
 } catch { /* Settings still work when browser storage is unavailable. */ }
 
 const canvas = document.querySelector('#game');
+mountHolidayScreens(document);
+const gameShell = document.querySelector('.game-shell');
 preventGameZoom(document);
 const status = document.querySelector('#load-status');
 const startScreen = document.querySelector('#start-screen');
@@ -70,6 +78,13 @@ const scoreLabel = document.querySelector('#score');
 const levelDial = document.querySelector('#level-dial');
 const levelProgressArc = document.querySelector('#level-progress-arc');
 const healthProgressArc = document.querySelector('#health-progress-arc');
+const sleighProgress = document.querySelector('#sleigh-progress');
+const sleighSegments = document.querySelector('#sleigh-segments');
+const sleighFill = document.querySelector('#sleigh-fill');
+const introOverlay = document.querySelector('#sleigh-intro');
+const skipIntro = document.querySelector('#skip-intro');
+const missionScreen = document.querySelector('#mission-screen');
+const beginSearch = document.querySelector('#begin-search');
 const passerbyCard = document.querySelector('.passerby');
 let shownCameo = null;
 const toast = document.querySelector('#toast');
@@ -77,6 +92,7 @@ const sprayButton = document.querySelector('#mobile-fire');
 const controlsDialog = document.querySelector('#controls-dialog');
 const settingsButton = document.querySelector('#open-settings');
 const settingsDone = document.querySelector('#settings-done');
+const startOver = document.querySelector('#start-over');
 const soundSetting = document.querySelector('#sound-setting');
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const query = new URLSearchParams(window.location.search);
@@ -93,7 +109,7 @@ const mouseAim = createMouseAim({
   getInitialPosition: aimCursorPosition,
   onUnlock() {
     lastMouseUnlock = performance.now();
-    if (playing && !mapTransition.active) openSettings();
+    if (playing && !gameInterlude()) openSettings();
   },
   onError() { mouseCaptureFailed = true; }
 });
@@ -124,9 +140,22 @@ renderer.toneMappingExposure = 1.12;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#7c929f');
 scene.fog = new THREE.Fog('#7c929f', 40, 100);
-const campaign = createCampaign(mapOrder(query.get('map')).map(map => map.id));
+let itinerary = mapOrder(query.get('map'));
 const world = createMapManager(scene, maps, .32 * HERO_SCALE);
-world.activate(campaign.plan(1).mapId);
+const showSenatePreview = !query.has('map');
+world.activate(showSenatePreview ? 'senate-square' : itinerary[0].id);
+const sleighParts = createSleighParts();
+if (sleighParts.length !== maps.length) throw new Error('Each district needs one sleigh part');
+const sleighCache = createSleighCache(scene, world, sleighParts);
+const runnerReward = createRunnerFinishReward(scene, sleighParts);
+const sleighAssembly = createSleighAssembly(sleighParts, document.querySelector('#sleigh-assembly'));
+sleighSegments.replaceChildren(...sleighParts.map((_, index) => {
+  const segment = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  for (const [attribute, value] of Object.entries({ cx: 46, cy: 46, r: 41, pathLength: 100,
+    'stroke-dasharray': `${100 / sleighParts.length - 3.6} 100`, transform: `rotate(${-84 + 360 * index / sleighParts.length} 46 46)`,
+  })) segment.setAttribute(attribute, value);
+  return segment;
+}));
 
 const cameraRig = createGameCamera();
 const { camera } = cameraRig;
@@ -211,18 +240,9 @@ const arenaCameos = createArenaCameos(scene, world);
 const arenaCombat = createArenaCombat({
   world, player, enemies, animateEnemy,
   onBite(enemy) {
-    updateHealth(); showBite(enemy); blip(115, .12);
+    recordHealthLost(1); showBite(enemy); blip(115, .12);
     if (player.hp <= 0) { endGame(); return false; }
     return true;
-  },
-});
-const waves = createWaveDirector({
-  campaign,
-  onWave: spawnWave,
-  onReinforcements(count, plan) {
-    levelEnemiesTotal += spawnEnemies(count, plan.combatWave);
-    updateArenaLevelProgress();
-    showToast(`REINFORCEMENTS +${count} · KEEP FIGHTING!`);
   },
 });
 const aimAssist = createAimAssist((origin, enemy) => world.lineClear(origin.x, origin.z, enemy.x, enemy.z, .12));
@@ -246,7 +266,7 @@ const seagulls = createSeagulls(scene, world, {
     if (!impact.hit || player.invulnerable > 0 || !playing) return;
     player.hp = Math.max(0, player.hp - 1); player.invulnerable = .9;
     if (isRunner()) runnerSession.state.invulnerable = Math.max(runnerSession.state.invulnerable, .9);
-    updateHealth(); blip(105, .12);
+    recordHealthLost(1); blip(105, .12);
     if (player.hp === 0) endGame();
   },
 });
@@ -255,10 +275,17 @@ const POWER_TIME = 8;
 let playing = false;
 let gameTime = 0;
 let score = 0;
+let bankedScore = 0;
+let searchTime = 0;
+let geeseDefeated = 0;
+let healthLost = 0;
 let levelProgress = 0;
-let levelNumber = 1;
-let levelEnemiesCleared = 0;
-let levelEnemiesTotal = 0;
+let levelIndex = 0;
+let foundParts = 0;
+let intro = null;
+let introSeen = false;
+const FINISH_HOLD = .85;
+let runnerArrival = 0;
 let audioContext = null;
 let renderingReady = false;
 const frameClock = createFrameClock();
@@ -268,43 +295,60 @@ const runnerSession = createRunnerSession({
   heroHeight: HERO_HEIGHT, heroScale: HERO_SCALE,
   isPlaying: () => playing,
   onDamage(hits) {
-    player.hp = Math.max(0, player.hp - hits); updateHealth(); blip(110, .12);
+    const lost = Math.min(player.hp, hits);
+    player.hp -= lost;
+    recordHealthLost(lost); blip(110, .12);
     burst(player.x, HERO_HEIGHT * .4, 0, 0xe85e55, 16, null, 2);
     if (player.hp === 0) { endGame(); return false; }
     return true;
   },
   onSpray(dt, firing, traffic) { updateSprayFeedback(updateSpray(dt, firing, traffic)); },
   onCollect: collectMedkit,
-  onScore(value) { score = value; updateScore(); },
   onProgress(fraction, traffic) {
     setLevelProgress(fraction);
+    updateScore();
+    const { distance, elapsed, crossings } = runnerSession.state;
+    runnerReward.update(distance, elapsed, reducedMotion.matches);
+    const crossingWarning = crossings.some(crossing => crossing.phase === 'warning' || crossing.phase === 'crossing');
     const passerby = traffic.find(agent => isCameo(agent.kind) && agent.age >= .3 && !agent.passed && agent.panicSide === undefined);
-    showCameo(passerby?.kind ?? null);
+    showCameo(crossingWarning ? null : passerby?.kind ?? null);
   },
   onFinish() {
-    score += 500; updateScore();
-    waves.completeMap();
+    runnerArrival = FINISH_HOLD;
+    resetInput();
+    stream.clear();
+    touchControls.setEnabled(false);
   },
 });
 const runnerInput = bindRunnerInput({
   canvas,
-  canInteract: () => playing && isRunner() && !controlsDialog.open && !mapTransition.active,
+  canInteract: () => playing && isRunner() && !controlsDialog.open && !gameInterlude(),
   dodge: direction => runnerSession.dodge(direction),
   setFiring: firing => firing ? keys.add('Fire') : keys.delete('Fire'), beginSpray,
 });
 
 const transitionRenderer = createTransitionRenderer(renderer);
-const mapTransition = createMapTransition({ onSwap: applyWave, onFinish: finishMapTransition });
+const mapTransition = createMapTransition({ onSwap: enterDistrict, onFinish: finishMapTransition });
+
+function gameInterlude() { return intro !== null || mapTransition.active || sleighAssembly.active || runnerArrival > 0; }
 
 function finishMapTransition() {
-  document.querySelector('.game-shell').classList.remove('map-changing');
+  gameShell.classList.remove('map-changing');
   resetInput();
   touchControls.setEnabled(playing);
   syncMouseAim();
 }
 
+function transitionToDistrict(index) {
+  if (!mapTransition.start({ index }, reducedMotion.matches ? .5 : 1.2)) return;
+  gameShell.classList.add('map-changing');
+  touchControls.setEnabled(false);
+  syncMouseAim();
+}
+
 async function prepareGraphics() {
   renderingReady = false;
+  startOver.disabled = true;
   try {
     await prepareScene(renderer, scene, camera, () => {
       if (mapTransition.active) transitionRenderer.render(scene, camera, mapTransition.progress, reducedMotion.matches);
@@ -312,6 +356,7 @@ async function prepareGraphics() {
     });
   } finally {
     frameClock.reset();
+    startOver.disabled = false;
   }
   renderingReady = true;
 }
@@ -329,16 +374,8 @@ function showCameo(kind) {
 function syncLevelUI() {
   const runner = isRunner();
   showCameo(null);
-  const stops = document.querySelector('.route-stops');
-  stops.setAttribute('aria-label', world.name);
-  stops.replaceChildren(...maps.map(map => {
-    const stop = document.createElement('i');
-    stop.classList.toggle('current', map.id === world.id);
-    return stop;
-  }));
   toast.hidden = runner;
-  if (runner) { clearTimeout(showToast.timer); toast.classList.remove('visible'); }
-  document.querySelector('.game-shell').classList.toggle('runner-mode', runner);
+  gameShell.classList.toggle('runner-mode', runner);
   document.querySelector('#joystick-zone').setAttribute('aria-label', runner ? 'Left/right to dodge; up to accelerate, down to brake' : 'Drag to move and aim');
 }
 
@@ -361,7 +398,7 @@ if (debugMaps) {
       button.append(name, id);
       button.addEventListener('click', () => {
         if (!renderingReady) return;
-        campaign.setStartingMap(map.id);
+        itinerary = mapOrder(map.id);
         if (controlsDialog.open) controlsDialog.close();
         startGame();
         requestMouseAim();
@@ -373,22 +410,21 @@ if (debugMaps) {
 
 async function loadModels() {
   try {
-    status.textContent = 'Loading the hero, barnacle geese, and Spanish slugs…';
-    const [gltf] = await Promise.all([
-      loadHero(message => { status.textContent = message; }),
-      loadEnemyModels(),
-    ]);
+    status.textContent = 'Loading the hero and barnacle geese…';
+    loadEnemyModels();
+    const gltf = await loadHero(message => { status.textContent = message; });
     player.rig = createHero(gltf.scene);
     player.model = player.rig.mesh;
     player.model.scale.setScalar(HERO_SCALE);
     player.body.add(player.model);
     placePlayerAtSpawn();
+    frameMenuPreview();
     // These hidden representatives retain enemy programs across districts,
     // including runs that start on a track without any arena enemies.
     const enemyPrograms = new THREE.Group();
     enemyPrograms.name = 'Prepared enemy programs';
     enemyPrograms.visible = false;
-    for (const kind of ['goose', 'slug']) enemyPrograms.add(createEnemy(kind, 1).root);
+    enemyPrograms.add(createEnemy('goose', 1).root);
     scene.add(enemyPrograms);
     status.textContent = 'Preparing the graphics…';
     await prepareGraphics();
@@ -406,9 +442,10 @@ async function loadModels() {
   }
 }
 
-function makeEnemy(x, z, level, kind) {
-  const enemy = createEnemy(kind, level);
+function makeEnemy(x, z, level, guardPost = null) {
+  const enemy = createEnemy('goose', level);
   enemy.onTramHit = removeEnemyByTram;
+  enemy.guardPost = guardPost;
   enemy.x = x;
   enemy.z = z;
   enemy.root.position.set(x, 0, z);
@@ -420,62 +457,72 @@ function removeEnemyByTram(enemy) {
   removeEnemy(enemy, true);
 }
 
-function spawnEnemies(count, level) {
-  world.routeTo(player.x, player.z);
-  let spawned = 0;
+function spawnEnemies(around, count, level, { minPlayerDistance = 0, ringStart = 7 } = {}) {
   for (let i = 0; i < count; i++) {
-    const point = world.spawnPoint(player, i, count);
-    if (point) {
-      makeEnemy(point.x, point.z, level, i % 3 === 0 ? 'slug' : 'goose');
-      spawned++;
+    const point = world.spawnPoint(around, i, count, ringStart);
+    if (!point || Math.hypot(point.x - player.x, point.z - player.z) < minPlayerDistance) continue;
+    if (enemies.every(enemy => Math.hypot(enemy.x - point.x, enemy.z - point.z) > 1.25)) {
+      makeEnemy(point.x, point.z, level);
     }
   }
-  return spawned;
 }
 
-function spawnWave(plan) {
-  if (playing && world.id !== plan.mapId) {
-    if (!mapTransition.start(plan, reducedMotion.matches ? .5 : 1.2)) return;
-    resetInput();
-    syncMouseAim();
-    touchControls.setEnabled(false);
-    document.querySelector('.game-shell').classList.add('map-changing');
-    return;
-  }
-  applyWave(plan);
+function collectSleighPart() {
+  if (!playing || gameInterlude() || foundParts !== levelIndex) return;
+  const award = currentDistrictScore(true);
+  bankedScore += award.total;
+  foundParts++;
+  updateSleighProgress();
+  updateScore();
+  setLevelProgress(1);
+  sleighAssembly.start(levelIndex, reducedMotion.matches, award);
+  gameShell.classList.add('sleigh-assembling');
+  resetInput();
+  stream.clear();
+  syncMouseAim();
+  touchControls.setEnabled(false);
+  blip(880, .16);
 }
 
-function applyWave(plan) {
-  const changedMap = world.activate(plan.mapId);
-  levelNumber = plan.number;
-  levelEnemiesCleared = 0;
-  levelEnemiesTotal = 0;
+function finishSleighAssembly() {
+  gameShell.classList.remove('sleigh-assembling');
+  if (foundParts === itinerary.length) { endGame(true); return; }
+  transitionToDistrict(levelIndex + 1);
+}
+
+function enterDistrict({ index }) {
+  const district = itinerary[index];
+  const changedMap = world.activate(district.id);
+  levelIndex = index;
+  searchTime = geeseDefeated = healthLost = 0;
   setLevelProgress(0);
-  if (changedMap || plan.number === 1) {
-    if (changedMap || !firstRound) setDistrictWeather();
-    firstRound = false;
-    // Keep score, but begin every district at full health with no old attacks.
-    // Reset also rebuilds navigation before placing pickups.
-    clearArena();
-    player.hp = player.maxHp; player.invulnerable = 0;
-    player.model.material.opacity = 1; player.model.material.transparent = false;
-    updateHealth();
-    world.reset();
-    placePlayerAtSpawn();
-    arenaCameos.reset(camera.position);
-    seagulls.reset(player, isRunner());
-    medkits.reset(player);
-    if (!isRunner()) batteries.reset(player);
-  } else if (!isRunner()) {
-    arenaCameos.nextWave(camera.position);
-  }
+  if (changedMap || !firstRound) setDistrictWeather();
+  firstRound = false;
+  // Keep score and parts while resetting health, attacks, and map navigation.
+  clearArena();
+  player.hp = player.maxHp; player.invulnerable = 0;
+  player.model.material.opacity = 1; player.model.material.transparent = false;
+  updateHealth();
+  world.reset();
+  placePlayerAtSpawn();
+  arenaCameos.reset(camera.position);
+  seagulls.reset(player, isRunner());
+  medkits.reset(player);
   syncLevelUI();
   if (isRunner()) {
-    runnerSession.start(world.runner, score);
+    runnerReward.place(index, world.runner.length);
+    runnerSession.start(world.runner);
   } else {
-    levelEnemiesTotal = spawnEnemies(plan.enemyCount, plan.combatWave);
-    updateArenaLevelProgress();
-    if (plan.combatWave > 1) showToast(`WAVE ${plan.combatWave}`);
+    batteries.reset(player);
+    const [cache] = world.pickupPoints('sleigh', .85);
+    if (!cache) throw new Error(`Missing reachable sleigh part in ${district.id}`);
+    sleighCache.place(cache, index);
+    const strength = itinerary.slice(0, index + 1).filter(map => map.mode !== 'runner').length;
+    for (const post of sleighGuardPosts(world, cache)) makeEnemy(post.x, post.z, strength, post);
+    const openingArena = strength === 1;
+    spawnEnemies(player, openingArena ? 4 : 5 + strength, strength, openingArena
+      ? { minPlayerDistance: 10.5, ringStart: 10.5 } : undefined);
+    spawnEnemies(cache, openingArena ? 3 : 6, strength, { minPlayerDistance: openingArena ? 11 : 8 });
   }
   if (changedMap && renderingReady) {
     prepareGraphics().catch(error => {
@@ -490,13 +537,8 @@ function removeEnemy(enemy, pop = false) {
   enemy.alive = false;
   disposeEnemy(enemy);
   if (pop) {
-    score += 150;
-    waves.onKill();
+    geeseDefeated++;
     updateScore();
-    if (!isRunner()) {
-      levelEnemiesCleared++;
-      updateArenaLevelProgress();
-    }
     burst(enemy.x, enemy.hitHeight, enemy.z, 0xffd34e, 10);
     blip(440 + Math.random() * 280, 0.045);
   }
@@ -507,18 +549,14 @@ function burst(x, y, z, color, count = 8, forward = null, scale = 1) {
 }
 
 function showBite(enemy) {
-  const attacker = enemy.goose
-    ? enemy.goose.beak.getWorldPosition(new THREE.Vector3())
-    : new THREE.Vector3(enemy.x, THREE.MathUtils.clamp(enemy.hitHeight, .18, .48), enemy.z);
+  const attacker = enemy.goose.beak.getWorldPosition(new THREE.Vector3());
   const contact = new THREE.Vector3();
   let nearest = Infinity;
-  // Use the nearest animated leg segment. A goose can nip above the shin;
-  // the low slug still bites around the ankle.
+  // Use the nearest animated leg segment, including nips above the shin.
   for (const leg of player.rig.legs) {
     const ankle = leg.ankle.getWorldPosition(new THREE.Vector3());
     const knee = leg.knee.getWorldPosition(new THREE.Vector3());
-    const joints = [ankle, knee];
-    if (enemy.goose) joints.push(leg.hip.getWorldPosition(new THREE.Vector3()));
+    const joints = [ankle, knee, leg.hip.getWorldPosition(new THREE.Vector3())];
     for (let i = 1; i < joints.length; i++) {
       const start = joints[i - 1], end = joints[i], segment = end.clone().sub(start);
       const lengthSq = segment.lengthSq();
@@ -591,7 +629,7 @@ function mouseHeading() {
 }
 
 function syncMouseAim() {
-  mouseAim.setEnabled(mouseSupported && mouseAimEnabled && !usingTouchControls && playing && !controlsDialog.open && !isRunner() && !mapTransition.active);
+  mouseAim.setEnabled(mouseSupported && mouseAimEnabled && !usingTouchControls && playing && !controlsDialog.open && !isRunner() && !gameInterlude());
 }
 
 function requestMouseAim() {
@@ -611,13 +649,29 @@ function resetAimAssist() {
 
 function update(dt) {
   if (controlsDialog.open) return;
+  if (intro) {
+    if (intro.update(dt)) finishIntro();
+    return;
+  }
+  if (sleighAssembly.active) {
+    if (sleighAssembly.update(dt)) finishSleighAssembly();
+    return;
+  }
   if (mapTransition.active) { mapTransition.update(dt); return; }
+  if (runnerArrival > 0) {
+    runnerArrival = Math.max(0, runnerArrival - dt);
+    const { distance, elapsed } = runnerSession.state;
+    runnerReward.update(distance, elapsed + FINISH_HOLD - runnerArrival, reducedMotion.matches);
+    if (runnerArrival === 0) collectSleighPart();
+    return;
+  }
   gameTime += dt;
   // Finish the final bite's splash even after the round ends.
   biteEffects.update(dt);
   effects.update(dt, playing && isRunner() ? runnerSession.state.speed : 0);
   if (!playing) return;
   if (isRunner()) { runnerSession.update(dt); return; }
+  searchTime += dt;
   const announcement = world.update(dt, [player, ...enemies, ...arenaCameos.actors]);
   if (announcement) showToast(announcement);
 
@@ -631,6 +685,10 @@ function update(dt) {
 
   player.root.position.set(player.x, 0, player.z);
   arenaCameos.update(dt, player, camera.position);
+  const follower = arenaCameos.actors.find(actor => (actor.phase === 'approach' || actor.phase === 'watch')
+    && !actor.fleeing && Math.hypot(actor.x - player.x, actor.z - player.z) < 4.2);
+  showCameo(follower?.kind ?? null);
+  if (sleighCache.update(gameTime, player, reducedMotion.matches)) { collectSleighPart(); return; }
   player.runBlend = THREE.MathUtils.damp(player.runBlend, moving ? 1 : 0, 18, dt);
   player.body.position.y = (Math.abs(Math.sin(player.runTime)) * 0.035 * player.runBlend + Math.sin(gameTime * 1.5) * 0.008 * (1 - player.runBlend)) * HERO_SCALE;
   player.body.rotation.z = Math.cos(player.runTime) * 0.025 * player.runBlend;
@@ -661,8 +719,6 @@ function update(dt) {
   for (let i = enemies.length - 1; i >= 0; i--) {
     if (!enemies[i].alive) enemies.splice(i, 1);
   }
-  if (playing) waves.update(dt, enemies.length);
-
   const assistedTarget = aimAssist.target;
   assistMarker.visible = !!assistedTarget?.alive;
   if (assistMarker.visible) {
@@ -704,15 +760,39 @@ function setLevelProgress(fraction) {
   updateDialLabel();
 }
 
-function updateArenaLevelProgress() {
-  const waveInMap = (levelNumber - 1) % WAVES_PER_MAP;
-  const waveProgress = levelEnemiesTotal > 0
-    ? THREE.MathUtils.clamp(levelEnemiesCleared / levelEnemiesTotal, 0, 1)
-    : 0;
-  setLevelProgress((waveInMap + waveProgress) / WAVES_PER_MAP);
+function updateSleighProgress() {
+  sleighProgress.setAttribute('aria-valuemax', sleighParts.length);
+  sleighProgress.setAttribute('aria-valuenow', foundParts);
+  sleighProgress.setAttribute('aria-valuetext', `${foundParts} of ${sleighParts.length} parts found`);
+  sleighFill.setAttribute('width', 48 * foundParts / sleighParts.length);
+  Array.from(sleighSegments.children).forEach((segment, index) => {
+    segment.classList.toggle('collected', index < foundParts);
+  });
+}
+
+function currentDistrictScore(completed = false) {
+  const district = itinerary[levelIndex];
+  const run = isRunner() ? runnerSession.state : null;
+  return calculateDistrictScore({
+    paceSeconds: districtPaceSeconds(district),
+    seconds: run?.elapsed ?? searchTime,
+    defeated: run?.cleared ?? geeseDefeated,
+    healthLost,
+    trafficPassed: run?.passed,
+    progress: run ? run.distance / world.runner.length : 0,
+    completed,
+  });
+}
+
+function recordHealthLost(amount) {
+  healthLost += amount;
+  updateHealth();
+  updateScore();
 }
 
 function updateScore() {
+  const inProgress = playing && foundParts === levelIndex;
+  score = bankedScore + (inProgress ? currentDistrictScore().total : 0);
   const text = String(score).padStart(4, '0');
   if (scoreLabel.textContent !== text) scoreLabel.textContent = text;
   const fontSize = `${Math.max(9, Math.min(18, 58 / (text.length * 0.5)))}px`;
@@ -778,23 +858,64 @@ function placePlayerAtSpawn() {
   animateHero(player.rig, 0, 0);
 }
 
-function startGame() {
+function frameMenuPreview() {
+  if (!showSenatePreview || world.id !== 'senate-square') return;
+  const wide = canvas.clientWidth >= 900;
+  const portrait = canvas.clientHeight > canvas.clientWidth;
+  camera.position.set(wide ? -22 : -9, 18, 35);
+  camera.lookAt(wide ? -20 : -2, portrait ? -6 : 7, -27);
+}
+
+function playFromMenu() {
+  if (!player.model || !renderingReady || intro || !missionScreen.hidden) return;
+  if (introSeen || debugMaps || query.has('map')) {
+    startGame(); requestMouseAim();
+    return;
+  }
+  introSeen = true;
+  try {
+    intro = createSleighIntro(introOverlay, { reducedMotion: reducedMotion.matches, onBreak: () => blip(133, .32) });
+    intro.resize(canvas.clientWidth, canvas.clientHeight);
+    intro.update(0);
+    startScreen.classList.add('hidden');
+    introOverlay.hidden = false;
+    gameShell.classList.add('intro-playing');
+    skipIntro.focus({ preventScroll: true });
+    frameClock.reset();
+  } catch (error) {
+    console.warn('Could not start the sleigh intro:', error);
+    finishIntro();
+  }
+}
+
+function finishIntro() {
+  intro?.dispose();
+  intro = null;
+  introOverlay.hidden = true;
+  gameShell.classList.remove('intro-playing');
+  startScreen.classList.add('hidden');
+  missionScreen.hidden = false;
+  beginSearch.focus({ preventScroll: true });
+}
+
+function startGame({ transition = false } = {}) {
   if (!player.model || !renderingReady) return;
   playing = false;
+  runnerArrival = 0;
+  sleighAssembly.clear();
+  gameShell.classList.remove('sleigh-assembling');
   mapTransition.cancel(); finishMapTransition();
   mouseCaptureFailed = false;
-  score = 0;
-  player.hp = player.maxHp;
-  player.invulnerable = 0;
-  player.model.material.opacity = 1;
-  player.model.material.transparent = false;
+  bankedScore = 0;
   updateScore();
-  updateHealth();
-  waves.start();
+  foundParts = 0;
+  updateSleighProgress();
+  if (transition) transitionToDistrict(0);
+  else enterDistrict({ index: 0 });
   playing = true;
-  syncLevelUI();
-  touchControls.setEnabled(true);
+  touchControls.setEnabled(!mapTransition.active);
   startScreen.classList.add('hidden');
+  missionScreen.hidden = true;
   endScreen.classList.add('hidden');
   keys.clear();
   canvas.focus({ preventScroll: true });
@@ -812,15 +933,17 @@ function clearArena() {
   player.tapTimer = 0;
   player.powerTimer = 0;
   batteries.clear();
+  sleighCache.clear();
+  runnerReward.clear();
   arenaCameos.clear();
-  for (const enemy of enemies) disposeEnemy(enemy);
+  for (const enemy of enemies) if (enemy.alive) disposeEnemy(enemy);
   effects.clear();
   enemies.length = 0;
 }
 
-function endGame() {
+function endGame(won = false) {
   showCameo(null);
-  if (isRunner()) runnerSession.syncScore();
+  updateScore();
   playing = false;
   syncMouseAim();
   resetAimAssist();
@@ -831,13 +954,13 @@ function endGame() {
   player.moveSpeed = 0;
   player.turnSpeed = 0;
   endScreen.classList.remove('hidden');
-  document.querySelector('#end-title').textContent = 'WASTED';
+  document.querySelector('#end-title').textContent = won ? 'SLEIGH COMPLETE' : 'WASTED';
   document.querySelector('#end-score').textContent = score.toLocaleString();
   restartButton.textContent = 'PLAY AGAIN';
-  leaderboard.submit(score, waves.current?.combatWave ?? 1);
+  leaderboard.submit(score, levelIndex + 1);
   player.model.material.opacity = 1;
   player.model.material.transparent = false;
-  blip(80, 0.25);
+  blip(won ? 1046 : 80, 0.25);
   keys.clear();
 }
 
@@ -846,6 +969,9 @@ function resize() {
   const height = canvas.clientHeight;
   renderer.setSize(width, height, false);
   cameraRig.resize(width, height, window.matchMedia('(pointer: coarse)').matches);
+  if (!playing && (!startScreen.classList.contains('hidden') || !missionScreen.hidden)) frameMenuPreview();
+  sleighAssembly.resize(width, height);
+  intro?.resize(width, height);
 }
 
 function animate(now) {
@@ -856,16 +982,18 @@ function animate(now) {
     return !controlsDialog.open && renderingReady;
   });
   if (!renderingReady) return;
-  if (!controlsDialog.open && !mapTransition.active) weather.update(dt, isRunner() ? runnerSession.state.distance : 0);
-  if (player.model) world.updateVisibility(camera, player.root, HERO_HEIGHT, dt);
-  if (mapTransition.active) {
+  if (!controlsDialog.open && !gameInterlude()) weather.update(dt, isRunner() ? runnerSession.state.distance : 0);
+  if (player.model && !sleighAssembly.active && !intro) world.updateVisibility(camera, player.root, HERO_HEIGHT, dt);
+  if (intro) intro.render(renderer);
+  else if (sleighAssembly.active) sleighAssembly.render(renderer);
+  else if (mapTransition.active) {
     transitionRenderer.render(scene, camera, mapTransition.progress, reducedMotion.matches);
   } else renderer.render(scene, camera);
   updateHeroHp();
 }
 
 function beginSpray() {
-  if (mapTransition.active) return;
+  if (gameInterlude()) return;
   player.tapTimer = 0.075;
   stream.resetPressure();
 }
@@ -931,10 +1059,12 @@ for (const radio of document.querySelectorAll('[data-control-mode]')) {
 function openSettings() {
   resetInput();
   settingsDone.textContent = playing ? 'RESUME' : 'DONE';
+  startOver.hidden = !playing;
   if (!controlsDialog.open) controlsDialog.showModal();
   syncMouseAim();
 }
 settingsButton.addEventListener('click', openSettings);
+document.querySelector('#pause-settings').addEventListener('click', openSettings);
 controlsDialog.addEventListener('close', () => {
   frameClock.reset();
   resetInput();
@@ -952,6 +1082,20 @@ controlsDialog.querySelector('form').addEventListener('submit', event => {
 });
 
 window.addEventListener('keydown', (event) => {
+  if (intro) {
+    if (event.code === 'Escape') {
+      event.preventDefault();
+      finishIntro();
+    }
+    return;
+  }
+  if (!missionScreen.hidden) {
+    if (event.code === 'Enter' && !event.repeat) {
+      event.preventDefault();
+      beginSearch.click();
+    }
+    return;
+  }
   if (event.code === 'Escape' && playing) {
     event.preventDefault();
     if (performance.now() - lastMouseUnlock < 200) return;
@@ -962,7 +1106,7 @@ window.addEventListener('keydown', (event) => {
     return;
   }
   if (controlsDialog.open) return;
-  if (mapTransition.active) {
+  if (gameInterlude()) {
     if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code)) event.preventDefault();
     return;
   }
@@ -980,7 +1124,7 @@ window.addEventListener('keydown', (event) => {
   }
   keys.add(event.code);
   if (event.code === 'Space' && !event.repeat && playing) beginSpray();
-  if (event.code === 'Enter' && !playing && !startScreen.classList.contains('hidden') && player.model) { startGame(); requestMouseAim(); }
+  if (event.code === 'Enter' && !playing && !startScreen.classList.contains('hidden')) playFromMenu();
 });
 window.addEventListener('keyup', (event) => keys.delete(event.code));
 window.addEventListener('blur', () => { resetInput(); if (playing) openSettings(); });
@@ -992,12 +1136,21 @@ bindGameInput({
   canvas,
   movementZone: document.querySelector('#joystick-zone'),
   movementHandle: document.querySelector('.joystick-hint'),
-  canInteract: () => playing && !controlsDialog.open && !isRunner() && !mapTransition.active,
+  canInteract: () => playing && !controlsDialog.open && !isRunner() && !gameInterlude(),
   setFiring: firing => firing ? keys.add('Fire') : keys.delete('Fire'),
   beginSpray,
   requestMouseAim,
 });
-startButton.addEventListener('click', () => { startGame(); requestMouseAim(); });
+startButton.addEventListener('click', playFromMenu);
+skipIntro.addEventListener('click', () => {
+  if (intro) finishIntro();
+});
+beginSearch.addEventListener('click', () => { startGame({ transition: true }); });
+startOver.addEventListener('click', () => {
+  if (!playing || !renderingReady) return;
+  controlsDialog.close();
+  startGame({ transition: true });
+});
 restartButton.addEventListener('click', () => {
   startGame(); requestMouseAim();
 });

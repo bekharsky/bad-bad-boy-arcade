@@ -4,24 +4,17 @@ import { createRunnerRun } from './course.js';
 import { createLaneSteering, runnerThrottle } from './runner-input.js';
 
 // Owns the runner's simulation and presentation. The game shell supplies only
-// cross-mode effects (health, spray, score, and campaign transitions).
+// cross-mode effects (health, spray, and campaign transitions).
 export function createRunnerSession({
   world, player, cameraRig, seagulls, medkits, touchControls, keys,
   heroHeight, heroScale, isPlaying, onDamage, onSpray, onCollect,
-  onScore, onProgress, onFinish,
+  onProgress, onFinish,
 }) {
   let run = createRunnerRun();
-  let baseScore = 0;
   const steering = createLaneSteering(direction => run.dodge(direction));
 
-  function syncScore() {
-    const { distance, bonus } = run.state;
-    onScore(baseScore + Math.floor(distance) * 2 + bonus);
-  }
-
-  function start(definition, score) {
+  function start(definition) {
     run = createRunnerRun(definition);
-    baseScore = score;
     player.invulnerable = 0;
     steering.reset();
     onProgress(0, run.state.traffic);
@@ -47,11 +40,11 @@ export function createRunnerSession({
     player.tapTimer = Math.max(0, player.tapTimer - dt);
     world.updateRunner(state, cameraRig.camera?.position);
     if (result.hits && !onDamage(result.hits)) return;
-    seagulls.update(dt, player, { scroll: state.speed, attacks: !state.finished });
+    const busyCrossing = state.crossings.some(crossing => crossing.phase === 'warning' || crossing.phase === 'crossing');
+    seagulls.update(dt, player, { scroll: state.speed, attacks: !state.finished && !busyCrossing });
     if (!isPlaying()) return;
     onSpray(dt, firing, state.traffic);
-    // Settle after spray damage so a hit on the finishing frame is counted.
-    syncScore();
+    // Report progress after spray so the campaign sees every traffic clear.
     onProgress(state.distance / run.length, state.traffic);
     medkits.update(dt, player, onCollect, state);
     player.invulnerable = state.invulnerable;
@@ -62,7 +55,7 @@ export function createRunnerSession({
   }
 
   return {
-    start, update, syncScore,
+    start, update,
     get state() { return run.state; },
     dodge(direction) { run.dodge(direction); },
     sprayHit(id, impact) { return run.sprayHit(id, impact); },

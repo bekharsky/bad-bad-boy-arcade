@@ -2,7 +2,7 @@ const API_URL = import.meta.env.VITE_LEADERBOARD_API_URL?.replace(/\/$/, '') ?? 
 const PROFILE_KEY = 'piss-deal-player-profile';
 
 const NAME_ADJECTIVES = ['Turbo', 'Frosty', 'Neon', 'Jolly', 'Rowdy', 'Toasty', 'Nordic', 'Cosmic', 'Salty', 'Tiny'];
-const NAME_NOUNS = ['Goose', 'Tram', 'Pigeon', 'Slug', 'Pickle', 'Sauna', 'Potato', 'Reindeer', 'Sisu', 'Commuter'];
+const NAME_NOUNS = ['Goose', 'Tram', 'Pigeon', 'Gull', 'Pickle', 'Sauna', 'Potato', 'Reindeer', 'Sisu', 'Commuter'];
 
 function generatedName() {
   const adjective = NAME_ADJECTIVES[Math.floor(Math.random() * NAME_ADJECTIVES.length)];

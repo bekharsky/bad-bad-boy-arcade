@@ -13,18 +13,14 @@ const { loadEnemyModels, createEnemy, animateEnemy, disposeEnemy } = await impor
 const { createLiquidStream } = await import('../liquid.js');
 const { ENEMY_HEALTH } = await import('../waves.js');
 
-test('geese replace the snail model without downloads, sharing one mesh but keeping separate animation and hit state', async context => {
+test('geese load without model downloads and share geometry with independent animation and hit state', context => {
   const loaded = [];
-  context.mock.method(GLTFLoader.prototype, 'loadAsync', async url => {
-    loaded.push(url);
-    const scene = new THREE.Group();
-    scene.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial()));
-    return { scene, animations: [] };
-  });
-  await loadEnemyModels();
-  assert.deepEqual(loaded, [new URL('../assets/enemies/slug.glb', import.meta.url).href]);
-  assert.deepEqual(ENEMY_HEALTH, { goose: 2, slug: 1 });
+  context.mock.method(GLTFLoader.prototype, 'loadAsync', async url => { loaded.push(url); });
+  loadEnemyModels();
+  assert.deepEqual(loaded, []);
+  assert.deepEqual(ENEMY_HEALTH, { goose: 2 });
   const first = createEnemy('goose', 1), second = createEnemy('goose', 1);
+  assert.ok([first, second].every(goose => goose.speed >= .92 && goose.speed <= 1.07));
   const meshes = enemy => { const result = []; enemy.model.traverse(node => { if (node.isMesh) result.push(node); }); return result; };
   const a = meshes(first), b = meshes(second);
   assert.equal(a.length, 1); assert.equal(a[0].isSkinnedMesh, true);

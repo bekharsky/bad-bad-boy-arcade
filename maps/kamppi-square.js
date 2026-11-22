@@ -24,6 +24,7 @@ export const kamppiSquareMap = {
     [[-21, 15], [-21, 14], [-10, 7], [-5, 4], [0, 3]],
   ],
   pickups: {
+    sleigh: [{ x: -38, z: 4.5 }],
     medkit: [{ x: -2, z: 6 }, hidden(-12, -39), hidden(-38, 8), hidden(25, 27), hidden(-5, 57.5)],
     battery: [hidden(12, -39), hidden(-38, 4.5), hidden(-15, 26), hidden(18, 57.5)],
   },

@@ -15,9 +15,43 @@
     <main class="game-shell">
       <canvas id="game" tabindex="0" aria-label="Piss Deal game"></canvas>
       <div id="hero-hud" class="hero-hud" hidden><div id="hero-power" class="hero-power" hidden></div></div>
+      <svg class="menu-symbols" aria-hidden="true" focusable="false">
+        <symbol id="holiday-sleigh" viewBox="0 0 96 49">
+          <path d="M12 8v5m-2.5-2.5h5M82 5v12m-6-6h12M15 31v9m-4.5-4.5h9M88 28v5m-2.5-2.5h5" fill="none" stroke="currentColor" stroke-linecap="round" />
+          <path d="M25 20c2 8 5 10 11 10h28c5 0 8-3 10-7l-4 10c-1 3-5 5-9 5H39c-10 0-14-6-14-13Z" fill="#bf4353" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
+          <path d="M32 33c3 2 5 2 9 2h19c3 0 5-1 7-3M21 22l-9 2m8 3-14 4" fill="none" stroke="#ffd083" stroke-width=".85" stroke-linecap="round" opacity=".85" />
+          <path d="M27 43h40c6 0 10-4 10-8 0-2-2-3-4-2m-34 5v5m19-5v5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          <path d="M36 19h12v11H36zm13 3h10v8H49z" fill="#345d54" stroke="currentColor" stroke-width="1.15" stroke-linejoin="round" />
+          <path d="M42 19v11m12-8v8m-12-11c-7-1-6-7-2-6 2 1 2 3 2 6 1-5 5-7 7-5 2 2-1 5-7 5Z" fill="none" stroke="currentColor" stroke-width="1.15" stroke-linejoin="round" />
+        </symbol>
+        <symbol id="settings-gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m9 3-.5 2.1-1.6.9-2.1-.6-2 3.4 1.6 1.5v1.9l-1.6 1.5 2 3.4 2.1-.6 1.6.9L9 20h4l.5-2.1 1.6-.9 2.1.6 2-3.4-1.6-1.5v-1.9l1.6-1.5-2-3.4-2.1.6-1.6-.9L13 3Z"/><circle cx="11" cy="11.5" r="3"/>
+        </symbol>
+      </svg>
+      <template id="holiday-screen-header">
+        <header class="menu-header">
+          <svg class="menu-sleigh" aria-hidden="true" focusable="false"><use href="#holiday-sleigh" /></svg>
+        </header>
+      </template>
 
       <header class="hud">
         <div class="passerby" aria-hidden="true" hidden></div>
+        <div id="sleigh-progress" class="sleigh-hud" role="progressbar" aria-label="Joulupukki’s sleigh parts" aria-valuemin="0">
+          <svg viewBox="0 0 92 92" aria-hidden="true" focusable="false">
+            <defs>
+              <path id="sleigh-silhouette" d="M28 43h30c3 0 6-3 6-5 0-1-1-2-2-2l-1 2-3-1c0-3 2-5 5-5 3 0 5 3 5 6 0 6-5 10-10 10H25v-4h3v-4c-4-2-6-6-6-11v-6h5c1 5 4 8 10 8h12c7 0 10-5 11-8h6l-4 13c-1 3-5 5-9 5v2h-5v-2H33v2z" />
+              <clipPath id="sleigh-fill-window"><rect id="sleigh-fill" x="21" y="21" width="0" height="29" /></clipPath>
+            </defs>
+            <g id="sleigh-segments"></g>
+            <g transform="translate(0 10)">
+              <use href="#sleigh-silhouette" class="sleigh-silhouette" />
+              <use href="#sleigh-silhouette" class="sleigh-filled" clip-path="url(#sleigh-fill-window)" />
+            </g>
+          </svg>
+        </div>
+        <button id="pause-settings" class="settings-button pause-settings" type="button" aria-label="Pause and open Controls" aria-haspopup="dialog" aria-controls="controls-dialog">
+          <svg aria-hidden="true" focusable="false"><use href="#settings-gear" /></svg>
+        </button>
         <div id="level-dial" class="level-dial" role="group" aria-label="Score 0000, level progress 0 percent, health 5 of 5">
           <svg viewBox="0 0 100 100" aria-hidden="true" focusable="false">
             <defs>
@@ -37,19 +71,52 @@
         </div>
       </header>
 
+      <section id="sleigh-intro" class="sleigh-intro" aria-label="Joulupukki loses his sleigh over Helsinki" hidden>
+        <div class="intro-shade" aria-hidden="true"></div>
+        <span id="intro-location" class="intro-location" aria-hidden="true">HELSINKI · CHRISTMAS EVE</span>
+        <button id="skip-intro" class="intro-skip" type="button">SKIP INTRO</button>
+      </section>
+
+      <section id="mission-screen" class="overlay" aria-labelledby="mission-title" hidden>
+        <div class="card mission-card holiday-card">
+          <h2 id="mission-title">Find all 6 parts of Joulupukki’s sleigh.</h2>
+          <button id="begin-search" class="primary-button" type="button">START SEARCH</button>
+        </div>
+      </section>
+
+      <section id="sleigh-assembly" class="sleigh-assembly" aria-label="Sleigh assembly" hidden>
+        <div class="assembly-heading" aria-live="polite">
+          <span id="assembly-status"></span>
+          <h2 id="assembly-part"></h2>
+        </div>
+        <div class="assembly-footer">
+          <div class="assembly-progress"><span>SLEIGH PARTS</span><strong id="assembly-count"></strong></div>
+          <div id="assembly-award" class="assembly-award" aria-label="District score" hidden>
+            <strong id="award-total"></strong>
+            <span id="award-breakdown"></span>
+          </div>
+        </div>
+      </section>
+
       <section id="start-screen" class="overlay">
-        <div class="card">
-          <div class="route-stops" role="img"></div>
-          <h1 aria-label="Piss Deal"><span class="title-line">PISS</span> <span class="title-line title-accent">DEAL</span></h1>
-          <label class="player-profile" for="player-name">
-            <span>PLAYER NAME</span>
-            <input id="player-name" name="player-name" type="text" maxlength="18" autocomplete="nickname" spellcheck="false" aria-describedby="player-name-hint" />
-            <small id="player-name-hint">Generated for you. Change it any time.</small>
-          </label>
+        <div class="card holiday-card">
+          <button id="open-settings" class="settings-button" data-header-action type="button" aria-label="Controls" aria-haspopup="dialog" aria-controls="controls-dialog">
+            <svg aria-hidden="true" focusable="false"><use href="#settings-gear" /></svg>
+          </button>
+          <h1 aria-label="Piss Deal">PISS <span class="title-accent">DEAL</span></h1>
+          <p class="campaign-brief">Rebuild Joulupukki’s sleigh, one part per district.</p>
+          <div class="profile-row">
+            <label class="player-profile" for="player-name">
+              <span>PLAYER NAME</span>
+              <input id="player-name" name="player-name" type="text" maxlength="18" autocomplete="nickname" spellcheck="false" />
+            </label>
+            <a class="leaderboard-icon" href="./leaderboard.html" aria-label="Leaderboard" title="Leaderboard">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4h8v6a4 4 0 0 1-8 0V4Zm0 2H4v2a4 4 0 0 0 4 4m8-6h4v2a4 4 0 0 1-4 4m-4 2v5m-4 1h8"/></svg>
+            </a>
+          </div>
           <div id="load-status" class="load-status" role="status">Loading models…</div>
           <button id="start" class="primary-button" type="button" disabled>LOADING…</button>
           <button id="retry-load" class="primary-button" type="button" hidden>RETRY LOADING</button>
-          <a class="leaderboard-link" href="./leaderboard.html">Leaderboard</a>
           <section class="debug-maps" data-debug-maps aria-label="Maps" hidden></section>
           <div class="start-controls" role="group" aria-label="Quick controls">
             <div class="start-control">
@@ -70,14 +137,11 @@
             <div class="runner-control runner-keyboard"><kbd>SPACE</kbd><span>SPRAY</span></div>
             <div class="runner-control runner-keyboard"><kbd>E</kbd><span>UP</span></div>
           </div>
-          <button id="open-settings" class="settings-button" type="button" aria-label="Controls" aria-haspopup="dialog" aria-controls="controls-dialog">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 3-.5 2.1-1.6.9-2.1-.6-2 3.4 1.6 1.5v1.9l-1.6 1.5 2 3.4 2.1-.6 1.6.9L9 20h4l.5-2.1 1.6-.9 2.1.6 2-3.4-1.6-1.5v-1.9l1.6-1.5-2-3.4-2.1.6-1.6-.9L13 3Z"/><circle cx="11" cy="11.5" r="3"/></svg>
-          </button>
         </div>
       </section>
 
       <section id="end-screen" class="overlay hidden">
-        <div class="card end-card">
+        <div class="card end-card holiday-card">
           <h2 id="end-title">WASTED</h2>
           <div class="end-result"><span>YOUR SCORE</span><strong id="end-score">0</strong></div>
           <div id="score-submit-status" class="score-submit-status" role="status"></div>
@@ -92,7 +156,7 @@
         </div>
       </section>
 
-      <dialog id="controls-dialog" class="card controls-card" aria-labelledby="controls-title">
+      <dialog id="controls-dialog" class="card holiday-card controls-card" aria-labelledby="controls-title">
         <h2 id="controls-title">CONTROLS</h2>
         <fieldset class="control-setting" aria-label="Movement">
           <div class="control-options">
@@ -100,10 +164,15 @@
             <label class="control-option"><input type="radio" name="game-movement" value="tank" data-control-mode checked /><span class="control-choice"><strong>Tank</strong><span>Move & turn</span></span></label>
           </div>
         </fieldset>
-        <label class="assist-setting"><input type="checkbox" data-aim-assist checked /><span class="assist-switch" aria-hidden="true"></span><span class="assist-copy"><strong>Aim assist</strong><span>Direct only</span></span></label>
-        <label class="assist-setting" hidden><input type="checkbox" data-mouse-aim checked /><span class="assist-switch" aria-hidden="true"></span><span class="assist-copy"><strong>Mouse aim</strong></span></label>
-        <label class="assist-setting"><input id="sound-setting" type="checkbox" /><span class="assist-switch" aria-hidden="true"></span><span class="assist-copy"><strong>Sound</strong></span></label>
-        <form method="dialog"><button id="settings-done" class="primary-button" type="submit">DONE</button></form>
+        <div class="control-toggles">
+          <label class="assist-setting"><input type="checkbox" data-aim-assist checked /><span class="assist-switch" aria-hidden="true"></span><span class="assist-copy"><strong>Aim assist</strong><span>Direct only</span></span></label>
+          <label class="assist-setting" hidden><input type="checkbox" data-mouse-aim checked /><span class="assist-switch" aria-hidden="true"></span><span class="assist-copy"><strong>Mouse aim</strong></span></label>
+          <label class="assist-setting"><input id="sound-setting" type="checkbox" /><span class="assist-switch" aria-hidden="true"></span><span class="assist-copy"><strong>Sound</strong></span></label>
+        </div>
+        <form method="dialog" class="controls-actions">
+          <button id="settings-done" class="primary-button" type="submit">DONE</button>
+          <button id="start-over" class="text-button" type="button" hidden>START OVER</button>
+        </form>
         <section class="debug-maps" data-debug-maps aria-label="Maps" hidden></section>
         <a class="credits-link" href="./credits.html" target="_blank" rel="noopener">Models & credits ↗</a>
       </dialog>

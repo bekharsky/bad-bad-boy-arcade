@@ -67,27 +67,28 @@ function steer(run) {
 }
 
 test('two-lane tram and cross-scooter traffic leaves a complete safe route across frame rates', () => {
+  const courseKinds = new Set();
   for (const fps of [15, 30, 60, 120]) for (const seed of [1, 42, 819, 17, 113]) {
     const run = createRunnerRun({ ...aleksanterinkatuMap.runner, random: seeded(seed) });
-    const kinds = new Set(), sideWarnings = new Set(); let hits = 0, warnings = 0, crosses = 0;
+    const sideWarnings = new Set(); let hits = 0, warnings = 0, crosses = 0;
     const seen = new Set();
     while (!run.state.finished) {
       steer(run);
       const result = run.update(1 / fps); hits += result.hits;
       if (result.warning) { warnings++; sideWarnings.add(result.warning.includes('LEFT') ? 'left' : 'right'); }
       for (const agent of run.state.traffic) {
-        if (!isCameo(agent.kind)) kinds.add(agent.kind);
+        if (!isCameo(agent.kind)) courseKinds.add(agent.kind);
         if (agent.crossing && !seen.has(agent.id)) { seen.add(agent.id); crosses++; }
       }
       assert.ok(run.state.traffic.length <= TRAFFIC_CAPACITY);
     }
     assert.equal(hits, 0, `${fps} FPS, seed ${seed}`);
     assert.equal(run.state.distance, ALEKSI_LENGTH);
-    assert.deepEqual([...kinds].sort(), ['bike', 'scooter', 'tram']);
     assert.equal(warnings, ALEKSI_CROSSINGS.length);
     assert.equal(crosses, ALEKSI_CROSSINGS.length * 2);
     assert.deepEqual([...sideWarnings].sort(), ['left', 'right']);
   }
+  assert.deepEqual([...courseKinds].sort(), ['barrier', 'bike', 'cone', 'goose', 'scooter', 'tram']);
 });
 
 test('both runners leave a safe path at full brake, boost and changing pace between crossings', () => {
@@ -244,9 +245,14 @@ test('real frontages keep their street sides, opposite neighbours and a lower Se
   assert.ok(ferry.getWorldPosition(new THREE.Vector3()).z < -50, 'The finish still looks across a quay and sea');
   const cameoGeometries = new Set();
   for (const kind of CAMEO_KINDS) map.root.getObjectByName(`cameo ${kind}`).traverse(node => { if (node.geometry) cameoGeometries.add(node.geometry); });
-  const geometries = new Set(); map.root.traverse(node => { if (node.geometry && !cameoGeometries.has(node.geometry)) geometries.add(node.geometry); });
+  const extraTraffic = new Set();
+  for (const name of ['goose goose', 'roadwork cone', 'roadwork barrier']) {
+    map.root.getObjectByName(name).traverse(node => { if (node.geometry) extraTraffic.add(node.geometry); });
+  }
+  const geometries = new Set(); map.root.traverse(node => { if (node.geometry && !cameoGeometries.has(node.geometry) && !extraTraffic.has(node.geometry)) geometries.add(node.geometry); });
   assert.ok([...geometries].reduce((sum, geometry) => sum + geometry.attributes.position.count, 0) <= 563701, 'Landmark detail stays within the previous street geometry budget');
   assert.ok([...cameoGeometries].reduce((sum, geometry) => sum + geometry.attributes.position.count, 0) < 310000, 'The full roster fits its 3D geometry budget');
+  assert.ok([...extraTraffic].reduce((sum, geometry) => sum + geometry.attributes.position.count, 0) < 10000);
   map.dispose();
 });
 

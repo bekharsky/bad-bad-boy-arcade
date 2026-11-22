@@ -9,8 +9,7 @@ const ARRIVAL_INTERVAL = 5;
 const MAX_GUESTS = 8;
 const NOTICE_RANGE = 18;
 
-// Civilian actors are deliberately separate from combat enemies and wave
-// counts. The session owns this small pool across district changes/restarts.
+// The session owns this small pool of civilians across district changes and restarts.
 export function createArenaCameos(scene, world, random = Math.random) {
   const group = new THREE.Group(); group.name = 'Arena civilians'; scene.add(group);
   const actors = [];
@@ -19,7 +18,7 @@ export function createArenaCameos(scene, world, random = Math.random) {
     root.name = `Civilian: ${kind}`; root.add(model); root.visible = false; group.add(root);
     const materials = prepareFadingMaterials(model);
     return { kind, civilian: true, root, model, materials, size: .55, hitHeight: kind === 'stubb' ? 1.6 : 1.45,
-      speed: 3.9 + index * .12, standoff: 2.9 + (index % 4) * .45, glance: .85 + (index % 5) * .19, alive: false };
+      speed: 3.9 + index * .12, standoff: 2.12 + (index % 4) * .24, glance: .85 + (index % 5) * .19, alive: false };
   });
   let disposed = false, running = false, untilArrival = ARRIVAL_INTERVAL;
 
@@ -115,6 +114,7 @@ export function createArenaCameos(scene, world, random = Math.random) {
     actor.phaseTime += dt;
     if (actor.age >= actor.leaveAt && actor.phase !== 'departure' && actor.phase !== 'fade') beginDeparture(actor);
     const dx = player.x - actor.x, dz = player.z - actor.z, distance = Math.hypot(dx, dz);
+    const gap = Math.max(actor.standoff, player.radius + actor.size + .6);
     switch (actor.phase) {
       case 'arrival':
         if (walkRoute(actor, player, dt)) actor.waypoint++;
@@ -132,7 +132,6 @@ export function createArenaCameos(scene, world, random = Math.random) {
         if (actor.decision > 0) break;
         actor.decision = .2;
         if (actor.phaseTime >= actor.glance && distance < NOTICE_RANGE && world.lineClear(actor.x, actor.z, player.x, player.z, actor.size)) {
-          // Give the hero a clear lane while the rest watch from farther away.
           let nearbyGuests = 0;
           for (const guest of actors) {
             if (guest.phase === 'approach' || guest.phase === 'watch') nearbyGuests++;
@@ -141,20 +140,23 @@ export function createArenaCameos(scene, world, random = Math.random) {
         } else if (actor.phaseTime > 5) beginDeparture(actor);
         break;
       case 'approach': {
-        if (distance > NOTICE_RANGE || !world.lineClear(actor.x, actor.z, player.x, player.z, actor.size)) {
+        if (distance > NOTICE_RANGE + 5) {
           changePhase(actor, 'lookout');
           break;
         }
-        const gap = Math.max(actor.standoff, player.radius + actor.size + .6);
-        if (distance <= gap + .05 || actor.phaseTime >= 3.8) changePhase(actor, 'watch');
+        const sight = world.lineClear(actor.x, actor.z, player.x, player.z, actor.size);
+        if (distance <= gap + .05 && sight) changePhase(actor, 'watch');
         else {
-          const fraction = Math.min(actor.speed * .72 * dt, distance - gap) / distance;
-          moveWithRoom(actor, player, dx * fraction, dz * fraction);
+          const direction = sight ? { x: dx, z: dz } : world.chase(actor.x, actor.z, player.x, player.z);
+          const length = Math.hypot(direction.x, direction.z);
+          const step = Math.min(actor.speed * .98 * dt, sight ? distance - gap : length);
+          if (length > .01) moveWithRoom(actor, player, direction.x / length * step, direction.z / length * step);
         }
         break;
       }
       case 'watch':
-        if (distance < 2.2 || actor.phaseTime >= actor.glance) changePhase(actor, 'retreat');
+        if (distance > gap + .65) changePhase(actor, 'approach');
+        else if (distance < player.radius + actor.size + .55 || actor.phaseTime >= actor.glance) changePhase(actor, 'retreat');
         break;
       case 'retreat':
         if (actor.phaseTime >= 1.35 || (distance > 10 && actor.phaseTime >= .7)) changePhase(actor, 'lookout');
@@ -172,6 +174,7 @@ export function createArenaCameos(scene, world, random = Math.random) {
 
   function update(dt, player, viewPosition) {
     if (dt <= 0 || disposed || !running) return;
+    world.routeTo(player.x, player.z);
     for (let i = actors.length - 1; i >= 0; i--) {
       const actor = actors[i];
       actor.age += dt;

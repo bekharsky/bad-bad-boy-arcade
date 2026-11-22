@@ -1,5 +1,3 @@
-const RUN_GAP = 2.6;
-
 // Arena owns enemy pursuit, separation and bite timing. Rendering and round
 // lifecycle stay with the coordinator; fatal damage stops the current step.
 export function createArenaCombat({ world, player, enemies, animateEnemy, onBite }) {
@@ -14,6 +12,9 @@ export function createArenaCombat({ world, player, enemies, animateEnemy, onBite
         enemy.hit = Math.max(0, enemy.hit - dt);
         const vx = player.x - enemy.x, vz = player.z - enemy.z;
         const distance = Math.hypot(vx, vz);
+        const post = enemy.guardPost;
+        const returning = post && (Math.hypot(player.x - post.x, player.z - post.z) > 10.5
+          || !world.lineClear(post.x, post.z, player.x, player.z, .6));
         const away = running && distance > 0 ? (playerDeltaX * vx + playerDeltaZ * vz) / (travel * distance) : 0;
         // Retain some sprint through sideways movement at a corner. A stop or
         // slow walk immediately brings back the ordinary bite and walk pace.
@@ -21,12 +22,13 @@ export function createArenaCombat({ world, player, enemies, animateEnemy, onBite
         const target = away > .2 ? running : away < -.55 ? 0 : Math.min(previous, running) * .8;
         const pursuit = running ? target + (previous - target) * Math.exp(-(target > previous ? 11 : 7) * dt) : 0;
         enemy.pursuit = pursuit;
-        const keepingGap = pursuit > .1;
-        const attacking = !keepingGap && distance <= enemy.size + player.radius + .06 && world.lineClear(enemy.x, enemy.z, player.x, player.z, .1);
+        const biteReach = enemy.size + player.radius + .14;
+        const attacking = !returning && distance <= biteReach && world.lineClear(enemy.x, enemy.z, player.x, player.z, .1);
         let heading = Math.atan2(vx, vz);
         let speed = 0;
         if (!attacking) {
-          const direction = world.chase(enemy.x, enemy.z, player.x, player.z);
+          const direction = returning ? { x: post.x - enemy.x, z: post.z - enemy.z }
+            : world.chase(enemy.x, enemy.z, player.x, player.z);
           for (const other of enemies) {
             if (other === enemy || !other.alive) continue;
             const sx = enemy.x - other.x, sz = enemy.z - other.z;
@@ -43,11 +45,10 @@ export function createArenaCombat({ world, player, enemies, animateEnemy, onBite
           const length = Math.hypot(direction.x, direction.z);
           if (length > .01) {
             let step = enemy.speed * dt;
-            if (keepingGap) {
-              const sprintRatio = enemy.kind === 'slug' ? .66 : .77;
-              const runSpeed = player.speed * (sprintRatio + .1 * Math.min(1, enemy.speed / 1.1));
-              const pace = enemy.speed + (runSpeed - enemy.speed) * pursuit;
-              step = Math.min(pace * dt, Math.max(0, distance - RUN_GAP));
+            if (returning) step = Math.min(step * 1.6, length);
+            else if (pursuit > .1) {
+              const pace = enemy.speed + (player.speed * .83 - enemy.speed) * pursuit;
+              step = Math.min(pace * dt, Math.max(0, distance - biteReach * .85));
             }
             const oldX = enemy.x, oldZ = enemy.z;
             if (step > 0) world.move(enemy, direction.x / length * step, direction.z / length * step, enemy.size);
@@ -57,13 +58,13 @@ export function createArenaCombat({ world, player, enemies, animateEnemy, onBite
           enemy.root.position.set(enemy.x, 0, enemy.z);
         } else if (enemy.attack <= 0 && player.invulnerable <= 0) {
           player.hp--;
-          player.invulnerable = .85;
+          player.invulnerable = 1.3;
           enemy.attack = 1.2;
           if (onBite(enemy) === false) return false;
         }
         const yaw = enemy.root.rotation.y ?? heading;
         const angle = Math.atan2(Math.sin(heading - yaw), Math.cos(heading - yaw));
-        const turn = (7 + (enemy.kind === 'slug' ? 10 : 15) * pursuit) * dt;
+        const turn = (10 + 15 * pursuit) * dt;
         enemy.root.rotation.y = Math.abs(angle) <= turn ? heading : yaw + Math.sign(angle) * turn;
         animateEnemy(enemy, dt, time, attacking, speed);
       }

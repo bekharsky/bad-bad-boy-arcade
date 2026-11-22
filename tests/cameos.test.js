@@ -25,14 +25,16 @@ test('both runner maps vary the roadside roster across seeds and agree across fr
       const sequences = [];
       for (const fps of [30, 60]) {
         const run = createRunnerRun({ ...map.runner, random: seeded(seed) });
-        const seen = new Set(), appearances = [];
+        const seen = new Set(), appearances = [], geese = new Set(), hazards = new Set();
+        let sharedStreet = false;
         while (!run.state.finished) {
           run.update(1 / fps);
           const cameos = run.state.traffic.filter(agent => isCameo(agent.kind));
           assert.ok(cameos.length <= 1);
-          if (cameos.some(agent => !agent.passed)) {
-            assert.ok(run.state.traffic.every(agent => isCameo(agent.kind) || agent.passed || agent.cleared),
-              'The cameo has an open stretch of the course');
+          for (const agent of run.state.traffic) if (!isCameo(agent.kind)) {
+            hazards.add(agent.id);
+            if (agent.kind === 'goose') geese.add(agent.id);
+            if (!agent.passed && cameos.some(guest => !guest.passed)) sharedStreet = true;
           }
           for (const agent of cameos) if (!seen.has(agent.id)) {
             seen.add(agent.id); appearances.push([agent.id, agent.x, agent.kind]);
@@ -44,8 +46,12 @@ test('both runner maps vary the roadside roster across seeds and agree across fr
             assert.ok(agent.progress - run.state.distance > (run.state.speed + agent.speed) * 1.7);
           }
         }
-        assert.ok(appearances.length >= (map === baanaMap ? 7 : 5), map.id + ' regularly introduces a new guest');
-        assert.equal(new Set(appearances.map(a => a[2])).size, appearances.length);
+        assert.ok(sharedStreet && hazards.size >= (map === baanaMap ? 40 : 20), map.id + ' keeps the course busy during cameos');
+        assert.ok(geese.size >= 4 && appearances.length >= 9, map.id + ' regularly introduces geese and guests');
+        for (let i = 0; i < appearances.length; i += CAMEO_KINDS.length) {
+          const cycle = appearances.slice(i, i + CAMEO_KINDS.length);
+          assert.equal(new Set(cycle.map(a => a[2])).size, cycle.length);
+        }
         firstKinds.add(appearances[0][2]);
         for (const [, , kind] of appearances) kinds.add(kind);
         sequences.push(appearances);
@@ -58,7 +64,7 @@ test('both runner maps vary the roadside roster across seeds and agree across fr
   }
 });
 
-test('changing throttle leaves time to see each approaching face before a crossing warning', () => {
+test('changing throttle leaves time to see each approaching face', () => {
   for (const map of [baanaMap, aleksanterinkatuMap]) {
     const run = createRunnerRun({ ...map.runner, random: seeded(1729) });
     const started = new Map();
@@ -69,7 +75,6 @@ test('changing throttle leaves time to see each approaching face before a crossi
       if (!actor) continue;
       if (!started.has(actor.id)) started.set(actor.id, run.state.elapsed);
       if (actor.z >= 0) assert.ok(run.state.elapsed - started.get(actor.id) >= 2.15);
-      assert.ok(run.state.crossings.every(c => c.phase === 'clear' || c.phase === 'approach'));
     }
     assert.ok(started.size >= 2);
   }

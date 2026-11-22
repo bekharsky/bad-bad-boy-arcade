@@ -1,6 +1,6 @@
 import { createEnemyPressure } from './enemy-pressure.js';
 
-export const ENEMY_HEALTH = Object.freeze({ goose: 2, slug: 1 });
+export const ENEMY_HEALTH = Object.freeze({ goose: 2 });
 export const WAVES_PER_MAP = 2;
 
 export function waveStats(number) {

@@ -6,11 +6,13 @@ Bad Bad Boy is loose in Helsinki. Take the city's cheekiest sculpture through li
 
 ## The journey
 
-Fight your way through **West Harbor**, **Kamppi**, **Central Station** and **Senate Square**. Clear two waves to move on from each square. Barnacle geese and Spanish slugs pursue you across the district, so you can lure a pack onto the tracks and let the tram clear it. Seagulls circle overhead and dive when you least want them to. Find medkits tucked around the neighbourhood and Battery cans that turn your spray into a bright triple stream.
+Rebuild Joulupukki’s sleigh after it breaks apart over Helsinki on Christmas Eve. In **West Harbor**, **Kamppi**, **Central Station** and **Senate Square**, search behind the buildings for the pieces. Barnacle geese guard the hiding places and give chase. Four seagulls circle overhead and attack one at a time. Medkits restore health and Battery cans turn your spray into a bright triple stream.
 
-Two running districts take you down **Baana** and **Aleksanterinkatu**. Change lanes to slip past cyclists, scooters, roadworks and trams; spray a path through the moving traffic. The route changes with every run, and your score carries into the next district.
+In **Baana** and **Aleksanterinkatu**, run to the part floating above the finish line. Change lanes to slip past geese, cyclists, scooters, roadworks and trams, and watch for the six seagulls overhead. Your score and sleigh parts carry into the next district. The segments in the upper-left corner show how many parts you’ve found. Each part clicks into place in a 3D assembly scene. Fit all six to win.
 
-Satirical caricatures appear as random passers-by. On the squares they emerge from behind buildings and follow pedestrian routes into the plaza. On both running routes they jog towards you on alternating shoulders. An uncaptioned portrait appears as they approach. A splash sends them running away. They deal no damage and play no part in scoring or wave completion. Each model has a sculpted head, volumetric hair and an animated lower jaw.
+Each part gives 500 points plus a speed bonus that depends on the district and how long you took. The first six enemies you defeat in a district give 70 points each, and later defeats give 25 each, up to 600 combat points. You lose 105 points for each heart of damage you take, even if a medkit heals it. Runner dodges add a small bonus.
+
+Satirical caricatures emerge from behind buildings, follow the hero around corners and crowd his view. During runs they approach from the shoulders and briefly match his pace where space allows. A portrait appears when they get close. A splash sends them running away. They are harmless and award no points.
 
 The city is an affectionate arcade version of Helsinki: a ferry and cranes at the harbour, market stalls and landmark façades along Aleksanterinkatu, the Chapel of Silence in Kamppi, and the cathedral above Senate Square. From the lantern bearers at Central Station, walk past Postitalo and between Kiasma and Sanomatalo to the timber canopy of Oodi. Look for copper-trimmed gables, white birch trunks and tiered spruces. Each district opens in clear weather, rain or snow. Wet paving catches the sky, and snow settles on roofs and branches throughout the district.
 
@@ -23,7 +25,7 @@ The city is an affectionate arcade version of Helsinki: a ferry and cranes at th
 | Aim at seagulls | Hold E while spraying | Drag upward from the spray button |
 | Pause | Esc | Controls button |
 
-In the running districts, left and right change lanes; up and down accelerate or brake. The Controls menu also offers movement, aiming and sound options.
+In the running districts, left and right change lanes while up and down accelerate or brake. Controls offers movement, aiming and sound options. Choose **Start Over** from the pause menu to restart the campaign.
 
 ## Credits
 

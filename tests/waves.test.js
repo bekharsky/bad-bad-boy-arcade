@@ -4,15 +4,14 @@ import { createCampaign, createWaveDirector, enemyHealth } from '../waves.js';
 
 test('campaign rotates completed maps in two-wave blocks while difficulty keeps increasing', () => {
   const campaign = createCampaign(['harbor', 'senate-square', 'kamppi']);
-  for (const [wave, mapId, count, slug, goose] of [
-    [1, 'harbor', 8, 1, 2], [2, 'harbor', 11, 1, 2], [3, 'senate-square', 14, 1, 2],
-    [4, 'senate-square', 17, 2, 3], [5, 'kamppi', 20, 2, 3], [6, 'kamppi', 23, 2, 3],
-    [7, 'harbor', 26, 3, 4], [8, 'harbor', 29, 3, 4], [9, 'senate-square', 30, 3, 4], [10, 'senate-square', 30, 4, 5],
+  for (const [wave, mapId, count, goose] of [
+    [1, 'harbor', 8, 2], [2, 'harbor', 11, 2], [3, 'senate-square', 14, 2],
+    [4, 'senate-square', 17, 3], [5, 'kamppi', 20, 3], [6, 'kamppi', 23, 3],
+    [7, 'harbor', 26, 4], [8, 'harbor', 29, 4], [9, 'senate-square', 30, 4], [10, 'senate-square', 30, 5],
   ]) {
     const plan = campaign.plan(wave);
     assert.equal(plan.mapId, mapId);
     assert.equal(plan.enemyCount, count);
-    assert.equal(enemyHealth('slug', wave), slug);
     assert.equal(enemyHealth('goose', wave), goose);
   }
   assert.equal(createCampaign(['harbor', 'kamppi'], { wavesPerMap: 5 }).plan(6).mapId, 'kamppi');

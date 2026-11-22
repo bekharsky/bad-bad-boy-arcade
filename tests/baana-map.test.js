@@ -31,6 +31,7 @@ test('Baana recycles scenery and traffic with bounded geometry and all rider col
   assert.equal(pool.length, TRAFFIC_CAPACITY);
   assert.equal(pool.filter(node => node.visible).length, run.state.traffic.length);
   assert.deepEqual(templates.children.map(node => node.name).filter(Boolean).sort(), [
+    'goose goose',
     ...CAMEO_KINDS.map(kind => 'cameo ' + kind),
     ...['blue', 'green', 'red'].flatMap(color => [color + ' bike', color + ' scooter']),
     ...['barrier', 'cone', 'tractor', 'trench'].map(kind => 'roadwork ' + kind),

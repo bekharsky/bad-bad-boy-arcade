@@ -14,7 +14,6 @@ const THREE = await import('three');
 const { createLiquidStream } = await import('../liquid.js');
 const { ENEMY_HEALTH } = await import('../waves.js');
 const { createEnemy, loadEnemyModels } = await import('../enemies.js');
-const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
 
 function setup(refraction = true, options = {}) {
   const scene = new THREE.Scene();
@@ -50,49 +49,37 @@ test('empty liquid stays hidden without scheduling empty buffer uploads', () => 
 
 const target = (x, z, hp = 100) => ({ alive: true, x, z, hp, hitHeight: .3, size: .43 });
 
-test('early-wave slugs take one direct hit and geese two at low and full pressure', () => {
+test('early geese take two direct hits at low and full pressure', () => {
   for (const charged of [false, true]) {
-    const hitsToKill = kind => {
-      const { advance, impacts } = setup();
-      const enemy = target(0, charged ? 7.5 : .7, ENEMY_HEALTH[kind]);
-      if (charged) advance(120, true);
-      for (let burst = 0; burst < 30 && enemy.alive; burst++) {
-        advance(5, true, [enemy]);
-        advance(5, charged, [enemy]);
-      }
-      assert.equal(enemy.alive, false, 'Both enemy types can be defeated');
-      assert.ok(impacts.every(hit => !hit.groundSplash), 'Count direct contacts only');
-      return impacts.length;
-    };
-    assert.equal(hitsToKill('slug'), 1);
-    assert.equal(hitsToKill('goose'), 2);
-  }
-});
-
-test('enemy health increases by one only after each three-wave block', async context => {
-  context.mock.method(GLTFLoader.prototype, 'loadAsync', async () => {
-    const scene = new THREE.Group();
-    scene.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial()));
-    return { scene, animations: [] };
-  });
-  await loadEnemyModels();
-  for (const [wave, slug, goose] of [[1, 1, 2], [3, 1, 2], [4, 2, 3], [6, 2, 3], [7, 3, 4], [9, 3, 4], [10, 4, 5]]) {
-    assert.equal(createEnemy('slug', wave).hp, slug, `Slug health on wave ${wave}`);
-    assert.equal(createEnemy('goose', wave).hp, goose, `Goose health on wave ${wave}`);
-  }
-});
-
-test('one short close tap kills an early slug and leaves a goose needing one more hit', () => {
-  for (const [kind, remaining] of [['slug', 0], ['goose', 1]]) {
     const { advance, impacts } = setup();
-    const enemy = target(0, .7, ENEMY_HEALTH[kind]);
-    advance(5, true, [enemy]);
-    advance(60, false, [enemy]);
-    assert.equal(impacts.length, 1);
-    assert.equal(enemy.hp, remaining);
-    assert.equal(enemy.alive, kind === 'goose');
-    assert.ok(impacts.every(hit => hit.charge < .1));
+    const enemy = target(0, charged ? 7.5 : .7, ENEMY_HEALTH.goose);
+    if (charged) advance(120, true);
+    for (let burst = 0; burst < 30 && enemy.alive; burst++) {
+      advance(5, true, [enemy]);
+      advance(5, charged, [enemy]);
+    }
+    assert.equal(enemy.alive, false);
+    assert.ok(impacts.every(hit => !hit.groundSplash), 'Count direct contacts only');
+    assert.equal(impacts.length, 2);
   }
+});
+
+test('goose health increases by one after each three-level difficulty block', () => {
+  loadEnemyModels();
+  for (const [level, hp] of [[1, 2], [3, 2], [4, 3], [6, 3], [7, 4], [9, 4], [10, 5]]) {
+    assert.equal(createEnemy('goose', level).hp, hp);
+  }
+});
+
+test('one short close tap leaves an early goose needing one more hit', () => {
+  const { advance, impacts } = setup();
+  const enemy = target(0, .7, ENEMY_HEALTH.goose);
+  advance(5, true, [enemy]);
+  advance(60, false, [enemy]);
+  assert.equal(impacts.length, 1);
+  assert.equal(enemy.hp, 1);
+  assert.equal(enemy.alive, true);
+  assert.ok(impacts.every(hit => hit.charge < .1));
 });
 
 test('charged liquid keeps stronger knockback after release with fixed direct damage', () => {

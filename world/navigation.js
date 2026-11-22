@@ -146,10 +146,10 @@ export function createNavigation({ bounds, colliders = [], dynamicColliders = ()
     }
     return { x: 0, z: 0 };
   }
-  function spawnPoint(player, index, count) {
+  function spawnPoint(player, index, count, ringStart = 7) {
     for (let tries = 0; tries < 100; tries++) {
       const angle = index / count * Math.PI * 2 + tries * .41;
-      const distance = 7 + Math.random() * 4;
+      const distance = ringStart + Math.random() * 4;
       const x = player.x + Math.cos(angle) * distance, z = player.z + Math.sin(angle) * distance;
       if (!blocked(x, z, .75) && distances[cell(x, z)] >= 0) return { x, z };
     }

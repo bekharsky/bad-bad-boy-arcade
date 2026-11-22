@@ -1,5 +1,7 @@
 import * as THREE from 'three';
+import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import { createSceneryModel } from '../maps/scenery-model.js';
+import { animateGoose, createGooseModel, gooseRig } from '../goose.js';
 import { createTrafficModel, animateTraffic } from './traffic-models.js';
 import { RUN_LANES, TRAFFIC_COLORS, TRAFFIC_CAPACITY, ROADWORK_TYPES } from './course.js';
 import { isCameo } from './cameo-roster.js';
@@ -12,6 +14,7 @@ export function createRunnerTraffic(root, name, { riderKinds = ['bike', 'scooter
   const trafficPool = [], trafficMaterials = [];
   const templates = new Map(), activeVariants = Array(TRAFFIC_CAPACITY).fill(null);
   const slotAppearance = [];
+  const goosePoses = [];
   const actorSlots = new Map(), activeActors = new Set(), slotOwners = Array(TRAFFIC_CAPACITY).fill(null);
   // Keep one copy of each geometry in the map subtree for deterministic
   // disposal. Slots clone only the variant they currently display.
@@ -21,13 +24,14 @@ export function createRunnerTraffic(root, name, { riderKinds = ['bike', 'scooter
   templateRoot.userData.runnerTraffic = true;
   root.add(templateRoot);
   function addTemplate(kind, color) {
-    const template = createTrafficModel(kind, color);
+    const template = kind === 'goose' ? createGooseModel() : createTrafficModel(kind, color);
+    if (kind === 'goose') { template.name = 'goose goose'; template.scale.setScalar(.88); }
     prepareFadingMaterials(template);
     templates.set(`${color} ${kind}`, template);
     templateRoot.add(template);
   }
   const pose = {};
-  for (const kind of riderKinds) for (const color of isCameo(kind) ? ['cameo'] : TRAFFIC_COLORS) addTemplate(kind, color);
+  for (const kind of riderKinds) for (const color of isCameo(kind) ? ['cameo'] : kind === 'goose' ? ['goose'] : TRAFFIC_COLORS) addTemplate(kind, color);
   for (const kind of roadworkKinds) addTemplate(kind, 'roadwork');
   if (tramChance > 0) addTemplate('tram', 'tram');
   const emptyGeometry = new THREE.BufferGeometry();
@@ -44,7 +48,10 @@ export function createRunnerTraffic(root, name, { riderKinds = ['bike', 'scooter
     root.add(object); trafficPool.push(object);
   }
   // Shared templates and per-slot materials are owned by the map subtree.
+  let elapsed = 0;
   return { update(state, viewPosition) {
+    const dt = Math.max(0, state.elapsed - elapsed);
+    elapsed = state.elapsed;
     activeActors.clear();
     for (const agent of state.traffic) activeActors.add(agent);
     // Compacting the course's array must not replace the models of surviving actors.
@@ -66,12 +73,18 @@ export function createRunnerTraffic(root, name, { riderKinds = ['bike', 'scooter
       object.visible = !agent.cleared;
       if (agent.cleared) continue;
       const cameo = isCameo(agent.kind);
-      const key = `${cameo ? 'cameo' : ROADWORK_TYPES.includes(agent.kind) ? 'roadwork' : agent.color} ${agent.kind}`;
+      const goose = agent.kind === 'goose';
+      const key = `${cameo ? 'cameo' : goose ? 'goose' : ROADWORK_TYPES.includes(agent.kind) ? 'roadwork' : agent.color} ${agent.kind}`;
       if (activeVariants[i] !== key) {
         const template = templates.get(key);
         if (!template) throw new Error(`Unknown traffic model: ${key}`);
+        if (goosePoses[i]) {
+          object.children[0].traverse(node => { if (node.isSkinnedMesh) node.skeleton.dispose(); });
+          goosePoses[i] = null;
+        }
         object.clear();
-        const variant = template.clone(true);
+        const variant = goose ? clone(template) : template.clone(true);
+        if (goose) goosePoses[i] = { goose: gooseRig(variant), body: variant, gait: 0 };
         if (!cameo) variant.traverse(node => {
           if (node.isMesh && node.material.vertexColors && node.material.side === material.side) node.material = material;
         });
@@ -109,6 +122,8 @@ export function createRunnerTraffic(root, name, { riderKinds = ['bike', 'scooter
         const approaching = agent.panicSide === undefined;
         animateCameo(variant, (agent.gait ?? state.elapsed) + agent.id, agent.stumbleTime === undefined,
           approaching ? viewerYaw : 0, false, approaching ? .18 : 0, agent.stumbleTime);
+      } else if (goose) {
+        animateGoose(goosePoses[i], dt, Math.abs(agent.z) < 2.5, agent.speed);
       } else {
         animateTraffic(variant, state.elapsed + agent.id, agent.crossing ? Math.abs(agent.vx) : agent.speed + state.speed, viewerYaw);
       }

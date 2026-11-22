@@ -1,9 +1,8 @@
 import * as THREE from 'three';
-import { createGullFlight } from './gull-flight.js';
+import { createGullFlight, RUNNER_GULL_COUNT } from './gull-flight.js';
 import { disposeObject } from './world/dispose.js';
 
-// Two reusable birds and two reusable attacks, shared geometry/materials.
-// No model download, spawning mesh churn, or wave membership.
+// The reusable flock shares geometry and materials across birds.
 export function createSeagulls(scene, world, callbacks = {}) {
   const root = new THREE.Group(); root.name = 'Ambient seagulls'; root.visible = false;
   scene.add(root);
@@ -32,7 +31,7 @@ export function createSeagulls(scene, world, callbacks = {}) {
     mesh.position.set(...position); mesh.scale.set(...scale); parent.add(mesh);
     return mesh;
   }
-  const models = Array.from({ length: 2 }, () => {
+  const models = Array.from({ length: RUNNER_GULL_COUNT }, () => {
     const bird = new THREE.Group(); root.add(bird);
     part(bird, sphere, white, [0, 0, 0], [.25, .23, .62]);
     part(bird, sphere, white, [0, .17, .48], [.2, .22, .23]);
@@ -50,6 +49,7 @@ export function createSeagulls(scene, world, callbacks = {}) {
     return { bird, wings, shadow, marker, drop };
   });
   const flight = createGullFlight({ ...callbacks,
+    runnerGullCount: RUNNER_GULL_COUNT,
     canStandAt: (...args) => world.canStandAt(...args),
     lineClear3D: (...args) => world.lineClear3D(...args),
   });
@@ -84,7 +84,15 @@ export function createSeagulls(scene, world, callbacks = {}) {
 
   return {
     birds: flight.birds,
-    reset(player, runner) { time = 0; flight.reset(player, runner); root.visible = true; render(); },
+    reset(player, runner) {
+      time = 0;
+      flight.reset(player, runner);
+      for (const { bird, shadow, marker, drop } of models.slice(flight.birds.length)) {
+        bird.visible = shadow.visible = marker.visible = drop.visible = false;
+      }
+      root.visible = true;
+      render();
+    },
     clear() { root.visible = false; },
     update(dt, player, options) { time += dt; flight.update(dt, player, options); render(dt); },
     repel: flight.repel,

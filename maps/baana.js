@@ -9,7 +9,7 @@ import { registerBuilding } from '../world/building-visibility.js';
 
 export const baanaMap = {
   id: 'baana', name: 'Baana Run', mode: 'runner',
-  runner: { length: BAANA_LENGTH, variety: true, cameoShoulder: 5.95, riderKinds: ['bike', 'scooter', ...CAMEO_KINDS] },
+  runner: { length: BAANA_LENGTH, variety: true, busy: true, cameoShoulder: 5.95, riderKinds: ['bike', 'scooter', 'goose', ...CAMEO_KINDS] },
   spawn: { x: 0, z: 0, heading: Math.PI },
   bounds: { minX: -5.5, maxX: 5.5, minZ: -130, maxZ: 30 },
   environment: { background: new THREE.Color('#7c929f'), fog: new THREE.Fog('#7c929f', 30, 112) },

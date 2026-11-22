@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { registerHooks } from 'node:module';
-import { createGullFlight } from '../gull-flight.js';
+import { createGullFlight, GULL_COUNT, RUNNER_GULL_COUNT } from '../gull-flight.js';
 import { aimingUp, createSprayAim } from '../spray-aim.js';
 
 registerHooks({ resolve(specifier, context, nextResolve) {
@@ -23,14 +23,15 @@ function setup(value = .1, runner = false, options = {}) {
   return { flight, player, impacts, advance };
 }
 
-test('two independent birds attack infrequently, one at a time, with both damaging attack types', () => {
+test('four gulls attack one at a time, with both damaging attack types', () => {
+  assert.equal(GULL_COUNT, 4);
   for (const value of [.1, .9]) for (const runner of [false, true]) {
     const { flight, impacts, advance } = setup(value, runner);
     advance(5); assert.equal(impacts.length, 0);
     for (let i = 0; i < 30 * 120; i++) {
       advance(1 / 120);
       assert.ok(flight.birds.filter(b => b.target).length <= 1);
-      assert.equal(flight.birds.length, 2);
+      assert.equal(flight.birds.length, 4);
     }
     assert.ok(impacts.length >= 2 && impacts.length <= 5);
     assert.ok(impacts.every(hit => hit.hit && hit.type === (value < .5 ? 'drop' : 'dive')));
@@ -137,11 +138,11 @@ test('air spray can repel moving birds in both arena and runner frames', () => {
     const spray = createSpraySystem(new THREE.Scene(), { lineClear3D: () => true }, bird => {
       if (flight.repel(bird)) repelled.add(bird.id);
     }, { refraction: false });
-    for (let frame = 0; frame < 18 * 60; frame++) {
+    for (let frame = 0; frame < 24 * 60; frame++) {
       flight.update(1 / 60, player, { scroll: runner ? 15 : 0 });
       spray.update(1 / 60, true, emitter, aim(player, flight.birds, true), flight.birds);
     }
-    assert.equal(repelled.size, 2); assert.equal(impacts.length, 0);
+    assert.equal(repelled.size, 4); assert.equal(impacts.length, 0);
   }
 });
 
@@ -172,7 +173,7 @@ test('birds arrive separately from the distance and settle before their first at
   assert.equal(flight.birds[1].phase, 'waiting');
   advance(4.5);
   assert.equal(flight.birds[0].phase, 'orbit');
-  assert.equal(flight.birds[1].phase, 'waiting');
+  assert.equal(flight.birds[1].phase, 'approach');
   assert.ok(flight.birds.every(b => !b.target));
   advance(1.5);
   assert.ok(flight.birds.every(b => !b.target));
@@ -234,6 +235,7 @@ test('restarts and map changes reuse bounded bird resources and clear all marker
   let meshCount = 0; root.traverse(node => { if (node.isMesh) meshCount++; });
   for (let i = 0; i < 30; i++) {
     gulls.reset(player, i % 2 === 0);
+    assert.equal(gulls.birds.length, i % 2 === 0 ? RUNNER_GULL_COUNT : GULL_COUNT);
     for (let frame = 0; frame < 8 * 30; frame++) gulls.update(1 / 30, player);
     gulls.clear(); assert.equal(root.visible, false);
   }

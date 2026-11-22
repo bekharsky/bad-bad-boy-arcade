@@ -25,6 +25,7 @@ export const senateSquareMap = {
     [[2, -9], [-5, -9], [-6, 2], [-8.5, 5], [-9, 11]],
   ],
   pickups: {
+    sleigh: [{ x: 5, z: 30.8 }],
     medkit: [{ x: -8, z: -3 }, hidden(-32.3, -7), hidden(32.3, -8), hidden(-17, 31), hidden(7, 31)],
     battery: [hidden(-32.3, 5), hidden(32.3, 5), hidden(-6, 31), hidden(20, 31)],
   },
