@@ -2,9 +2,15 @@ name = "piss-deal-leaderboard"
 main = "index.js"
 compatibility_date = "2026-11-21"
 workers_dev = true
+preview_urls = false
+
+[observability]
+enabled = true
+
+[observability.logs]
+enabled = true
 
 [[d1_databases]]
 binding = "DB"
 database_name = "piss-deal-leaderboard"
-# Replace after creating the D1 database in the Cloudflare account.
-database_id = "71ac1a27-c00d-46f2-a222-5d81ae62f8fd"
+database_id = "f3e845dc-e03b-4ac2-8513-684b59af7e13"
