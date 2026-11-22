@@ -47,3 +47,52 @@ test('nearby enemies still separate while distant enemies leave steering unchang
   assert.ok(first.z < 0, 'The nearby enemy deflects pursuit');
   assert.equal(distant.z, 8, 'A distant actor does not add separation');
 });
+
+test('geese and slugs pick up their pace during a retreat and turn faster around a corner', () => {
+  for (const [kind, baseSpeed] of [['goose', .65], ['slug', .75]]) {
+    const actor = { ...enemy(-6), kind, speed: baseSpeed };
+    const { combat, player, world } = fixture([actor]);
+    player.speed = 3.6;
+    world.chase = (x, z, tx, tz) => ({ x: tx - x, z: tz - z });
+    const dt = 1 / 60;
+    for (let frame = 0; frame < 60; frame++) {
+      player.x += player.speed * dt;
+      combat.update(dt, frame * dt, player.speed * dt, 0);
+    }
+    assert.ok(actor.x > -4 && actor.x < -2.4, kind + ' runs slower than the hero');
+
+    player.z += player.speed * dt;
+    world.chase = () => ({ x: 0, z: 1 }); // The next waypoint is around the corner.
+    const sprintHeading = actor.root.rotation.y;
+    combat.update(dt, 1, 0, player.speed * dt);
+    const sprintTurn = Math.abs(actor.root.rotation.y - sprintHeading);
+    assert.ok(actor.z > 2 * baseSpeed * dt, kind + ' keeps running through the turn');
+
+    const oldZ = actor.z, walkHeading = actor.root.rotation.y;
+    combat.update(dt, 1 + dt);
+    assert.ok(Math.abs(actor.z - oldZ - baseSpeed * dt) < 1e-9, kind + ' returns to a walk');
+    assert.ok(sprintTurn > 2 * Math.abs(actor.root.rotation.y - walkHeading));
+  }
+});
+
+test('a sprinting pursuer keeps its gap until the hero stops', () => {
+  const actor = enemy(-1.2);
+  const { combat, player, world } = fixture([actor]);
+  player.speed = 3.6;
+  world.chase = (x, z, tx, tz) => ({ x: tx - x, z: tz - z });
+  const dt = 1 / 60;
+  player.x += player.speed * dt;
+  combat.update(dt, 0, player.speed * dt, 0);
+  assert.equal(player.hp, 5);
+  assert.equal(actor.x, -1.2);
+
+  actor.x = -4;
+  for (let frame = 0; frame < 96; frame++) {
+    player.z += player.speed * dt;
+    combat.update(dt, frame * dt, 0, player.speed * dt);
+    assert.ok(Math.hypot(player.x - actor.x, player.z - actor.z) >= 2.6 - 1e-9);
+  }
+  assert.equal(player.hp, 5);
+  for (let frame = 0; frame < 480 && player.hp === 5; frame++) combat.update(dt, frame * dt);
+  assert.equal(player.hp, 4, 'The ordinary bite still applies after the hero stops');
+});

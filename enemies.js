@@ -8,11 +8,20 @@ import { paintFigure } from './world/painted-material.js';
 const templates = new Map();
 const SLUG_MODEL_URL = new URL('./assets/enemies/slug.glb', import.meta.url).href;
 
+function prepareTemplate(source, footprint) {
+  const bounds = new THREE.Box3().setFromObject(source.scene);
+  const size = bounds.getSize(new THREE.Vector3());
+  const scale = footprint / Math.max(size.x, size.z);
+  const centre = bounds.getCenter(new THREE.Vector3());
+  centre.y = bounds.min.y;
+  return { scene: source.scene, animations: source.animations, scale, centre, height: size.y * scale };
+}
+
 export async function loadEnemyModels() {
-  if (!templates.has('goose')) templates.set('goose', { scene: createGooseModel(), animations: [] });
+  if (!templates.has('goose')) templates.set('goose', prepareTemplate({ scene: createGooseModel(), animations: [] }, 1.5));
   const loader = new GLTFLoader();
   const slug = await loader.loadAsync(SLUG_MODEL_URL);
-  templates.set('slug', slug);
+  templates.set('slug', prepareTemplate(slug, 1.35));
 }
 
 export function createEnemy(kind, level) {
@@ -26,7 +35,7 @@ export function createEnemy(kind, level) {
   model.traverse(node => {
     if (!node.isMesh) return;
     node.castShadow = node.receiveShadow = true;
-    if (node.isSkinnedMesh) node.frustumCulled = false;
+    if (node.isSkinnedMesh && !node.boundingSphere) node.frustumCulled = false;
     const copyMaterial = original => {
       if (!materials.has(original)) {
         const material = original.clone();
@@ -38,13 +47,8 @@ export function createEnemy(kind, level) {
     };
     node.material = Array.isArray(node.material) ? node.material.map(copyMaterial) : copyMaterial(node.material);
   });
-  model.updateMatrixWorld(true);
-  const bounds = new THREE.Box3().setFromObject(model);
-  const size = bounds.getSize(new THREE.Vector3());
-  const scale = (kind === 'goose' ? 1.5 : 1.35) / Math.max(size.x, size.z);
-  body.scale.setScalar(scale);
-  const centre = bounds.getCenter(new THREE.Vector3());
-  model.position.sub(new THREE.Vector3(centre.x, bounds.min.y, centre.z));
+  body.scale.setScalar(source.scale);
+  model.position.sub(source.centre);
   const radius = kind === 'goose' ? .47 : .52;
   const mixer = source.animations.length ? new THREE.AnimationMixer(model) : null;
   const actions = {};
@@ -56,15 +60,15 @@ export function createEnemy(kind, level) {
   return {
     root, body, model, kind, mixer, actions, state: 'walk', materials: [...materials.values()],
     goose: kind === 'goose' ? gooseRig(model) : null, gait: Math.random() * Math.PI * 2,
-    size: radius, hitHeight: kind === 'goose' ? .6 * scale : size.y * scale * .52, baseScale: scale,
+    size: radius, hitHeight: kind === 'goose' ? .6 * source.scale : source.height * .52, baseScale: source.scale,
     hp: enemyHealth(kind, level),
     speed: 0.5 + Math.random() * 0.15 + Math.min(level, 12) * 0.035,
-    hit: 0, attack: Math.random() * 0.5, alive: true, wobble: Math.random() * Math.PI * 2,
+    hit: 0, flashing: false, attack: Math.random() * 0.5, alive: true, wobble: Math.random() * Math.PI * 2,
   };
 }
 
-export function animateEnemy(enemy, dt, time, attacking) {
-  if (enemy.goose) animateGoose(enemy, dt, attacking);
+export function animateEnemy(enemy, dt, _time, attacking, speed = enemy.speed) {
+  if (enemy.goose) animateGoose(enemy, dt, attacking, speed);
   else if (enemy.mixer) {
     const state = attacking ? 'attack' : 'walk';
     if (state !== enemy.state) {
@@ -72,15 +76,19 @@ export function animateEnemy(enemy, dt, time, attacking) {
       enemy.actions[state].reset().fadeIn(0.15).play();
       enemy.state = state;
     }
-    enemy.mixer.update(dt * (attacking ? 1 : enemy.speed));
+    enemy.mixer.update(dt * (attacking ? 1 : speed));
   } else {
     // The slug has no animation clips; its subtle pulse suggests crawling.
-    enemy.body.scale.z = enemy.baseScale * (1 + Math.sin(time * 5 + enemy.wobble) * 0.025);
-    enemy.body.rotation.z = Math.sin(time * 3 + enemy.wobble) * 0.025;
+    enemy.wobble += dt * (2.5 + speed * 4);
+    enemy.body.scale.z = enemy.baseScale * (1 + Math.sin(enemy.wobble) * .025);
+    enemy.body.rotation.z = Math.sin(enemy.wobble + .8) * .025;
   }
+  const flashing = enemy.hit > 0;
+  if (flashing === enemy.flashing) return;
+  enemy.flashing = flashing;
   for (const material of enemy.materials) {
-    material.emissive.set(enemy.hit > 0 ? '#ffe58c' : '#000000');
-    material.emissiveIntensity = enemy.hit > 0 ? 0.7 : 0;
+    material.emissive.set(flashing ? '#ffe58c' : '#000000');
+    material.emissiveIntensity = flashing ? .7 : 0;
   }
 }
 

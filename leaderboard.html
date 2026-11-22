@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#173d35" />
+    <title>Leaderboard — Piss Deal</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body class="scores-page">
+    <main class="card scores-card">
+      <h1>Leaderboard</h1>
+      <section class="leaderboard" aria-labelledby="leaderboard-title">
+        <div class="leaderboard-heading"><h2 id="leaderboard-title">TOP 5</h2></div>
+        <ol id="leaderboard-list" class="leaderboard-list" aria-live="polite"></ol>
+        <div id="leaderboard-status" class="leaderboard-status" role="status">Loading scores…</div>
+      </section>
+      <a class="leaderboard-link" href="./">Back to game</a>
+    </main>
+    <script type="module">
+      import { createLeaderboardView } from './leaderboard.js';
+
+      const view = createLeaderboardView(document.querySelector('#leaderboard-list'), document.querySelector('#leaderboard-status'));
+      view.refresh();
+    </script>
+  </body>
+</html>

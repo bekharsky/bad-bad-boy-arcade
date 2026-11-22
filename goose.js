@@ -25,8 +25,8 @@ export function createGooseModel() {
     geometry.setAttribute('skinWeight', new THREE.Float32BufferAttribute(weights, 4));
     pieces.push(geometry);
   }
-  function oval(color, position, scale, bone = 0, rotation = 0) {
-    piece(new THREE.SphereGeometry(1, 12, 8).scale(...scale).rotateX(rotation).translate(...position), color, bone);
+  function oval(color, position, scale, bone = 0, rotation = 0, detail = 10) {
+    piece(new THREE.SphereGeometry(1, detail, Math.floor(detail * .7)).scale(...scale).rotateX(rotation).translate(...position), color, bone);
   }
   const dark = '#20282c', grey = '#87928e', cream = '#eeeadd';
   oval(grey, [0, .59, -.06], [.34, .33, .57]);
@@ -41,8 +41,8 @@ export function createGooseModel() {
   oval(cream, [0, .52, .265], [.155, .15, .105], 1);
   for (const side of [-1, 1]) {
     oval(cream, [side * .153, .51, .16], [.047, .135, .16], 1);
-    oval('#0b1115', [side * .18, .575, .205], [.025, .026, .028], 1);
-    oval('#b4bdb3', [side * .196, .583, .215], [.007, .008, .007], 1);
+    oval('#0b1115', [side * .18, .575, .205], [.025, .026, .028], 1, 0, 6);
+    oval('#b4bdb3', [side * .196, .583, .215], [.007, .008, .007], 1, 0, 6);
   }
   oval('#171e22', [0, .475, .385], [.082, .066, .17], 1, -.12);
 
@@ -52,8 +52,8 @@ export function createGooseModel() {
     // the elevated game camera without another texture or material batch.
     for (let feather = 0; feather < 5; feather++) {
       const z = .23 - feather * .145;
-      oval(feather % 2 ? '#b5beb5' : '#d0d3c7', [side * .07, .045 - feather * .027, z], [.043, .125, .075], bone, -.22);
-      oval('#394642', [side * .08, .035 - feather * .027, z - .028], [.037, .11, .035], bone, -.22);
+      oval(feather % 2 ? '#b5beb5' : '#d0d3c7', [side * .07, .045 - feather * .027, z], [.043, .125, .075], bone, -.22, 6);
+      oval('#394642', [side * .08, .035 - feather * .027, z - .028], [.037, .11, .035], bone, -.22, 6);
     }
   }
   for (const bone of [2, 3]) {
@@ -73,7 +73,11 @@ export function createGooseModel() {
   for (const part of pieces) part.dispose();
   const mesh = new THREE.SkinnedMesh(geometry, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .85 }));
   mesh.name = 'Barnacle goose'; mesh.add(bones[0]); mesh.bind(new THREE.Skeleton(bones));
-  mesh.castShadow = mesh.receiveShadow = true; mesh.frustumCulled = false;
+  mesh.castShadow = mesh.receiveShadow = true;
+  // Include the neck lunge, legs and flapping wings in the shared culling bound.
+  geometry.computeBoundingSphere();
+  mesh.boundingSphere = geometry.boundingSphere.clone();
+  mesh.boundingSphere.radius += .55;
   const scene = new THREE.Group(); scene.name = 'Barnacle goose template'; scene.add(mesh);
   return scene;
 }
@@ -87,16 +91,16 @@ export function gooseRig(model) {
   };
 }
 
-export function animateGoose(enemy, dt, attacking) {
-  enemy.gait += dt * (attacking ? 9 : enemy.speed * 9);
-  const phase = enemy.gait, stride = attacking ? .12 : .48;
+export function animateGoose(enemy, dt, attacking, speed = enemy.speed) {
+  enemy.gait += dt * (attacking ? 9 : speed * 9);
+  const phase = enemy.gait, stride = attacking ? .12 : .48 * Math.min(1, speed / .45);
   for (let i = 0; i < 2; i++) {
     enemy.goose.legs[i].rotation.x = Math.sin(phase + i * Math.PI) * stride;
     enemy.goose.wings[i].rotation.z = (i ? 1 : -1) * (attacking ? .25 + Math.sin(phase) * .1 : Math.sin(phase) * .025);
   }
   const lunge = attacking ? .7 + Math.sin(phase) * .18 : Math.sin(phase * .5) * .045;
   enemy.goose.neck.rotation.x = THREE.MathUtils.damp(enemy.goose.neck.rotation.x, lunge, 15, dt);
-  enemy.body.position.y = Math.abs(Math.sin(phase)) * (attacking ? .008 : .018);
-  enemy.body.rotation.z = Math.sin(phase) * (attacking ? .015 : .045);
+  enemy.body.position.y = Math.abs(Math.sin(phase)) * (attacking ? .008 : .0375 * stride);
+  enemy.body.rotation.z = Math.sin(phase) * (attacking ? .015 : .094 * stride);
   enemy.body.rotation.x = attacking ? .06 : 0;
 }

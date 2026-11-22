@@ -33,10 +33,53 @@ function readProfile() {
   return { id: newPlayerId(), nickname: generatedName() };
 }
 
-export function createLeaderboard({ nameInput, lists, startStatus, endStatus, retryButton }) {
+function renderEntries(list, entries) {
+  const rows = entries.map((entry, index) => {
+    const row = document.createElement('li');
+    const rank = document.createElement('span');
+    const nickname = document.createElement('span');
+    const score = document.createElement('strong');
+    row.className = 'leaderboard-row';
+    rank.className = 'leaderboard-rank';
+    nickname.className = 'leaderboard-name';
+    score.className = 'leaderboard-score';
+    rank.textContent = String(index + 1).padStart(2, '0');
+    nickname.textContent = entry.nickname;
+    score.textContent = Number(entry.score).toLocaleString();
+    row.append(rank, nickname, score);
+    return row;
+  });
+  list.replaceChildren(...rows);
+}
+
+export function createLeaderboardView(list, status) {
+  let latestRequest = 0;
+  async function refresh() {
+    const request = ++latestRequest;
+    if (!API_URL) {
+      status.textContent = 'Online scores are not connected in this preview.';
+      return;
+    }
+    status.textContent = 'Loading scores…';
+    try {
+      const response = await fetch(`${API_URL}/leaderboard`, { headers: { Accept: 'application/json' } });
+      if (!response.ok) throw new Error(`Leaderboard request failed: ${response.status}`);
+      const data = await response.json();
+      if (request !== latestRequest) return;
+      const entries = Array.isArray(data.entries) ? data.entries.slice(0, 5) : [];
+      renderEntries(list, entries);
+      status.textContent = entries.length ? '' : 'No scores yet. Set the first record!';
+    } catch {
+      if (request === latestRequest) status.textContent = 'Online scores are temporarily unavailable.';
+    }
+  }
+  return { refresh };
+}
+
+export function createLeaderboard({ nameInput, list, listStatus, submitStatus, retryButton }) {
+  const { refresh } = createLeaderboardView(list, listStatus);
   const profile = readProfile();
   let lastSubmission = null;
-  let submitting = false;
   nameInput.value = profile.nickname;
 
   function saveProfile() {
@@ -46,78 +89,13 @@ export function createLeaderboard({ nameInput, lists, startStatus, endStatus, re
     return profile.nickname;
   }
 
-  function setStatuses(message) {
-    startStatus.textContent = message;
-    endStatus.textContent = message;
-  }
-
-  function render(entries) {
-    for (const list of lists) {
-      list.replaceChildren();
-      if (!entries.length) {
-        const empty = document.createElement('li');
-        empty.className = 'leaderboard-empty';
-        empty.textContent = 'No scores yet. Set the first record!';
-        list.append(empty);
-        continue;
-      }
-      for (const [index, entry] of entries.entries()) {
-        const row = document.createElement('li');
-        const rank = document.createElement('span');
-        const nickname = document.createElement('span');
-        const score = document.createElement('strong');
-        row.className = 'leaderboard-row';
-        rank.className = 'leaderboard-rank';
-        nickname.className = 'leaderboard-name';
-        score.className = 'leaderboard-score';
-        rank.textContent = String(index + 1).padStart(2, '0');
-        nickname.textContent = entry.nickname;
-        score.textContent = Number(entry.score).toLocaleString();
-        row.append(rank, nickname, score);
-        list.append(row);
-      }
-    }
-  }
-
-  async function refresh() {
-    if (!API_URL) {
-      setStatuses('Online scores are not connected in this preview.');
-      render([]);
-      return [];
-    }
-    setStatuses('Loading scores…');
-    try {
-      const response = await fetch(`${API_URL}/leaderboard`, { headers: { Accept: 'application/json' } });
-      if (!response.ok) throw new Error(`Leaderboard request failed: ${response.status}`);
-      const data = await response.json();
-      const entries = Array.isArray(data.entries) ? data.entries.slice(0, 5) : [];
-      render(entries);
-      setStatuses('');
-      return entries;
-    } catch {
-      setStatuses('Online scores are temporarily unavailable.');
-      return [];
-    }
-  }
-
-  async function submit(score, wave) {
-    if (submitting) return;
-    const payload = {
-      playerId: profile.id,
-      nickname: saveProfile(),
-      score: Math.max(0, Math.floor(Number(score) || 0)),
-      wave: Math.max(1, Math.floor(Number(wave) || 1)),
-    };
-    lastSubmission = payload;
-    if (!API_URL) {
-      endStatus.textContent = 'Online scores are not connected in this preview.';
-      retryButton.hidden = true;
-      return;
-    }
-
-    submitting = true;
+  async function send(payload) {
     retryButton.hidden = true;
-    endStatus.textContent = 'Saving your score…';
+    if (!API_URL) {
+      submitStatus.textContent = '';
+      return refresh();
+    }
+    submitStatus.textContent = 'Saving your score…';
     try {
       const response = await fetch(`${API_URL}/scores`, {
         method: 'POST',
@@ -125,23 +103,31 @@ export function createLeaderboard({ nameInput, lists, startStatus, endStatus, re
         body: JSON.stringify(payload),
       });
       if (!response.ok) throw new Error(`Score submission failed: ${response.status}`);
-      endStatus.textContent = `Score saved for ${payload.nickname}.`;
-      await refresh();
-      endStatus.textContent = `Score saved for ${payload.nickname}.`;
+      if (payload !== lastSubmission) return;
+      submitStatus.textContent = `Score saved for ${payload.nickname}.`;
     } catch {
-      endStatus.textContent = 'Could not save this score. Check the connection and retry.';
+      if (payload !== lastSubmission) return;
+      submitStatus.textContent = 'Could not save this score. Check the connection and retry.';
       retryButton.hidden = false;
-    } finally {
-      submitting = false;
     }
+    await refresh();
+  }
+
+  function submit(score, wave) {
+    lastSubmission = {
+      playerId: profile.id,
+      nickname: saveProfile(),
+      score: Math.max(0, Math.floor(Number(score) || 0)),
+      wave: Math.max(1, Math.floor(Number(wave) || 1)),
+    };
+    return send(lastSubmission);
   }
 
   nameInput.addEventListener('change', saveProfile);
   nameInput.addEventListener('blur', saveProfile);
   retryButton.addEventListener('click', () => {
-    if (lastSubmission) submit(lastSubmission.score, lastSubmission.wave);
+    if (lastSubmission) send(lastSubmission);
   });
-  refresh();
 
-  return { refresh, submit, getNickname: saveProfile };
+  return { submit };
 }

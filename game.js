@@ -58,9 +58,9 @@ const startButton = document.querySelector('#start');
 const restartButton = document.querySelector('#restart');
 const leaderboard = createLeaderboard({
   nameInput: document.querySelector('#player-name'),
-  lists: [document.querySelector('#leaderboard-list'), document.querySelector('#end-leaderboard-list')],
-  startStatus: document.querySelector('#leaderboard-status'),
-  endStatus: document.querySelector('#score-submit-status'),
+  list: document.querySelector('#end-leaderboard-list'),
+  listStatus: document.querySelector('#end-leaderboard-status'),
+  submitStatus: document.querySelector('#score-submit-status'),
   retryButton: document.querySelector('#retry-score'),
 });
 const heroHud = document.querySelector('#hero-hud');
@@ -124,9 +124,6 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.12;
-// Refraction is only visible through the thin stream. A half-size source keeps
-// the glossy appearance while shading 75% fewer pixels in its extra scene pass.
-renderer.transmissionResolutionScale = .5;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#7c929f');
@@ -209,7 +206,8 @@ function hitEnemy(enemy, direction, impact) {
   enemy.root.position.set(enemy.x, 0, enemy.z);
   if (enemy.hp <= 0) removeEnemy(enemy, true);
 }
-const streamOptions = { scale: HERO_HEIGHT / 2.25, refraction: !window.matchMedia('(pointer: coarse)').matches, getHitTime: () => gameTime };
+// The glossy, translucent jet can draw directly over the city in one pass.
+const streamOptions = { scale: HERO_HEIGHT / 2.25, refraction: false, getHitTime: () => gameTime };
 const stream = createSpraySystem(scene, world, hitEnemy, streamOptions);
 
 const enemies = [];
@@ -615,6 +613,7 @@ function update(dt) {
   if (announcement) showToast(announcement);
 
   const firing = keys.has('Space') || keys.has('Fire') || touchControls.input.firing || player.tapTimer > 0;
+  const oldX = player.x, oldZ = player.z;
   const moving = updateMovement(dt, firing);
   if (mouseAim.locked && !mouseAim.aiming) {
     const cursor = aimCursorPosition();
@@ -644,7 +643,7 @@ function update(dt) {
     player.fireTimer = 0.1;
   }
 
-  if (!arenaCombat.update(dt, gameTime)) return;
+  if (!arenaCombat.update(dt, gameTime, player.x - oldX, player.z - oldZ)) return;
 
   player.invulnerable = Math.max(0, player.invulnerable - dt);
   player.model.material.opacity = player.invulnerable > 0 && Math.floor(gameTime * 18) % 2 === 0 ? 0.45 : 1;

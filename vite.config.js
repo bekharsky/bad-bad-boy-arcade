@@ -9,6 +9,7 @@ export default defineConfig({
       input: {
         game: resolve(import.meta.dirname, 'index.html'),
         credits: resolve(import.meta.dirname, 'credits.html'),
+        leaderboard: resolve(import.meta.dirname, 'leaderboard.html'),
       },
       output: {
         manualChunks(id) {

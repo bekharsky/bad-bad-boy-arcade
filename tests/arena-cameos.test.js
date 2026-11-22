@@ -62,6 +62,46 @@ test('the second arena wave brings fresh guests through clear entrances', () => 
   cameos.dispose();
 });
 
+test('a politician repeatedly runs up, watches the hero, and backs off without contact', () => {
+  const { player, cameos } = fixture();
+  player.z = 6;
+  const guest = cameos.actors[1], phases = [];
+  for (let frame = 0; frame < 1200; frame++) {
+    const oldDistance = Math.hypot(guest.x - player.x, guest.z - player.z);
+    const phase = guest.phase;
+    cameos.update(1 / 60, player, { x: 20, z: -5 });
+    if (guest.phase !== phase) phases.push(guest.phase);
+    const distance = Math.hypot(guest.x - player.x, guest.z - player.z);
+    assert.ok(distance >= guest.standoff - 1e-8);
+    if (guest.phase === phase && phase === 'approach') assert.ok(distance < oldDistance);
+    if (guest.phase === phase && phase === 'retreat') assert.ok(distance > oldDistance);
+    if (phase === 'watch') assert.ok(Math.abs(guest.heading) < .1, 'The guest looks at the hero');
+  }
+  assert.deepEqual(phases.slice(0, 8), ['lookout', 'approach', 'watch', 'retreat', 'lookout', 'approach', 'watch', 'retreat']);
+  assert.equal(player.hp, 5);
+  cameos.dispose();
+});
+
+test('Central Station guests can repeat the approach from their routes while the hero stays at spawn', () => {
+  const scene = new THREE.Scene(), world = createMapManager(scene, maps);
+  world.activate('central-station');
+  const cameos = createArenaCameos(scene, world, () => .95);
+  const player = { ...world.spawn, hp: 5, radius: .74, root: new THREE.Group() };
+  cameos.reset();
+  const firstGuests = [...cameos.actors], visits = new Map();
+  for (let frame = 0; frame < 44 * 60; frame++) {
+    const phases = firstGuests.map(actor => actor.phase);
+    world.update(1 / 60, [player, ...cameos.actors]);
+    cameos.update(1 / 60, player);
+    firstGuests.forEach((actor, i) => {
+      if (actor.phase === 'approach' && phases[i] !== 'approach') visits.set(actor, (visits.get(actor) ?? 0) + 1);
+    });
+  }
+  assert.ok([...visits.values()].some(count => count >= 2));
+  assert.equal(player.hp, 5);
+  cameos.dispose(); world.dispose();
+});
+
 test('splashing is optional and only triggers a temporary reaction, never a kill', () => {
   const { scene, world, player, cameos } = fixture();
   const actor = cameos.actors[1], emitter = new THREE.Object3D();
