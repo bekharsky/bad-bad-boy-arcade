@@ -57,7 +57,7 @@ export async function optimizeHero(bytes) {
   const jpeg = await sharp(bytes.subarray(imageStart, imageStart + imageView.byteLength))
     .resize({ width: 1024, withoutEnlargement: true }).jpeg({ quality: 85, mozjpeg: true }).toBuffer();
 
-  gltf.asset.generator = 'Bad Bad Boy arcade: meshoptimizer + Sharp';
+  gltf.asset.generator = 'Piss Deal: meshoptimizer + Sharp';
   gltf.bufferViews = []; gltf.accessors = [];
   const chunks = []; let byteOffset = 0;
   function addBuffer(data, target) {

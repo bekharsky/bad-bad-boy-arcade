@@ -1,8 +1,8 @@
-# Bad Bad Boy Arcade
+# Piss Deal
 
 Bad Bad Boy is loose in Helsinki. Take the city's cheekiest sculpture through lively squares, waterfront streets and two fast runs, armed with a very personal spray attack.
 
-**[Play Bad Bad Boy Arcade](https://bekharsky.github.io/piss-deal/)**
+**[Play Piss Deal](https://bekharsky.github.io/piss-deal/)**
 
 ## The journey
 
