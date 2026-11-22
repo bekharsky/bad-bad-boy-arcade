@@ -111,7 +111,7 @@ const material = {
   pbrMetallicRoughness: { baseColorFactor: [1, 1, 1, 1], baseColorTexture: { index: 0 }, metallicFactor: 0, roughnessFactor: .92 }
 };
 
-const gltf = { asset: { version: '2.0', generator: 'Bad Bad Boy arcade asset preparation' }, scene: 0, scenes: [{ nodes: [0] }], nodes: [{ name: 'BadBadBoy', mesh: 0 }], meshes: [], materials: [material], textures: [{ source: 0, sampler: 0 }], images: [], samplers: [{ magFilter: 9729, minFilter: 9987, wrapS: 10497, wrapT: 10497 }], buffers: [], bufferViews: [], accessors: [] };
+const gltf = { asset: { version: '2.0', generator: 'Piss Deal asset preparation' }, scene: 0, scenes: [{ nodes: [0] }], nodes: [{ name: 'BadBadBoy', mesh: 0 }], meshes: [], materials: [material], textures: [{ source: 0, sampler: 0 }], images: [], samplers: [{ magFilter: 9729, minFilter: 9987, wrapS: 10497, wrapT: 10497 }], buffers: [], bufferViews: [], accessors: [] };
 const buffers = []; let byteOffset = 0;
 function addBuffer(data, target) {
   const index = gltf.bufferViews.length;
