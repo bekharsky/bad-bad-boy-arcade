@@ -70,6 +70,8 @@ test('a politician repeatedly runs up, watches the hero, and backs off without c
     const oldDistance = Math.hypot(guest.x - player.x, guest.z - player.z);
     const phase = guest.phase;
     cameos.update(1 / 60, player, { x: 20, z: -5 });
+    const engaging = cameos.actors.filter(actor => actor.phase === 'approach' || actor.phase === 'watch');
+    assert.ok(engaging.length <= 2);
     if (guest.phase !== phase) phases.push(guest.phase);
     const distance = Math.hypot(guest.x - player.x, guest.z - player.z);
     assert.ok(distance >= guest.standoff - 1e-8);

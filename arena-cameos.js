@@ -122,8 +122,20 @@ export function createArenaCameos(scene, world, random = Math.random) {
         } else if (actor.phaseTime > 28) beginDeparture(actor);
         break;
       case 'lookout':
+        if (distance < player.radius + actor.size + .8) {
+          changePhase(actor, 'retreat');
+          break;
+        }
+        actor.decision -= dt;
+        if (actor.decision > 0) break;
+        actor.decision = .2;
         if (actor.phaseTime >= actor.glance && distance < NOTICE_RANGE && world.lineClear(actor.x, actor.z, player.x, player.z, actor.size)) {
-          changePhase(actor, 'approach');
+          // Give the hero a clear lane while the rest watch from farther away.
+          let nearbyGuests = 0;
+          for (const guest of actors) {
+            if (guest.phase === 'approach' || guest.phase === 'watch') nearbyGuests++;
+          }
+          if (nearbyGuests < 2) changePhase(actor, 'approach');
         } else if (actor.phaseTime > 5) beginDeparture(actor);
         break;
       case 'approach': {

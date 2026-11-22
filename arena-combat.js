@@ -44,7 +44,8 @@ export function createArenaCombat({ world, player, enemies, animateEnemy, onBite
           if (length > .01) {
             let step = enemy.speed * dt;
             if (keepingGap) {
-              const runSpeed = player.speed * (.76 + .1 * Math.min(1, enemy.speed / 1.1));
+              const sprintRatio = enemy.kind === 'slug' ? .66 : .77;
+              const runSpeed = player.speed * (sprintRatio + .1 * Math.min(1, enemy.speed / 1.1));
               const pace = enemy.speed + (runSpeed - enemy.speed) * pursuit;
               step = Math.min(pace * dt, Math.max(0, distance - RUN_GAP));
             }
@@ -62,7 +63,7 @@ export function createArenaCombat({ world, player, enemies, animateEnemy, onBite
         }
         const yaw = enemy.root.rotation.y ?? heading;
         const angle = Math.atan2(Math.sin(heading - yaw), Math.cos(heading - yaw));
-        const turn = (7 + 15 * pursuit) * dt;
+        const turn = (7 + (enemy.kind === 'slug' ? 10 : 15) * pursuit) * dt;
         enemy.root.rotation.y = Math.abs(angle) <= turn ? heading : yaw + Math.sign(angle) * turn;
         animateEnemy(enemy, dt, time, attacking, speed);
       }

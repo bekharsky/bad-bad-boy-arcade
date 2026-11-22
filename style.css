@@ -71,7 +71,7 @@ button { font: inherit; }
 .settings-button svg { display: block; width: 24px; height: 24px; }
 .settings-button:hover { color: var(--gold); border-color: #ffd34e66; background: #ffd34e0a; }
 .settings-button:focus-visible, .primary-button:focus-visible { outline: 2px solid var(--ink); outline-offset: 4px; }
-.game-shell:has(#start-screen:not(.hidden)) .hud { visibility: hidden; }
+.game-shell:has(#start-screen:not(.hidden), #end-screen:not(.hidden)) .hud { visibility: hidden; }
 #start { min-height: 48px; font-size: 16px; }
 .load-status { margin-bottom: 12px; color: var(--gold); font-size: 12px; line-height: 1.6; }
 .load-status.hidden { display: none; }
@@ -164,12 +164,17 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 900 clamp(52px, 8vw, 78px
 .leaderboard-status { margin-top: 5px; color: #d1d8c3; font: 500 12px/1.4 Inter, sans-serif; }
 .leaderboard-status:empty { margin-top: 0; }
 .leaderboard-end { margin: -8px 0 18px; text-align: left; }
+.wave-remaining { color: #ffe3a1; font: 700 11px/1 "Barlow Condensed", sans-serif; letter-spacing: .08em; }
+.end-result { display: grid; gap: 4px; margin: 0 0 24px; padding: 14px 0; border-block: 1px dashed #e3cfa27d; }
+.end-result span { color: #d1d8c3; font: 700 12px/1 "Barlow Condensed", sans-serif; letter-spacing: .14em; }
+.end-result strong { color: var(--gold); font: 800 40px/1 "Barlow Condensed", sans-serif; font-variant-numeric: tabular-nums; }
 .scores-page { display: grid; place-items: safe center; padding: clamp(16px, 5vw, 48px); overflow-y: auto; }
 .scores-card { width: min(420px, 100%); margin: 0; }
 .scores-card h1 { margin: 0; font-size: clamp(38px, 10vw, 59px); line-height: 1; }
 .scores-card .leaderboard-row { min-height: 40px; border-bottom: 1px solid #e3cfa230; font-size: 14px; }
 .scores-card .leaderboard-rank, .scores-card .leaderboard-score { font-size: 17px; }
 .score-submit-status { min-height: 20px; margin: -12px 0 14px; color: #d8d5c4; font: 500 12px/1.5 Inter, sans-serif; }
+.score-submit-status:empty { min-height: 0; margin: 0; }
 .secondary-button { width: 100%; margin: -6px 0 16px; padding: 9px 12px; border: 1px solid #e3cfa258; border-radius: 2px; color: #fff2d3; background: #ffffff0b; font: 800 11px/1 "Barlow Condensed", sans-serif; letter-spacing: .12em; cursor: pointer; }
 .secondary-button:hover { border-color: #ffd34e; background: #ffd34e12; }
 .secondary-button[hidden] { display: none; }

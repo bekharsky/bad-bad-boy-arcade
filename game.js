@@ -69,6 +69,8 @@ const heroHpFill = document.querySelector('#hero-hp-fill');
 const heroHeadPosition = new THREE.Vector3();
 const scoreLabel = document.querySelector('#score');
 const waveLabel = document.querySelector('#wave');
+const waveRemaining = document.querySelector('#wave-remaining');
+let lastEnemyCount = -1;
 const passerbyCard = document.querySelector('.passerby');
 let shownCameo = null;
 const toast = document.querySelector('#toast');
@@ -652,6 +654,10 @@ function update(dt) {
   for (let i = enemies.length - 1; i >= 0; i--) {
     if (!enemies[i].alive) enemies.splice(i, 1);
   }
+  if (playing && enemies.length !== lastEnemyCount) {
+    lastEnemyCount = enemies.length;
+    waveRemaining.textContent = lastEnemyCount ? `${lastEnemyCount} LEFT` : 'CLEAR';
+  }
   if (playing) waves.update(dt, enemies.length);
 
   const assistedTarget = aimAssist.target;
@@ -805,6 +811,7 @@ function endGame() {
   player.turnSpeed = 0;
   endScreen.classList.remove('hidden');
   document.querySelector('#end-title').textContent = 'WASTED';
+  document.querySelector('#end-score').textContent = score.toLocaleString();
   restartButton.textContent = 'PLAY AGAIN';
   leaderboard.submit(score, waves.current?.combatWave ?? 1);
   player.model.material.opacity = 1;

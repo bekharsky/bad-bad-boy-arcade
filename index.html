@@ -25,7 +25,7 @@
           </svg>
           <span class="spray-range" aria-hidden="true"><strong id="spray-range">0.9</strong><span>m</span></span>
         </div>
-        <div class="stat"><span class="stat-label" id="wave-stat-label">WAVE</span><strong id="wave">1</strong></div>
+        <div class="stat"><span class="stat-label" id="wave-stat-label">WAVE</span><strong id="wave">1</strong><span id="wave-remaining" class="wave-remaining"></span></div>
         <div class="stat"><span class="stat-label">SCORE</span><strong id="score">0000</strong></div>
       </header>
 
@@ -71,6 +71,7 @@
       <section id="end-screen" class="overlay hidden">
         <div class="card end-card">
           <h2 id="end-title">WASTED</h2>
+          <div class="end-result"><span>YOUR SCORE</span><strong id="end-score">0</strong></div>
           <div id="score-submit-status" class="score-submit-status" role="status"></div>
           <button id="retry-score" class="secondary-button" type="button" hidden>RETRY SCORE</button>
           <section class="leaderboard leaderboard-end" aria-labelledby="end-leaderboard-title">
