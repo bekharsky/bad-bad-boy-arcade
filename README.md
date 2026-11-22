@@ -2,7 +2,7 @@
 
 Bad Bad Boy is loose in Helsinki. Take the city's cheekiest sculpture through lively squares, waterfront streets and two fast runs, armed with a very personal spray attack.
 
-**[Play Bad Bad Boy Arcade](https://bekharsky.github.io/bad-bad-boy-arcade/)**
+**[Play Bad Bad Boy Arcade](https://bekharsky.github.io/piss-deal/)**
 
 ## The journey
 
@@ -27,4 +27,4 @@ In the running districts, left and right change lanes; up and down accelerate or
 
 ## Credits
 
-Inspired by Tommi Toija's *Bad Bad Boy* sculpture. See the [model and asset credits](./CREDITS.md) and the [in-game credits](https://bekharsky.github.io/bad-bad-boy-arcade/credits.html). The [working notes](./docs/gameplay-and-development-notes.md) describe the current game structure and development workflow.
+Inspired by Tommi Toija's *Bad Bad Boy* sculpture. See the [model and asset credits](./CREDITS.md) and the [in-game credits](https://bekharsky.github.io/piss-deal/credits.html). The [working notes](./docs/gameplay-and-development-notes.md) describe the current game structure and development workflow.
