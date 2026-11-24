@@ -17,14 +17,15 @@ export function createGullFlight({ random = Math.random, canStandAt = () => true
     phase: 'waiting', age: 0, nextJetHit: 0, target: null, drop: null,
   }));
   const birds = flock.slice(0, GULL_COUNT);
-  let time = 0, accumulator = 0, nextAttack = 6, nextBird = 0, runner = false;
+  let time = 0, accumulator = 0, nextAttack = 6, attackGrace = 0, nextBird = 0, runner = false;
   const previous = { x: 0, z: 0 };
 
-  function reset(player, running = false) {
+  function reset(player, running = false, { attackDelay = 0 } = {}) {
     runner = running;
     birds.splice(0, birds.length, ...flock.slice(0, runner ? runnerGullCount : GULL_COUNT));
     const biggerFlock = birds.length > GULL_COUNT;
-    time = accumulator = nextBird = 0; nextAttack = (biggerFlock ? 8 : 9) + random() * 2;
+    time = accumulator = nextBird = 0; nextAttack = (biggerFlock ? 8 : 9) + random() * 2 + attackDelay;
+    attackGrace = attackDelay ? nextAttack : 0;
     previous.x = player.x; previous.z = player.z;
     for (const bird of birds) {
       Object.assign(bird, { phase: 'waiting', age: 0, alive: false, nextJetHit: 0, target: null, drop: null, start: null, vx: 0, vy: 0, vz: 0,
@@ -182,7 +183,7 @@ export function createGullFlight({ random = Math.random, canStandAt = () => true
       // Only invisible staging relocates a bird; visible flight is continuous.
       if (bird.phase === 'approach' && bird.age === 0) bird.vx = bird.vy = bird.vz = 0;
     }
-    if (attacks && time >= nextAttack && !birds.some(b => b.target || b.drop)) {
+    if (attacks && time >= Math.max(nextAttack, attackGrace) && !birds.some(b => b.target || b.drop)) {
       const bird = birds[nextBird++ % birds.length];
       if (!bird.alive || bird.phase !== 'orbit' || bird.age < SETTLE_TIME || !launch(bird, player, velocity, scroll)) nextAttack = time + 1;
       else nextAttack = Infinity;

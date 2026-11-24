@@ -46,6 +46,7 @@ button { font: inherit; }
 
 .game-shell { position: relative; width: 100%; height: 100%; height: 100dvh; --control-bottom: max(32px, calc(env(safe-area-inset-bottom) + 20px)); overflow: hidden; touch-action: none; overscroll-behavior: none; background: radial-gradient(ellipse at 50% 35%, #29263a, #11131b 70%); }
 #game { display: block; width: 100%; height: 100%; outline: 0; touch-action: none; }
+.mouse-aim-enabled #game, .mouse-aim-enabled .joystick-zone { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='17' height='17' viewBox='0 0 17 17'%3E%3Cpath d='M8.5 2v4m0 5v4M2 8.5h4m5 0h4' stroke='%23111620' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='M8.5 2v4m0 5v4M2 8.5h4m5 0h4' stroke='%23fff2d6' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E") 8 8, crosshair; }
 .hero-hud { position: absolute; left: 0; top: 0; width: 64px; height: 7px; pointer-events: none; }
 .hero-power { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 4px; font-size: 13px; font-weight: 800; white-space: nowrap; color: #39ff14; text-shadow: 0 0 6px #39ff14aa; }
 
@@ -135,6 +136,9 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 900 clamp(52px, 8vw, 78px
 .runner-mode .end-card h2 { font-size: clamp(28px, 4.5vw, 48px); line-height: 1; }
 .toast { position: absolute; z-index: 3; top: 82px; left: 50%; transform: translate(-50%, -10px); padding: 9px 15px; border: 1px solid #ffffff20; border-radius: 999px; color: var(--gold); background: #181925df; font: 700 12px/1 "Barlow Condensed", sans-serif; letter-spacing: .12em; opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; }
 .toast.visible { transform: translate(-50%, 0); opacity: 1; }
+.spray-tutorial { position: absolute; z-index: 3; left: 50%; bottom: max(32px, calc(env(safe-area-inset-bottom) + 18px)); width: max-content; max-width: calc(100% - 32px); transform: translateX(-50%); padding: 10px 15px; border-radius: 8px; background: #121622ed; color: var(--ink); font: 700 14px/1.4 Inter, sans-serif; text-align: center; pointer-events: none; }
+.spray-tutorial:empty { opacity: 0; }
+.map-changing .spray-tutorial, .game-shell:has(#controls-dialog[open]) .spray-tutorial { visibility: hidden; }
 .mobile-controls { display: none; }
 .runner-start-hint { display: none; }
 .runner-mode .runner-start-hint { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; margin-top: 20px; color: var(--muted); font-size: 11px; letter-spacing: .08em; }
@@ -238,6 +242,7 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 900 clamp(52px, 8vw, 78px
 
 @media (pointer: coarse) {
   .start-controls, .controls-card .control-setting { display: none; }
+  .spray-tutorial { bottom: calc(var(--control-bottom) + 123px); }
 }
 
 @media (max-width: 380px) {

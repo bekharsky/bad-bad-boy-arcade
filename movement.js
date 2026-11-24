@@ -1,5 +1,3 @@
-const MANUAL_AIM_TURN_RATE = 3.2;
-
 function turnPlayer(player, targetSpeed, dt) {
   if (!targetSpeed) {
     player.turnSpeed = 0;
@@ -25,24 +23,14 @@ export function movePlayer(player, city, { keys, touch, mode, dt, firing, height
   if (touchStrength) mode = 'direct';
   const x = touchStrength ? touch.x : Number(keys.has('KeyD') || keys.has('ArrowRight')) - Number(keys.has('KeyA') || keys.has('ArrowLeft'));
   const z = touchStrength ? touch.z : Number(keys.has('KeyS') || keys.has('ArrowDown')) - Number(keys.has('KeyW') || keys.has('ArrowUp'));
-  const precise = keys.has('ShiftLeft') || keys.has('ShiftRight');
-  const maxSpeed = player.speed * (precise ? 0.4 : firing ? 0.7 : 1);
+  const mouseAiming = aimHeading !== null && !touchStrength;
+  const maxSpeed = player.speed * (firing ? 0.7 : 1);
   let throttle = 0;
 
-  if (mode === 'direct' && precise && !touchStrength) {
-    // Shift temporarily gives keyboard players continuous aim between the
-    // eight movement directions. Releasing it keeps the chosen angle.
-    turnPlayer(player, -x * MANUAL_AIM_TURN_RATE, dt);
-    player.targetHeading = player.heading;
-    player.moveX = Math.sin(player.heading);
-    player.moveZ = Math.cos(player.heading);
+  if (mode === 'tank') {
     throttle = -z;
-    if (!throttle) player.moveSpeed = 0;
-  } else if (mode === 'tank') {
-    throttle = -z;
-    const turnRate = (firing ? 1.7 : 3.2) * (precise ? .6 : 1);
-    if (aimHeading !== null && !x && !precise && !touchStrength) faceHeading(player, aimHeading, dt);
-    else turnPlayer(player, -x * turnRate, dt);
+    const turnRate = firing ? 1.7 : 3.2;
+    if (!mouseAiming) turnPlayer(player, -x * turnRate, dt);
     player.targetHeading = player.heading;
   } else {
     // Travel responds immediately; facing and aim ease toward the requested
@@ -54,12 +42,20 @@ export function movePlayer(player, city, { keys, touch, mode, dt, firing, height
       player.targetHeading = Math.atan2(x, z);
       throttle = Math.min(1, length);
     }
-    if (aimHeading !== null && !x && !z) player.targetHeading = aimHeading;
-    const requested = player.targetHeading ?? player.heading;
-    const target = resolveAim?.(requested, dt) ?? requested;
-    // Small corrections reach their exact angle in one frame. Larger turns
-    // stay smooth and finish in finite time instead of trailing the input.
-    faceHeading(player, target, dt, touchStrength ? 22 : 14);
+    if (!mouseAiming) {
+      const requested = player.targetHeading ?? player.heading;
+      const target = resolveAim?.(requested, dt) ?? requested;
+      if (firing && !touchStrength) {
+        player.heading = target;
+        player.turnSpeed = 0;
+      } else faceHeading(player, target, dt, touchStrength ? 22 : 14);
+    }
+  }
+
+  // Use the cursor's direction on the same simulation step that emits a shot.
+  if (mouseAiming) {
+    player.heading = player.targetHeading = aimHeading;
+    player.turnSpeed = 0;
   }
 
   player.heading = Math.atan2(Math.sin(player.heading), Math.cos(player.heading));

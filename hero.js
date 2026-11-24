@@ -69,15 +69,21 @@ export function createHero(scene) {
   return { mesh, emitter, legs };
 }
 
-export function animateHero(rig, time, strength) {
+export function animateHero(rig, time, strength, travelAngle = 0) {
+  const forward = Math.cos(travelAngle);
+  const sideways = Math.sin(travelAngle);
+  const kneeSwing = 1.08 - .65 * Math.abs(sideways);
   for (const leg of rig.legs) {
     const phase = time + leg.phaseOffset;
-    const hip = -0.72 * Math.sin(phase);
-    const knee = 0.08 + 1.08 * Math.max(0, Math.cos(phase - 0.15));
-    // All rotations use the lateral X axis: the legs swing forward/backward
-    // in the YZ plane, and the recovery leg folds at the knee.
+    const swing = Math.sin(phase);
+    const hip = -.72 * forward * swing;
+    const knee = .08 + kneeSwing * Math.max(0, Math.cos(phase - .15));
+    const outward = Math.sign(leg.hip.position.x);
+    const sideStep = .29 * sideways * swing + .12 * outward * Math.abs(sideways);
     leg.hip.rotation.x = hip * strength;
+    leg.hip.rotation.z = sideStep * strength;
     leg.knee.rotation.x = knee * strength;
     leg.ankle.rotation.x = (-(hip + knee) * 0.65 + 0.12 * Math.sin(phase - 0.5)) * strength;
+    leg.ankle.rotation.z = -.55 * sideStep * strength;
   }
 }

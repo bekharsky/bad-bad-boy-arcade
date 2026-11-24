@@ -26,7 +26,7 @@ export const harborMap = {
     [[-8, 18], [-5, 18], [-5, 16], [-7, 11], [-7.5, 7.5], [-9, 5]],
   ],
   pickups: {
-    sleigh: [{ x: -20, z: 7.5 }],
+    sleigh: [{ x: 24.4, z: 6.3 }],
     medkit: [{ x: 3.5, z: 9.5 }, ...courtyards.slice(0, 4).map(hiddenPoint)],
     battery: courtyards.slice(4).map(hiddenPoint),
   },

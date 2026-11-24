@@ -13,7 +13,7 @@ export function createArenaCombat({ world, player, enemies, animateEnemy, onBite
         const vx = player.x - enemy.x, vz = player.z - enemy.z;
         const distance = Math.hypot(vx, vz);
         const post = enemy.guardPost;
-        const returning = post && (Math.hypot(player.x - post.x, player.z - post.z) > 10.5
+        const returning = post && (Math.hypot(player.x - post.x, player.z - post.z) > (enemy.guardRange ?? 10.5)
           || !world.lineClear(post.x, post.z, player.x, player.z, .6));
         const away = running && distance > 0 ? (playerDeltaX * vx + playerDeltaZ * vz) / (travel * distance) : 0;
         // Retain some sprint through sideways movement at a corner. A stop or

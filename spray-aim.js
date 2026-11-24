@@ -1,4 +1,4 @@
-// E changes elevation only. Shift continues to belong to precision movement.
+// E changes spray elevation without changing horizontal aim.
 export const aimingUp = (keys, touch) => keys.has('KeyE') || !!touch.airborne;
 
 export function createSprayAim() {

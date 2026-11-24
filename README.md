@@ -21,7 +21,8 @@ The city is an affectionate arcade version of Helsinki: a ferry and cranes at th
 | | Desktop | Touchscreen |
 | --- | --- | --- |
 | Move and dodge | Arrow keys or WASD | Left joystick |
-| Spray | Space or mouse button; hold for more range | Right spray button; hold for more range |
+| Turn | In Direct, the hero faces the direction of travel. In Tank, left and right turn the hero. | In the direction of travel |
+| Spray | Press Space to spray forward, or left-click to spray at the crosshair. Tap for a short spray, or hold for more range. | Tap the right spray button, or hold for more range. |
 | Aim at seagulls | Hold E while spraying | Drag upward from the spray button |
 | Pause | Esc | Controls button |
 

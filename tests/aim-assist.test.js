@@ -90,14 +90,17 @@ test('assisted aim does not redirect movement or overwrite the requested directi
   assert.equal(player.dx, Math.sin(player.heading));
 });
 
-test('Tank and Shift fine aim bypass automatic targeting', () => {
-  for (const mode of ['direct', 'tank']) {
+test('Tank and mouse shots bypass automatic targeting', () => {
+  for (const [mode, keys, aimHeading, expectedDirection] of [
+    ['direct', ['ArrowRight'], -.8, -1],
+    ['tank', ['ArrowRight'], null, -1],
+  ]) {
     const player = { x: 0, z: 0, heading: 0, turnSpeed: 0, moveSpeed: 0, speed: 3.6, radius: .5, runTime: 0, root: { rotation: {} } };
     movePlayer(player, { move() {} }, {
-      keys: new Set(mode === 'direct' ? ['ShiftLeft', 'ArrowRight'] : ['ArrowRight']), touch: { x: 0, z: 0 },
-      mode, dt: 1 / 60, firing: true, height: 3.45,
+      keys: new Set(keys), touch: { x: 0, z: 0 },
+      mode, aimHeading, dt: 1 / 60, firing: true, height: 3.45,
       resolveAim() { assert.fail('Manual modes must not invoke automatic targeting'); }
     });
-    assert.ok(player.heading < 0);
+    assert.equal(Math.sign(player.heading), expectedDirection);
   }
 });

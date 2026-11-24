@@ -33,6 +33,7 @@ import { createRunnerFinishReward } from './runner/finish-reward.js';
 import { CAMEO_KINDS, isCameo } from './runner/cameo-roster.js';
 import { createSeagulls } from './seagulls.js';
 import { aimingUp, createSprayAim } from './spray-aim.js';
+import { createSprayTutorial } from './spray-tutorial.js';
 import { createLeaderboard } from './leaderboard.js';
 import { calculateDistrictScore, districtPaceSeconds } from './campaign-score.js';
 import { mountHolidayScreens } from './screen-ui.js';
@@ -40,6 +41,8 @@ import { mountHolidayScreens } from './screen-ui.js';
 // World metres; the hero keeps the same physical size across every map.
 const HERO_HEIGHT = 3.45;
 const HERO_SCALE = HERO_HEIGHT / HERO_BASE_HEIGHT;
+const TURN_KEYS = ['ArrowLeft', 'ArrowRight', 'KeyA', 'KeyD'];
+const MOVE_KEYS = [...TURN_KEYS, 'ArrowUp', 'ArrowDown', 'KeyW', 'KeyS'];
 const keys = new Set();
 let controlMode = 'tank';
 const coarsePointer = window.matchMedia('(pointer: coarse)').matches;
@@ -88,6 +91,7 @@ const beginSearch = document.querySelector('#begin-search');
 const passerbyCard = document.querySelector('.passerby');
 let shownCameo = null;
 const toast = document.querySelector('#toast');
+const sprayTutorial = createSprayTutorial(document.querySelector('#spray-tutorial'));
 const sprayButton = document.querySelector('#mobile-fire');
 const controlsDialog = document.querySelector('#controls-dialog');
 const settingsButton = document.querySelector('#open-settings');
@@ -97,22 +101,16 @@ const soundSetting = document.querySelector('#sound-setting');
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const query = new URLSearchParams(window.location.search);
 const debugMaps = query.get('debug') === 'maps';
-const mouseSupported = typeof canvas.requestPointerLock === 'function' && window.matchMedia('(any-pointer: fine)').matches;
+const mouseSupported = window.matchMedia('(any-pointer: fine)').matches;
 const aimRay = new THREE.Raycaster();
 const aimScreen = new THREE.Vector2();
 const aimPoint = new THREE.Vector3();
 const aimGround = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-let lastMouseUnlock = -Infinity;
-let mouseCaptureFailed = false;
-const mouseAim = createMouseAim({
-  canvas,
-  getInitialPosition: aimCursorPosition,
-  onUnlock() {
-    lastMouseUnlock = performance.now();
-    if (playing && !gameInterlude()) openSettings();
-  },
-  onError() { mouseCaptureFailed = true; }
-});
+const aimTargetBounds = new THREE.Sphere();
+const aimTargetHit = new THREE.Vector3();
+const gullPoint = new THREE.Vector3();
+const gullScreen = new THREE.Vector3();
+const mouseAim = createMouseAim({ canvas });
 const touchControls = createTouchControls({
   zone: document.querySelector('#joystick-zone'),
   stick: document.querySelector('#joystick'),
@@ -208,8 +206,10 @@ const player = {
   powerTimer: 0,
   fireTimer: 0,
   tapTimer: 0,
+  mouseTap: false,
   runTime: 0,
-  runBlend: 0
+  runBlend: 0,
+  runAngle: 0,
 };
 player.root.add(player.body);
 player.root.position.set(player.x, 0, player.z);
@@ -401,7 +401,6 @@ if (debugMaps) {
         itinerary = mapOrder(map.id);
         if (controlsDialog.open) controlsDialog.close();
         startGame();
-        requestMouseAim();
       });
       picker.append(button);
     }
@@ -451,6 +450,7 @@ function makeEnemy(x, z, level, guardPost = null) {
   enemy.root.position.set(x, 0, z);
   scene.add(enemy.root);
   enemies.push(enemy);
+  return enemy;
 }
 
 function removeEnemyByTram(enemy) {
@@ -475,6 +475,7 @@ function collectSleighPart() {
   updateSleighProgress();
   updateScore();
   setLevelProgress(1);
+  sprayTutorial.reset();
   sleighAssembly.start(levelIndex, reducedMotion.matches, award);
   gameShell.classList.add('sleigh-assembling');
   resetInput();
@@ -492,6 +493,7 @@ function finishSleighAssembly() {
 
 function enterDistrict({ index }) {
   const district = itinerary[index];
+  const openingHarbor = index === 0 && district.id === 'harbor';
   const changedMap = world.activate(district.id);
   levelIndex = index;
   searchTime = geeseDefeated = healthLost = 0;
@@ -505,8 +507,9 @@ function enterDistrict({ index }) {
   updateHealth();
   world.reset();
   placePlayerAtSpawn();
+  sprayTutorial.reset(openingHarbor);
   arenaCameos.reset(camera.position);
-  seagulls.reset(player, isRunner());
+  seagulls.reset(player, isRunner(), { attackDelay: openingHarbor ? 6 : 0 });
   medkits.reset(player);
   syncLevelUI();
   if (isRunner()) {
@@ -518,11 +521,23 @@ function enterDistrict({ index }) {
     if (!cache) throw new Error(`Missing reachable sleigh part in ${district.id}`);
     sleighCache.place(cache, index);
     const strength = itinerary.slice(0, index + 1).filter(map => map.mode !== 'runner').length;
-    for (const post of sleighGuardPosts(world, cache)) makeEnemy(post.x, post.z, strength, post);
-    const openingArena = strength === 1;
-    spawnEnemies(player, openingArena ? 4 : 5 + strength, strength, openingArena
-      ? { minPlayerDistance: 10.5, ringStart: 10.5 } : undefined);
-    spawnEnemies(cache, openingArena ? 3 : 6, strength, { minPlayerDistance: openingArena ? 11 : 8 });
+    const posts = sleighGuardPosts(world, cache);
+    for (const post of openingHarbor ? posts.slice(0, 4) : posts) makeEnemy(post.x, post.z, strength, post);
+    if (openingHarbor) {
+      // Give the player one easy target in the plaza. It stays at its post until approached.
+      const post = world.pickupPoint({ x: 0, z: 4.5 }, .65);
+      if (post) {
+        const goose = makeEnemy(post.x, post.z, strength, post);
+        goose.guardRange = 4.5;
+        goose.hp = 1;
+        goose.speed *= .8;
+      }
+    } else {
+      const openingArena = strength === 1;
+      spawnEnemies(player, openingArena ? 4 : 5 + strength, strength, openingArena
+        ? { minPlayerDistance: 10.5, ringStart: 10.5 } : undefined);
+      spawnEnemies(cache, openingArena ? 3 : 6, strength, { minPlayerDistance: openingArena ? 11 : 8 });
+    }
   }
   if (changedMap && renderingReady) {
     prepareGraphics().catch(error => {
@@ -597,44 +612,50 @@ function blip(frequency, duration) {
 }
 
 function updateMovement(dt, firing) {
-  if (keyboardSteering() || touchControls.input.x || touchControls.input.z) mouseAim.resetAim();
   const mode = usingTouchControls ? 'direct' : controlMode;
-  const assisted = mode === 'direct' && aimAssistEnabled && firing && !aimingUp(keys, touchControls.input) && !mouseAim.aiming && !keys.has('ShiftLeft') && !keys.has('ShiftRight');
-  if (!assisted) resetAimAssist();
-  return movePlayer(player, world, {
+  const mouseFiring = keys.has('Fire') || (player.mouseTap && player.tapTimer > 0);
+  const assisted = mode === 'direct' && aimAssistEnabled && firing && !aimingUp(keys, touchControls.input);
+  let assistUsed = false;
+  const moving = movePlayer(player, world, {
     keys, touch: touchControls.input, mode, dt, firing, height: HERO_HEIGHT,
-    resolveAim: assisted ? resolveAssistedHeading : null,
-    aimHeading: mouseHeading()
+    resolveAim: assisted ? (heading, step) => {
+      assistUsed = true;
+      return resolveAssistedHeading(heading, step);
+    } : null,
+    aimHeading: mouseFiring ? mouseHeading() : null,
   });
-}
-
-function keyboardSteering() {
-  return keys.has('ArrowLeft') || keys.has('ArrowRight') || keys.has('KeyA') || keys.has('KeyD')
-    || keys.has('ShiftLeft') || keys.has('ShiftRight')
-    || (controlMode === 'direct' && (keys.has('ArrowUp') || keys.has('ArrowDown') || keys.has('KeyW') || keys.has('KeyS')));
-}
-
-function aimCursorPosition() {
-  aimPoint.set(player.x + Math.sin(player.heading) * 4, 0, player.z + Math.cos(player.heading) * 4).project(camera);
-  return { x: (aimPoint.x + 1) * canvas.clientWidth / 2, y: (1 - aimPoint.y) * canvas.clientHeight / 2 };
+  if (!assistUsed) resetAimAssist();
+  return moving;
 }
 
 function mouseHeading() {
   if (!mouseAim.aiming) return null;
-  aimScreen.set(mouseAim.position.x / canvas.clientWidth * 2 - 1, 1 - mouseAim.position.y / canvas.clientHeight * 2);
+  aimScreen.set(mouseAim.position.x * 2 - 1, 1 - mouseAim.position.y * 2);
   aimRay.setFromCamera(aimScreen, camera);
-  if (!aimRay.ray.intersectPlane(aimGround, aimPoint)) return player.heading;
+  const { ray } = aimRay;
+  const ground = ray.intersectPlane(aimGround, aimPoint);
+  let closest = ground ? ray.origin.distanceToSquared(ground) : Infinity;
+  // A goose under the crosshair is above the ground plane. Use its hitbox
+  // so a click on its body aims at the goose rather than the pavement behind it.
+  for (const enemy of enemies) {
+    if (!enemy.alive) continue;
+    aimTargetBounds.center.set(enemy.x, enemy.hitHeight, enemy.z);
+    aimTargetBounds.radius = enemy.size;
+    if (!ray.intersectSphere(aimTargetBounds, aimTargetHit)) continue;
+    const distance = ray.origin.distanceToSquared(aimTargetHit);
+    if (distance >= closest || !world.lineClear3D(ray.origin, aimTargetHit, .04)) continue;
+    closest = distance;
+    aimPoint.copy(aimTargetBounds.center);
+  }
+  if (closest === Infinity) ray.at(camera.far, aimPoint);
   const dx = aimPoint.x - player.x, dz = aimPoint.z - player.z;
   return dx * dx + dz * dz > .01 ? Math.atan2(dx, dz) : player.heading;
 }
 
 function syncMouseAim() {
-  mouseAim.setEnabled(mouseSupported && mouseAimEnabled && !usingTouchControls && playing && !controlsDialog.open && !isRunner() && !gameInterlude());
-}
-
-function requestMouseAim() {
-  syncMouseAim();
-  if (!mouseCaptureFailed) mouseAim.request();
+  const enabled = mouseSupported && mouseAimEnabled && !usingTouchControls && playing && !controlsDialog.open && !isRunner() && !gameInterlude();
+  mouseAim.setEnabled(enabled);
+  gameShell.classList.toggle('mouse-aim-enabled', enabled);
 }
 
 function resolveAssistedHeading(heading, dt) {
@@ -678,10 +699,6 @@ function update(dt) {
   const firing = keys.has('Space') || keys.has('Fire') || touchControls.input.firing || player.tapTimer > 0;
   const oldX = player.x, oldZ = player.z;
   const moving = updateMovement(dt, firing);
-  if (mouseAim.locked && !mouseAim.aiming) {
-    const cursor = aimCursorPosition();
-    mouseAim.setPosition(cursor.x, cursor.y);
-  }
 
   player.root.position.set(player.x, 0, player.z);
   arenaCameos.update(dt, player, camera.position);
@@ -689,11 +706,15 @@ function update(dt) {
     && !actor.fleeing && Math.hypot(actor.x - player.x, actor.z - player.z) < 4.2);
   showCameo(follower?.kind ?? null);
   if (sleighCache.update(gameTime, player, reducedMotion.matches)) { collectSleighPart(); return; }
+  if (moving) player.runAngle = usingTouchControls || controlMode === 'direct'
+    ? Math.atan2(player.x - oldX, player.z - oldZ) - player.heading
+    : 0;
   player.runBlend = THREE.MathUtils.damp(player.runBlend, moving ? 1 : 0, 18, dt);
   player.body.position.y = (Math.abs(Math.sin(player.runTime)) * 0.035 * player.runBlend + Math.sin(gameTime * 1.5) * 0.008 * (1 - player.runBlend)) * HERO_SCALE;
-  player.body.rotation.z = Math.cos(player.runTime) * 0.025 * player.runBlend;
-  player.body.rotation.x = 0.07 * player.runBlend * THREE.MathUtils.clamp(player.moveSpeed / player.speed, -1, 1);
-  animateHero(player.rig, player.runTime, player.runBlend);
+  const stride = player.runBlend * THREE.MathUtils.clamp(player.moveSpeed / player.speed, -1, 1);
+  player.body.rotation.z = Math.cos(player.runTime) * 0.025 * player.runBlend - Math.sin(player.runAngle) * .06 * stride;
+  player.body.rotation.x = 0.07 * Math.cos(player.runAngle) * stride;
+  animateHero(player.rig, player.runTime, player.runBlend, player.runAngle);
   medkits.update(dt, player, collectMedkit);
   batteries.update(dt, player, collectBattery);
 
@@ -701,6 +722,9 @@ function update(dt) {
   // Each parcel starts at the hands, then follows its own ballistic trajectory.
   seagulls.update(dt, player);
   if (!playing) return;
+  sprayTutorial.update(dt, {
+    touch: usingTouchControls, mouse: mouseAim.enabled, firing, airborne: aimingUp(keys, touchControls.input), gullVisible: nearbyGullVisible,
+  });
   const spray = updateSpray(dt, firing, enemies, player.powerTimer > 0);
   player.powerTimer = Math.max(0, player.powerTimer - dt);
   updateSprayFeedback(spray);
@@ -727,6 +751,16 @@ function update(dt) {
   }
   // Pan with a fixed viewing angle so movement does not swing the aiming view.
   cameraRig.frame(player.x, player.z, dt);
+}
+
+function nearbyGullVisible() {
+  return seagulls.birds.some(bird => {
+    if (!bird.alive || Math.hypot(bird.x - player.x, bird.z - player.z) > 18) return false;
+    gullPoint.set(bird.x, bird.hitHeight, bird.z);
+    gullScreen.copy(gullPoint).project(camera);
+    return Math.abs(gullScreen.x) < 1 && Math.abs(gullScreen.y) < 1 && Math.abs(gullScreen.z) < 1
+      && world.lineClear3D(camera.position, gullPoint, .1);
+  });
 }
 
 function updateSpray(dt, firing, groundTargets, powered = false) {
@@ -849,6 +883,7 @@ function placePlayerAtSpawn() {
   player.turnSpeed = 0;
   player.runTime = 0;
   player.runBlend = 0;
+  player.runAngle = 0;
   player.fireTimer = 0;
   player.root.rotation.y = player.heading;
   player.root.position.set(player.x, 0, player.z);
@@ -869,7 +904,7 @@ function frameMenuPreview() {
 function playFromMenu() {
   if (!player.model || !renderingReady || intro || !missionScreen.hidden) return;
   if (introSeen || debugMaps || query.has('map')) {
-    startGame(); requestMouseAim();
+    startGame();
     return;
   }
   introSeen = true;
@@ -905,7 +940,6 @@ function startGame({ transition = false } = {}) {
   sleighAssembly.clear();
   gameShell.classList.remove('sleigh-assembling');
   mapTransition.cancel(); finishMapTransition();
-  mouseCaptureFailed = false;
   bankedScore = 0;
   updateScore();
   foundParts = 0;
@@ -924,6 +958,7 @@ function startGame({ transition = false } = {}) {
 
 function clearArena() {
   resetInput();
+  sprayTutorial.reset();
   clearTimeout(showToast.timer);
   toast.classList.remove('visible');
   stream.clear();
@@ -943,6 +978,7 @@ function clearArena() {
 
 function endGame(won = false) {
   showCameo(null);
+  sprayTutorial.reset();
   updateScore();
   playing = false;
   syncMouseAim();
@@ -992,13 +1028,15 @@ function animate(now) {
   updateHeroHp();
 }
 
-function beginSpray() {
+function beginSpray(mouse = false) {
   if (gameInterlude()) return;
   player.tapTimer = 0.075;
+  player.mouseTap = mouse;
   stream.resetPressure();
 }
 
 function resetInput() {
+  arenaInput.reset();
   runnerInput.reset();
   runnerSession.resetInput();
   resetAimAssist();
@@ -1006,6 +1044,7 @@ function resetInput() {
   keys.clear();
   touchControls.reset();
   player.tapTimer = 0;
+  player.mouseTap = false;
   player.moveSpeed = 0;
   player.turnSpeed = 0;
   player.targetHeading = player.heading;
@@ -1031,7 +1070,6 @@ function syncControlMode() {
 for (const checkbox of document.querySelectorAll('[data-mouse-aim]')) {
   checkbox.addEventListener('change', () => {
     mouseAimEnabled = checkbox.checked;
-    mouseCaptureFailed = false;
     try { localStorage.setItem('golden-blast-mouse-aim', String(mouseAimEnabled)); } catch { /* Storage is optional. */ }
     resetInput();
     syncControlMode();
@@ -1074,11 +1112,6 @@ controlsDialog.addEventListener('close', () => {
 controlsDialog.querySelector('form').addEventListener('submit', event => {
   event.preventDefault();
   controlsDialog.close();
-  resetInput();
-  if (playing) {
-    canvas.focus({ preventScroll: true });
-    requestMouseAim();
-  }
 });
 
 window.addEventListener('keydown', (event) => {
@@ -1098,7 +1131,6 @@ window.addEventListener('keydown', (event) => {
   }
   if (event.code === 'Escape' && playing) {
     event.preventDefault();
-    if (performance.now() - lastMouseUnlock < 200) return;
     if (!event.repeat) {
       if (controlsDialog.open) controlsDialog.close();
       else openSettings();
@@ -1115,10 +1147,10 @@ window.addEventListener('keydown', (event) => {
     if (!event.repeat) runnerSession.dodge(event.code === 'ArrowLeft' || event.code === 'KeyA' ? -1 : 1);
     return;
   }
-  if (!mouseAim.locked && event.target instanceof Element && event.target.closest('select, input')) return;
+  if (event.target instanceof Element && event.target.closest('select, input')) return;
   if (!playing && event.target instanceof Element && event.target.closest('button, a')) return;
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code)) event.preventDefault();
-  if (usingTouchControls && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyE', 'ShiftLeft', 'ShiftRight'].includes(event.code)) {
+  if (usingTouchControls && (MOVE_KEYS.includes(event.code) || event.code === 'KeyE')) {
     usingTouchControls = false;
     syncControlMode();
   }
@@ -1132,14 +1164,14 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) { resetInput(); if (playing) openSettings(); }
 });
 window.addEventListener('resize', resize);
-bindGameInput({
+const arenaInput = bindGameInput({
   canvas,
   movementZone: document.querySelector('#joystick-zone'),
   movementHandle: document.querySelector('.joystick-hint'),
   canInteract: () => playing && !controlsDialog.open && !isRunner() && !gameInterlude(),
   setFiring: firing => firing ? keys.add('Fire') : keys.delete('Fire'),
   beginSpray,
-  requestMouseAim,
+  pointMouseAim: mouseAim.point,
 });
 startButton.addEventListener('click', playFromMenu);
 skipIntro.addEventListener('click', () => {
@@ -1152,7 +1184,7 @@ startOver.addEventListener('click', () => {
   startGame({ transition: true });
 });
 restartButton.addEventListener('click', () => {
-  startGame(); requestMouseAim();
+  startGame();
 });
 soundSetting.checked = soundEnabled;
 soundSetting.addEventListener('change', () => {

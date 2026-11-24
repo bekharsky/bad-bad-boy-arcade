@@ -84,9 +84,9 @@ export function createSeagulls(scene, world, callbacks = {}) {
 
   return {
     birds: flight.birds,
-    reset(player, runner) {
+    reset(player, runner, options) {
       time = 0;
-      flight.reset(player, runner);
+      flight.reset(player, runner, options);
       for (const { bird, shadow, marker, drop } of models.slice(flight.birds.length)) {
         bird.visible = shadow.visible = marker.visible = drop.visible = false;
       }

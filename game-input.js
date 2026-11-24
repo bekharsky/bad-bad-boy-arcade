@@ -1,36 +1,52 @@
-// Pointer lock is an optional aiming helper, never a requirement for input.
-export function bindGameInput({ canvas, movementZone, movementHandle, canInteract, setFiring, beginSpray, requestMouseAim }) {
+const FIRE_BUTTON = 1;
+
+export function bindGameInput({ canvas, movementZone, movementHandle, canInteract, setFiring, beginSpray, pointMouseAim }) {
+  let firing = false;
+
   function focusGame() {
     if (canInteract()) canvas.focus({ preventScroll: true });
   }
 
-  // The virtual joystick prevents the pointer's default action. Explicitly
-  // focus the game even when a control rather than the canvas gets the click.
-  function spray(event) {
-    if (event.pointerType !== 'mouse' || event.button !== 0 || !canInteract()) return;
-    event.preventDefault();
-    focusGame();
-    setFiring(true);
-    beginSpray();
-    requestMouseAim();
+  function onPlayfield(event) {
+    if (event.target === canvas) return true;
+    if (event.target !== movementZone) return false;
+    const handle = movementHandle?.getBoundingClientRect();
+    return !handle || event.clientX < handle.left || event.clientX > handle.right || event.clientY < handle.top || event.clientY > handle.bottom;
   }
+
+  function reset() {
+    if (!firing) return;
+    firing = false;
+    setFiring(false);
+  }
+
   window.addEventListener('pointerdown', event => {
     focusGame();
-    if (!canInteract() || event.target !== movementZone || event.pointerType !== 'mouse' || event.button !== 0) return;
-    const handle = movementHandle?.getBoundingClientRect();
-    const onHandle = handle && event.clientX >= handle.left && event.clientX <= handle.right && event.clientY >= handle.top && event.clientY <= handle.bottom;
-    if (onHandle) return;
-    // The transparent touch zone covers most of the left-hand playfield.
-    // Keep mouse clicks there as shots; mouse dragging from the visible joystick still steers.
-    event.stopPropagation();
-    spray(event);
+    if (event.pointerType !== 'mouse' || event.button !== 0 || !canInteract() || !onPlayfield(event)) return;
+    event.preventDefault();
+    // The transparent joystick zone covers part of the playfield.
+    if (event.target === movementZone) event.stopPropagation();
+    pointMouseAim(event);
+    firing = true;
+    setFiring(true);
+    beginSpray(true);
   }, true);
   window.addEventListener('focus', focusGame);
-  canvas.addEventListener('pointerdown', spray);
+  window.addEventListener('pointermove', event => {
+    // With another mouse button held, releasing left may arrive as pointermove.
+    if (firing && event.pointerType === 'mouse' && !(event.buttons & FIRE_BUTTON)) reset();
+  });
+  window.addEventListener('contextmenu', event => {
+    if (canInteract() && onPlayfield(event)) event.preventDefault();
+  });
   for (const name of ['pointerup', 'pointercancel']) {
     window.addEventListener(name, event => {
-      if (event.pointerType === 'mouse') setFiring(false);
+      if (event.pointerType === 'mouse') reset();
     });
   }
-  window.addEventListener('blur', () => setFiring(false));
+  window.addEventListener('pointerout', event => {
+    if (event.pointerType === 'mouse' && !event.relatedTarget) reset();
+  });
+  window.addEventListener('blur', reset);
+  return { reset };
 }

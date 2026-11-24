@@ -82,6 +82,21 @@ test('blocked ground or a roof prevents attacks through scenery', () => {
   }
 });
 
+test('an opening grace period delays attacks while gulls still arrive on schedule', () => {
+  const { flight, player, impacts, advance } = setup(.1);
+  flight.reset(player, false, { attackDelay: 6 });
+  advance(7);
+  assert.equal(flight.birds[0].phase, 'orbit');
+  advance(7);
+  assert.ok(flight.birds.every(bird => !bird.target));
+  assert.equal(impacts.length, 0);
+  advance(5);
+  assert.ok(impacts.some(hit => hit.hit));
+  flight.reset(player);
+  advance(10);
+  assert.ok(flight.birds.some(bird => bird.target), 'A later district gets its usual timing');
+});
+
 test('fixed-step flight and attacks agree across frame rates; idle updates consume no game time', () => {
   const run = fps => {
     const { flight, player, impacts } = setup(.1, true);

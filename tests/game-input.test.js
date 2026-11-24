@@ -6,52 +6,46 @@ import { createMouseAim } from '../mouse-aim.js';
 function pointer(surface, type, target = surface, properties = {}) {
   const event = new Event(type, { cancelable: true });
   Object.defineProperty(event, 'target', { value: target });
-  Object.assign(event, { pointerType: 'mouse', button: 0, clientX: 200, clientY: 300, ...properties });
+  Object.assign(event, { pointerType: 'mouse', button: 0, buttons: type === 'pointerdown' ? 1 : 0, clientX: 200, clientY: 300, ...properties });
   surface.dispatchEvent(event);
   return event;
 }
 
-function setup({ capture = false } = {}) {
+function setup({ aiming = false } = {}) {
   globalThis.window = new EventTarget();
   globalThis.document = new EventTarget();
   const canvas = new EventTarget();
-  canvas.clientWidth = 600;
-  canvas.clientHeight = 800;
+  canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: 600, height: 800 });
   canvas.focus = () => { document.activeElement = canvas; };
-  canvas.requestPointerLock = () => Promise.reject(new Error('Not supported in this webview'));
   const movementZone = {};
   const movementHandle = { getBoundingClientRect: () => ({ left: 24, right: 112, top: 680, bottom: 768 }) };
-  let interactive = true, firing = false, bursts = 0, errors = 0;
-  const mouseAim = createMouseAim({
-    canvas,
-    getInitialPosition: () => ({ x: 300, y: 400 }),
-    onUnlock() {}, onError() { errors++; }
-  });
-  mouseAim.setEnabled(capture);
-  bindGameInput({
+  let interactive = true, firing = false, bursts = 0, shotAim, mouseShot;
+  const mouseAim = createMouseAim({ canvas });
+  mouseAim.setEnabled(aiming);
+  const input = bindGameInput({
     canvas, movementZone, movementHandle,
     canInteract: () => interactive,
     setFiring: value => { firing = value; },
-    beginSpray: () => { bursts++; },
-    requestMouseAim: () => mouseAim.request(),
+    beginSpray: mouse => { bursts++; mouseShot = mouse; shotAim = mouseAim.aiming ? { ...mouseAim.position } : null; },
+    pointMouseAim: mouseAim.point,
   });
   return {
     canvas, movementZone,
+    reset: input.reset,
     setInteractive(value) { interactive = value; },
-    firing: () => firing, bursts: () => bursts, errors: () => errors,
+    firing: () => firing, bursts: () => bursts, shotAim: () => shotAim, mouseShot: () => mouseShot,
   };
 }
 
-test('a primary mouse click fires on its first press even when pointer lock is rejected', async () => {
-  const game = setup({ capture: true });
+test('the first mouse press updates the heading before emitting a spray', () => {
+  const game = setup({ aiming: true });
   document.activeElement = { tagName: 'BUTTON' };
-  const press = pointer(game.canvas, 'pointerdown');
+  const press = pointer(window, 'pointerdown', game.canvas);
   assert.equal(press.defaultPrevented, true, 'Default pointer focus must not undo the explicit canvas focus');
   assert.equal(game.firing(), true);
   assert.equal(game.bursts(), 1);
-  await Promise.resolve();
-  assert.equal(game.errors(), 1);
-  assert.equal(game.firing(), true, 'Aiming-helper failure must not cancel the shot');
+  assert.deepEqual(game.shotAim(), { x: 1 / 3, y: .375 });
+  assert.equal(game.mouseShot(), true);
   assert.equal(document.activeElement, game.canvas);
   pointer(window, 'pointerup');
   assert.equal(game.firing(), false);
@@ -90,7 +84,7 @@ test('returning focus or pressing a screen control restores keyboard focus only 
   document.activeElement = settingsInput;
   window.dispatchEvent(new Event('focus'));
   pointer(window, 'pointerdown', settingsInput, { pointerType: 'touch' });
-  pointer(game.canvas, 'pointerdown');
+  pointer(window, 'pointerdown', game.canvas);
   assert.equal(document.activeElement, settingsInput, 'Settings and title-screen controls keep their focus');
   assert.equal(game.bursts(), 0);
   game.setInteractive(true);
@@ -98,15 +92,40 @@ test('returning focus or pressing a screen control restores keyboard focus only 
   assert.equal(document.activeElement, game.canvas);
 });
 
-test('right clicks do not fire, and release, cancellation and blur never leave a stuck spray', () => {
+test('right clicks do not fire, and release, cancellation and exit never leave a stuck spray', () => {
   const game = setup();
-  pointer(game.canvas, 'pointerdown', game.canvas, { button: 2 });
+  pointer(window, 'pointerdown', game.canvas, { button: 2, buttons: 2 });
   assert.equal(game.bursts(), 0);
-  for (const name of ['pointerup', 'pointercancel', 'blur']) {
-    pointer(game.canvas, 'pointerdown');
+  for (const name of ['pointerup', 'pointercancel', 'pointerout', 'blur']) {
+    pointer(window, 'pointerdown', game.canvas);
     assert.equal(game.firing(), true);
     if (name === 'blur') window.dispatchEvent(new Event('blur'));
     else pointer(window, name);
     assert.equal(game.firing(), false);
   }
+});
+
+test('secondary buttons on the map do not trigger gameplay or open the browser menu', () => {
+  const game = setup({ aiming: true });
+  for (const [button, buttons] of [[2, 2], [1, 4]]) {
+    pointer(window, 'pointerdown', game.movementZone, { button, buttons });
+    assert.equal(game.firing(), false);
+    assert.equal(game.bursts(), 0);
+  }
+  assert.equal(pointer(window, 'contextmenu', game.movementZone).defaultPrevented, true);
+});
+
+test('a held spray ends on left-button release or gameplay reset', () => {
+  const game = setup({ aiming: true });
+  pointer(window, 'pointerdown', game.canvas);
+  pointer(window, 'pointermove', game.canvas, { buttons: 3 });
+  assert.equal(game.firing(), true);
+  assert.equal(game.bursts(), 1);
+  pointer(window, 'pointermove', game.canvas, { buttons: 2 });
+  assert.equal(game.firing(), false);
+  pointer(window, 'pointerdown', game.canvas);
+  game.reset();
+  pointer(window, 'pointermove', game.canvas, { buttons: 1 });
+  assert.equal(game.firing(), false);
+  assert.equal(game.bursts(), 2);
 });
