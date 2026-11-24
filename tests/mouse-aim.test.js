@@ -16,13 +16,13 @@ function setup() {
   return { aim, move };
 }
 
-test('hover tracks the real cursor before firing without a pointer lock', () => {
+test('mouse steering starts with the pointer position already available in the menu', () => {
   const { aim, move } = setup();
   move(440, 170);
   assert.equal(aim.aiming, false);
   aim.setEnabled(true);
-  move(440, 170);
   assert.equal(aim.aiming, true);
+  assert.equal(aim.following, true);
   assert.deepEqual(aim.position, { x: .5, y: .25 });
   move(441, 171);
   assert.deepEqual(aim.position, { x: .50125, y: 151 / 600 });
@@ -50,22 +50,40 @@ test('aim clears when the pointer leaves the playfield or the game loses focus',
   Object.assign(exit, { pointerType: 'mouse', relatedTarget: null });
   window.dispatchEvent(exit);
   assert.equal(aim.aiming, false);
-  for (const type of ['blur', 'resize']) {
-    move(640, 470);
-    window.dispatchEvent(new Event(type));
-    assert.equal(aim.aiming, false);
-  }
+  move(640, 470);
+  window.dispatchEvent(new Event('blur'));
+  assert.equal(aim.aiming, false);
+  assert.equal(aim.following, true);
 });
 
-test('pausing clears the target and a later mouse point can take over again', () => {
+test('resuming restores mouse steering with the pointer position from the pause menu', () => {
   const { aim, move } = setup();
   aim.setEnabled(true);
   move(440, 170);
+  aim.yieldToKeyboard();
   aim.setEnabled(false);
   move(640, 470);
-  aim.setEnabled(true);
   assert.equal(aim.aiming, false);
-  aim.point({ pointerType: 'mouse', clientX: 640, clientY: 470 });
+  aim.resetSteering();
+  window.dispatchEvent(new Event('resize'));
+  aim.setEnabled(true);
   assert.deepEqual(aim.position, { x: .75, y: .75 });
   assert.equal(aim.aiming, true);
+  assert.equal(aim.following, true);
+});
+
+test('keyboard steering stops following until the mouse actually moves again', () => {
+  const { aim, move } = setup();
+  aim.setEnabled(true);
+  move(440, 170);
+  assert.equal(aim.following, true);
+  aim.yieldToKeyboard();
+  move(440, 170);
+  assert.equal(aim.following, false);
+  assert.equal(aim.aiming, true, 'A held mouse shot can still use the current position');
+  move(441, 170);
+  assert.equal(aim.following, true);
+  move(39, 170);
+  assert.equal(aim.aiming, false);
+  assert.equal(aim.following, true, 'Keep steering forward on the last heading after exiting');
 });

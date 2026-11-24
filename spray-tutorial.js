@@ -1,21 +1,24 @@
 const MIN_VISIBLE_TIME = 3;
 const HINTS = {
   ground: {
-    mouse: 'Left-click to spray at the crosshair. Space sprays forward. Hold for more range.',
+    mouse: 'Move the mouse to aim. Left-click or press Space to spray. Hold for more range.',
     desktop: 'Press Space to spray forward. Hold for more range.',
     touch: 'Tap the spray button. Hold for more range.',
   },
   gull: {
-    desktop: 'Seagull! Hold E while spraying to aim up.',
-    touch: 'Seagull! Hold the spray button and drag up.',
+    desktop: 'Hold E + fire',
+    touch: 'Drag spray up',
   },
 };
 
-export function createSprayTutorial(element) {
+export function createSprayTutorial(ground, gull) {
   let stage = null, elapsed = 0, used = false;
 
   function show(message) {
-    if (element.textContent !== message) element.textContent = message;
+    const groundMessage = stage === 'ground' ? message : '';
+    const gullMessage = stage === 'gull' ? message : '';
+    if (ground.textContent !== groundMessage) ground.textContent = groundMessage;
+    if (gull.textContent !== gullMessage) gull.textContent = gullMessage;
   }
 
   return {

@@ -23,7 +23,6 @@ import { createBurstEffects } from './burst-effects.js';
 import { createMedkits } from './medkits.js';
 import { createTouchControls } from './touch-controls.js';
 import { movePlayer } from './movement.js';
-import { createAimAssist } from './aim-assist.js';
 import { createMouseAim } from './mouse-aim.js';
 import { bindGameInput } from './game-input.js';
 import { preventGameZoom } from './gesture-guard.js';
@@ -41,20 +40,14 @@ import { mountHolidayScreens } from './screen-ui.js';
 // World metres; the hero keeps the same physical size across every map.
 const HERO_HEIGHT = 3.45;
 const HERO_SCALE = HERO_HEIGHT / HERO_BASE_HEIGHT;
-const TURN_KEYS = ['ArrowLeft', 'ArrowRight', 'KeyA', 'KeyD'];
-const MOVE_KEYS = [...TURN_KEYS, 'ArrowUp', 'ArrowDown', 'KeyW', 'KeyS'];
+const TURN_KEYS = ['ArrowLeft', 'ArrowRight'];
+const RUNNER_DODGE_KEYS = [...TURN_KEYS, 'KeyA', 'KeyD'];
+const MOVE_KEYS = [...RUNNER_DODGE_KEYS, 'ArrowUp', 'ArrowDown', 'KeyW', 'KeyS'];
 const keys = new Set();
-let controlMode = 'tank';
 const coarsePointer = window.matchMedia('(pointer: coarse)').matches;
 let usingTouchControls = coarsePointer;
-let aimAssistEnabled = true;
-let mouseAimEnabled = true;
 let soundEnabled = false;
 try {
-  const savedMode = localStorage.getItem('golden-blast-controls');
-  if (savedMode === 'direct' || savedMode === 'tank') controlMode = savedMode;
-  aimAssistEnabled = localStorage.getItem('golden-blast-aim-assist') !== 'false';
-  mouseAimEnabled = localStorage.getItem('golden-blast-mouse-aim') !== 'false';
   soundEnabled = localStorage.getItem('golden-blast-sound') === 'true';
 } catch { /* Settings still work when browser storage is unavailable. */ }
 
@@ -91,13 +84,12 @@ const beginSearch = document.querySelector('#begin-search');
 const passerbyCard = document.querySelector('.passerby');
 let shownCameo = null;
 const toast = document.querySelector('#toast');
-const sprayTutorial = createSprayTutorial(document.querySelector('#spray-tutorial'));
+const gullHint = document.querySelector('#gull-hint');
+const sprayTutorial = createSprayTutorial(document.querySelector('#spray-tutorial'), gullHint);
 const sprayButton = document.querySelector('#mobile-fire');
-const controlsDialog = document.querySelector('#controls-dialog');
-const settingsButton = document.querySelector('#open-settings');
-const settingsDone = document.querySelector('#settings-done');
+const pauseDialog = document.querySelector('#pause-dialog');
 const startOver = document.querySelector('#start-over');
-const soundSetting = document.querySelector('#sound-setting');
+const soundButtons = document.querySelectorAll('[data-toggle-sound]');
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const query = new URLSearchParams(window.location.search);
 const debugMaps = query.get('debug') === 'maps';
@@ -120,7 +112,7 @@ const touchControls = createTouchControls({
   onFireStart: beginSpray,
   onInput() {
     canvas.focus({ preventScroll: true });
-    if (!usingTouchControls) { usingTouchControls = true; syncControlMode(); }
+    if (!usingTouchControls) { usingTouchControls = true; syncMouseAim(); }
   }
 });
 
@@ -245,14 +237,6 @@ const arenaCombat = createArenaCombat({
     return true;
   },
 });
-const aimAssist = createAimAssist((origin, enemy) => world.lineClear(origin.x, origin.z, enemy.x, enemy.z, .12));
-const assistMarker = new THREE.Mesh(
-  new THREE.RingGeometry(.88, 1, 32),
-  new THREE.MeshBasicMaterial({ color: '#ffd34e', transparent: true, opacity: .85, depthWrite: false })
-);
-assistMarker.rotation.x = -Math.PI / 2;
-assistMarker.visible = false;
-scene.add(assistMarker);
 const effects = createBurstEffects(scene);
 const biteEffects = createBiteEffects(scene);
 const medkits = createMedkits(scene, world);
@@ -322,7 +306,7 @@ const runnerSession = createRunnerSession({
 });
 const runnerInput = bindRunnerInput({
   canvas,
-  canInteract: () => playing && isRunner() && !controlsDialog.open && !gameInterlude(),
+  canInteract: () => playing && isRunner() && !pauseDialog.open && !gameInterlude(),
   dodge: direction => runnerSession.dodge(direction),
   setFiring: firing => firing ? keys.add('Fire') : keys.delete('Fire'), beginSpray,
 });
@@ -399,7 +383,7 @@ if (debugMaps) {
       button.addEventListener('click', () => {
         if (!renderingReady) return;
         itinerary = mapOrder(map.id);
-        if (controlsDialog.open) controlsDialog.close();
+        if (pauseDialog.open) pauseDialog.close();
         startGame();
       });
       picker.append(button);
@@ -432,7 +416,7 @@ async function loadModels() {
     startButton.textContent = 'PLAY';
     for (const button of document.querySelectorAll('[data-debug-map]')) button.disabled = false;
     const initialButton = debugMaps ? startScreen.querySelector('[data-debug-map]') : startButton;
-    if (!controlsDialog.open && [document.body, canvas].includes(document.activeElement)) initialButton.focus({ preventScroll: true });
+    if (!pauseDialog.open && [document.body, canvas].includes(document.activeElement)) initialButton.focus({ preventScroll: true });
     window.dispatchEvent(new Event('game:ready'));
   } catch (error) {
     console.error('Could not load game models:', error);
@@ -612,20 +596,14 @@ function blip(frequency, duration) {
 }
 
 function updateMovement(dt, firing) {
-  const mode = usingTouchControls ? 'direct' : controlMode;
   const mouseFiring = keys.has('Fire') || (player.mouseTap && player.tapTimer > 0);
-  const assisted = mode === 'direct' && aimAssistEnabled && firing && !aimingUp(keys, touchControls.input);
-  let assistUsed = false;
-  const moving = movePlayer(player, world, {
-    keys, touch: touchControls.input, mode, dt, firing, height: HERO_HEIGHT,
-    resolveAim: assisted ? (heading, step) => {
-      assistUsed = true;
-      return resolveAssistedHeading(heading, step);
-    } : null,
-    aimHeading: mouseFiring ? mouseHeading() : null,
+  const heading = mouseFiring || mouseAim.following ? mouseHeading() : null;
+  return movePlayer(player, world, {
+    keys, touch: touchControls.input, dt, firing, height: HERO_HEIGHT,
+    cursorHeading: heading,
+    shotHeading: mouseFiring ? heading : null,
+    steerWithMouse: mouseAim.following,
   });
-  if (!assistUsed) resetAimAssist();
-  return moving;
 }
 
 function mouseHeading() {
@@ -636,7 +614,7 @@ function mouseHeading() {
   const ground = ray.intersectPlane(aimGround, aimPoint);
   let closest = ground ? ray.origin.distanceToSquared(ground) : Infinity;
   // A goose under the crosshair is above the ground plane. Use its hitbox
-  // so a click on its body aims at the goose rather than the pavement behind it.
+  // so the cursor over its body aims at the goose instead of the pavement.
   for (const enemy of enemies) {
     if (!enemy.alive) continue;
     aimTargetBounds.center.set(enemy.x, enemy.hitHeight, enemy.z);
@@ -653,23 +631,13 @@ function mouseHeading() {
 }
 
 function syncMouseAim() {
-  const enabled = mouseSupported && mouseAimEnabled && !usingTouchControls && playing && !controlsDialog.open && !isRunner() && !gameInterlude();
+  const enabled = mouseSupported && !usingTouchControls && playing && !pauseDialog.open && !isRunner() && !gameInterlude();
   mouseAim.setEnabled(enabled);
   gameShell.classList.toggle('mouse-aim-enabled', enabled);
 }
 
-function resolveAssistedHeading(heading, dt) {
-  const target = aimAssist.update(player, heading, enemies, dt);
-  return target ? Math.atan2(target.x - player.x, target.z - player.z) : null;
-}
-
-function resetAimAssist() {
-  aimAssist.reset();
-  assistMarker.visible = false;
-}
-
 function update(dt) {
-  if (controlsDialog.open) return;
+  if (pauseDialog.open) return;
   if (intro) {
     if (intro.update(dt)) finishIntro();
     return;
@@ -706,9 +674,7 @@ function update(dt) {
     && !actor.fleeing && Math.hypot(actor.x - player.x, actor.z - player.z) < 4.2);
   showCameo(follower?.kind ?? null);
   if (sleighCache.update(gameTime, player, reducedMotion.matches)) { collectSleighPart(); return; }
-  if (moving) player.runAngle = usingTouchControls || controlMode === 'direct'
-    ? Math.atan2(player.x - oldX, player.z - oldZ) - player.heading
-    : 0;
+  if (moving) player.runAngle = Math.atan2(player.x - oldX, player.z - oldZ) - player.heading;
   player.runBlend = THREE.MathUtils.damp(player.runBlend, moving ? 1 : 0, 18, dt);
   player.body.position.y = (Math.abs(Math.sin(player.runTime)) * 0.035 * player.runBlend + Math.sin(gameTime * 1.5) * 0.008 * (1 - player.runBlend)) * HERO_SCALE;
   const stride = player.runBlend * THREE.MathUtils.clamp(player.moveSpeed / player.speed, -1, 1);
@@ -743,14 +709,7 @@ function update(dt) {
   for (let i = enemies.length - 1; i >= 0; i--) {
     if (!enemies[i].alive) enemies.splice(i, 1);
   }
-  const assistedTarget = aimAssist.target;
-  assistMarker.visible = !!assistedTarget?.alive;
-  if (assistMarker.visible) {
-    assistMarker.position.set(assistedTarget.x, .025, assistedTarget.z);
-    assistMarker.scale.setScalar(assistedTarget.size + .18);
-  }
-  // Pan with a fixed viewing angle so movement does not swing the aiming view.
-  cameraRig.frame(player.x, player.z, dt);
+  cameraRig.frameArena(player.x, player.z, dt, { dx: player.x - oldX, dz: player.z - oldZ });
 }
 
 function nearbyGullVisible() {
@@ -840,12 +799,12 @@ function updateDialLabel() {
 }
 
 // Keeps the temporary power label above the hero while a battery boost is active.
-function updateHeroHp() {
+function updateHeroOverlay() {
   const powered = player.powerTimer > 0;
   const label = powered ? `BATTERY ${Math.ceil(player.powerTimer)}s` : '';
   if (heroPower.textContent !== label) heroPower.textContent = label;
   heroPower.hidden = !powered;
-  if (!playing || !powered) { heroHud.hidden = true; return; }
+  if (!playing || (!powered && !gullHint.textContent)) { heroHud.hidden = true; return; }
   heroHeadPosition.set(player.x, HERO_HEIGHT + 0.5, player.z).project(camera);
   const onScreen = heroHeadPosition.z < 1;
   heroHud.hidden = !onScreen;
@@ -889,7 +848,8 @@ function placePlayerAtSpawn() {
   player.root.position.set(player.x, 0, player.z);
   player.body.position.set(0, 0, 0);
   player.body.rotation.set(0, 0, 0);
-  cameraRig.frame(isRunner() ? 0 : player.x, player.z, 0, true);
+  if (isRunner()) cameraRig.frameRunner(0, 0, true);
+  else cameraRig.frameArena(player.x, player.z, 0, { instant: true });
   animateHero(player.rig, 0, 0);
 }
 
@@ -982,7 +942,6 @@ function endGame(won = false) {
   updateScore();
   playing = false;
   syncMouseAim();
-  resetAimAssist();
   touchControls.setEnabled(false);
   stream.clear();
   seagulls.clear();
@@ -1015,17 +974,17 @@ function animate(now) {
   if (document.hidden || !renderingReady) { frameClock.reset(); return; }
   const dt = frameClock.advance(now, step => {
     update(step);
-    return !controlsDialog.open && renderingReady;
+    return !pauseDialog.open && renderingReady;
   });
   if (!renderingReady) return;
-  if (!controlsDialog.open && !gameInterlude()) weather.update(dt, isRunner() ? runnerSession.state.distance : 0);
+  if (!pauseDialog.open && !gameInterlude()) weather.update(dt, isRunner() ? runnerSession.state.distance : 0);
   if (player.model && !sleighAssembly.active && !intro) world.updateVisibility(camera, player.root, HERO_HEIGHT, dt);
   if (intro) intro.render(renderer);
   else if (sleighAssembly.active) sleighAssembly.render(renderer);
   else if (mapTransition.active) {
     transitionRenderer.render(scene, camera, mapTransition.progress, reducedMotion.matches);
   } else renderer.render(scene, camera);
-  updateHeroHp();
+  updateHeroOverlay();
 }
 
 function beginSpray(mouse = false) {
@@ -1039,8 +998,7 @@ function resetInput() {
   arenaInput.reset();
   runnerInput.reset();
   runnerSession.resetInput();
-  resetAimAssist();
-  mouseAim.resetAim();
+  mouseAim.resetSteering();
   keys.clear();
   touchControls.reset();
   player.tapTimer = 0;
@@ -1052,66 +1010,22 @@ function resetInput() {
   player.moveZ = Math.cos(player.heading);
 }
 
-function syncControlMode() {
-  const direct = usingTouchControls || controlMode === 'direct';
-  for (const radio of document.querySelectorAll('[data-control-mode]')) radio.checked = radio.value === controlMode;
-  for (const checkbox of document.querySelectorAll('[data-aim-assist]')) {
-    checkbox.checked = aimAssistEnabled;
-    checkbox.disabled = !direct;
-  }
-  for (const checkbox of document.querySelectorAll('[data-mouse-aim]')) {
-    checkbox.closest('label').hidden = !mouseSupported;
-    checkbox.checked = mouseAimEnabled;
-    checkbox.disabled = false;
-  }
-  syncMouseAim();
-}
-
-for (const checkbox of document.querySelectorAll('[data-mouse-aim]')) {
-  checkbox.addEventListener('change', () => {
-    mouseAimEnabled = checkbox.checked;
-    try { localStorage.setItem('golden-blast-mouse-aim', String(mouseAimEnabled)); } catch { /* Storage is optional. */ }
-    resetInput();
-    syncControlMode();
-  });
-}
-
-for (const checkbox of document.querySelectorAll('[data-aim-assist]')) {
-  checkbox.addEventListener('change', () => {
-    aimAssistEnabled = checkbox.checked;
-    try { localStorage.setItem('golden-blast-aim-assist', String(aimAssistEnabled)); } catch { /* Storage is optional. */ }
-    resetInput();
-    syncControlMode();
-  });
-}
-
-for (const radio of document.querySelectorAll('[data-control-mode]')) {
-  radio.addEventListener('change', () => {
-    if (!radio.checked) return;
-    controlMode = radio.value === 'tank' ? 'tank' : 'direct';
-    try { localStorage.setItem('golden-blast-controls', controlMode); } catch { /* Storage is optional. */ }
-    resetInput();
-    syncControlMode();
-  });
-}
-function openSettings() {
+function pauseGame() {
+  if (!playing || pauseDialog.open) return;
   resetInput();
-  settingsDone.textContent = playing ? 'RESUME' : 'DONE';
-  startOver.hidden = !playing;
-  if (!controlsDialog.open) controlsDialog.showModal();
+  pauseDialog.showModal();
   syncMouseAim();
 }
-settingsButton.addEventListener('click', openSettings);
-document.querySelector('#pause-settings').addEventListener('click', openSettings);
-controlsDialog.addEventListener('close', () => {
+document.querySelector('#pause-game').addEventListener('click', pauseGame);
+pauseDialog.addEventListener('close', () => {
   frameClock.reset();
   resetInput();
-  (playing ? canvas : settingsButton).focus({ preventScroll: true });
+  (playing ? canvas : startButton).focus({ preventScroll: true });
   syncMouseAim();
 });
-controlsDialog.querySelector('form').addEventListener('submit', event => {
+pauseDialog.querySelector('form').addEventListener('submit', event => {
   event.preventDefault();
-  controlsDialog.close();
+  pauseDialog.close();
 });
 
 window.addEventListener('keydown', (event) => {
@@ -1132,17 +1046,17 @@ window.addEventListener('keydown', (event) => {
   if (event.code === 'Escape' && playing) {
     event.preventDefault();
     if (!event.repeat) {
-      if (controlsDialog.open) controlsDialog.close();
-      else openSettings();
+      if (pauseDialog.open) pauseDialog.close();
+      else pauseGame();
     }
     return;
   }
-  if (controlsDialog.open) return;
+  if (pauseDialog.open) return;
   if (gameInterlude()) {
     if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code)) event.preventDefault();
     return;
   }
-  if (playing && isRunner() && ['ArrowLeft', 'ArrowRight', 'KeyA', 'KeyD'].includes(event.code)) {
+  if (playing && isRunner() && RUNNER_DODGE_KEYS.includes(event.code)) {
     event.preventDefault();
     if (!event.repeat) runnerSession.dodge(event.code === 'ArrowLeft' || event.code === 'KeyA' ? -1 : 1);
     return;
@@ -1150,25 +1064,27 @@ window.addEventListener('keydown', (event) => {
   if (event.target instanceof Element && event.target.closest('select, input')) return;
   if (!playing && event.target instanceof Element && event.target.closest('button, a')) return;
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code)) event.preventDefault();
-  if (usingTouchControls && (MOVE_KEYS.includes(event.code) || event.code === 'KeyE')) {
+  const movementKey = MOVE_KEYS.includes(event.code);
+  if (TURN_KEYS.includes(event.code) && !event.repeat) mouseAim.yieldToKeyboard();
+  if (usingTouchControls && (movementKey || event.code === 'KeyE')) {
     usingTouchControls = false;
-    syncControlMode();
+    syncMouseAim();
   }
   keys.add(event.code);
   if (event.code === 'Space' && !event.repeat && playing) beginSpray();
   if (event.code === 'Enter' && !playing && !startScreen.classList.contains('hidden')) playFromMenu();
 });
 window.addEventListener('keyup', (event) => keys.delete(event.code));
-window.addEventListener('blur', () => { resetInput(); if (playing) openSettings(); });
+window.addEventListener('blur', () => { resetInput(); if (playing) pauseGame(); });
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) { resetInput(); if (playing) openSettings(); }
+  if (document.hidden) { resetInput(); if (playing) pauseGame(); }
 });
 window.addEventListener('resize', resize);
 const arenaInput = bindGameInput({
   canvas,
   movementZone: document.querySelector('#joystick-zone'),
   movementHandle: document.querySelector('.joystick-hint'),
-  canInteract: () => playing && !controlsDialog.open && !isRunner() && !gameInterlude(),
+  canInteract: () => playing && !pauseDialog.open && !isRunner() && !gameInterlude(),
   setFiring: firing => firing ? keys.add('Fire') : keys.delete('Fire'),
   beginSpray,
   pointMouseAim: mouseAim.point,
@@ -1180,20 +1096,31 @@ skipIntro.addEventListener('click', () => {
 beginSearch.addEventListener('click', () => { startGame({ transition: true }); });
 startOver.addEventListener('click', () => {
   if (!playing || !renderingReady) return;
-  controlsDialog.close();
+  pauseDialog.close();
   startGame({ transition: true });
 });
 restartButton.addEventListener('click', () => {
   startGame();
 });
-soundSetting.checked = soundEnabled;
-soundSetting.addEventListener('change', () => {
-  soundEnabled = soundSetting.checked;
-  try { localStorage.setItem('golden-blast-sound', String(soundEnabled)); } catch { /* Storage is optional. */ }
-  if (soundEnabled) blip(520, 0.05);
-});
+function syncSound() {
+  for (const button of soundButtons) {
+    button.setAttribute('aria-pressed', String(soundEnabled));
+    button.title = soundEnabled ? 'Mute sound' : 'Enable sound';
+    button.querySelector('use').setAttribute('href', soundEnabled ? '#speaker-on' : '#speaker-off');
+  }
+}
 
-syncControlMode();
+for (const button of soundButtons) {
+  button.addEventListener('click', () => {
+    soundEnabled = !soundEnabled;
+    try { localStorage.setItem('golden-blast-sound', String(soundEnabled)); } catch { /* Storage is optional. */ }
+    syncSound();
+    if (soundEnabled) blip(520, 0.05);
+  });
+}
+
+syncSound();
+syncMouseAim();
 syncLevelUI();
 resize();
 loadModels();

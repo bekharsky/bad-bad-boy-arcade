@@ -20,13 +20,14 @@ The city is an affectionate arcade version of Helsinki: a ferry and cranes at th
 
 | | Desktop | Touchscreen |
 | --- | --- | --- |
-| Move and dodge | Arrow keys or WASD | Left joystick |
-| Turn | In Direct, the hero faces the direction of travel. In Tank, left and right turn the hero. | In the direction of travel |
+| Move | W/A/S/D move up/left/down/right independently of aim. | Left joystick |
+| Drive with the arrows | Up/Down move forward/back. Left/Right steer until the mouse moves again. | |
+| Aim with the mouse | The hero faces the crosshair while moving in any direction. | |
 | Spray | Press Space to spray forward, or left-click to spray at the crosshair. Tap for a short spray, or hold for more range. | Tap the right spray button, or hold for more range. |
 | Aim at seagulls | Hold E while spraying | Drag upward from the spray button |
-| Pause | Esc | Controls button |
+| Pause | Esc | Pause button |
 
-In the running districts, left and right change lanes while up and down accelerate or brake. Controls offers movement, aiming and sound options. Choose **Start Over** from the pause menu to restart the campaign.
+In the running districts, left and right change lanes while up and down accelerate or brake. Choose **Start Over** from the pause menu to restart the campaign.
 
 ## Credits
 

@@ -6,56 +6,37 @@ function turnPlayer(player, targetSpeed, dt) {
   // Respond to a direction change immediately, then ease into the new turn.
   if (player.turnSpeed * targetSpeed < 0) player.turnSpeed = 0;
   const decay = Math.exp(-18 * dt);
-  player.heading += targetSpeed * dt + (player.turnSpeed - targetSpeed) * (1 - decay) / 18;
+  const heading = player.targetHeading + targetSpeed * dt + (player.turnSpeed - targetSpeed) * (1 - decay) / 18;
+  player.targetHeading = Math.atan2(Math.sin(heading), Math.cos(heading));
   player.turnSpeed = targetSpeed + (player.turnSpeed - targetSpeed) * decay;
 }
 
-function faceHeading(player, target, dt, turnRate = 14) {
-  const angle = Math.atan2(Math.sin(target - player.heading), Math.cos(target - player.heading));
+function approachHeading(heading, target, dt, turnRate = 14) {
+  const angle = Math.atan2(Math.sin(target - heading), Math.cos(target - heading));
   const turnStep = turnRate * dt;
-  player.heading = Math.abs(angle) <= turnStep ? target : player.heading + Math.sign(angle) * turnStep;
-  player.turnSpeed = 0;
+  return Math.abs(angle) <= turnStep ? target : heading + Math.sign(angle) * turnStep;
 }
 
-export function movePlayer(player, city, { keys, touch, mode, dt, firing, height, resolveAim = null, aimHeading = null }) {
+export function movePlayer(player, city, { keys, touch, dt, firing, height, cursorHeading = null, shotHeading = null, steerWithMouse = false }) {
   const touchStrength = Math.hypot(touch.x, touch.z);
-  // A virtual stick is directional even if the keyboard uses Tank controls.
-  if (touchStrength) mode = 'direct';
-  const x = touchStrength ? touch.x : Number(keys.has('KeyD') || keys.has('ArrowRight')) - Number(keys.has('KeyA') || keys.has('ArrowLeft'));
-  const z = touchStrength ? touch.z : Number(keys.has('KeyS') || keys.has('ArrowDown')) - Number(keys.has('KeyW') || keys.has('ArrowUp'));
-  const mouseAiming = aimHeading !== null && !touchStrength;
-  const maxSpeed = player.speed * (firing ? 0.7 : 1);
-  let throttle = 0;
+  const x = touchStrength ? touch.x : Number(keys.has('KeyD')) - Number(keys.has('KeyA'));
+  const z = touchStrength ? touch.z : Number(keys.has('KeyS')) - Number(keys.has('KeyW'));
+  const turn = touchStrength ? 0 : Number(keys.has('ArrowLeft')) - Number(keys.has('ArrowRight'));
+  const throttle = touchStrength ? 0 : Number(keys.has('ArrowUp')) - Number(keys.has('ArrowDown'));
+  const directStrength = Math.hypot(x, z);
+  const mouseSteering = steerWithMouse && !touchStrength;
+  const mouseHeading = touchStrength ? null : shotHeading ?? (mouseSteering ? cursorHeading : null);
+  player.targetHeading ??= player.heading;
+  turnPlayer(player, turn * (firing ? 1.7 : 3.2), dt);
+  if (!turn && !throttle && directStrength && !mouseSteering) player.targetHeading = Math.atan2(x, z);
 
-  if (mode === 'tank') {
-    throttle = -z;
-    const turnRate = firing ? 1.7 : 3.2;
-    if (!mouseAiming) turnPlayer(player, -x * turnRate, dt);
-    player.targetHeading = player.heading;
+  if (mouseHeading !== null) {
+    player.heading = mouseHeading;
+    if (!turn && (mouseSteering || (!throttle && !directStrength))) player.targetHeading = mouseHeading;
+  } else if (firing && !touchStrength) {
+    player.heading = player.targetHeading;
   } else {
-    // Travel responds immediately; facing and aim ease toward the requested
-    // direction independently, so smooth turns never hold movement back.
-    if (x || z) {
-      const length = Math.hypot(x, z);
-      player.moveX = x / length;
-      player.moveZ = z / length;
-      player.targetHeading = Math.atan2(x, z);
-      throttle = Math.min(1, length);
-    }
-    if (!mouseAiming) {
-      const requested = player.targetHeading ?? player.heading;
-      const target = resolveAim?.(requested, dt) ?? requested;
-      if (firing && !touchStrength) {
-        player.heading = target;
-        player.turnSpeed = 0;
-      } else faceHeading(player, target, dt, touchStrength ? 22 : 14);
-    }
-  }
-
-  // Use the cursor's direction on the same simulation step that emits a shot.
-  if (mouseAiming) {
-    player.heading = player.targetHeading = aimHeading;
-    player.turnSpeed = 0;
+    player.heading = approachHeading(player.heading, player.targetHeading, dt, touchStrength ? 22 : 14);
   }
 
   player.heading = Math.atan2(Math.sin(player.heading), Math.cos(player.heading));
@@ -63,18 +44,27 @@ export function movePlayer(player, city, { keys, touch, mode, dt, firing, height
   player.dz = Math.cos(player.heading);
   player.root.rotation.y = player.heading;
 
-  const targetSpeed = throttle * maxSpeed;
-  const damping = throttle ? 14 : mode === 'direct' ? 48 : 24;
+  // WASD and touch directions are independent of aim and arrow throttle.
+  const directScale = Math.max(1, directStrength);
+  const moveX = x / directScale + throttle * Math.sin(player.targetHeading);
+  const moveZ = z / directScale + throttle * Math.cos(player.targetHeading);
+  const strength = Math.hypot(moveX, moveZ);
+  const moving = strength > 1e-6;
+  if (moving) {
+    player.moveX = moveX / strength;
+    player.moveZ = moveZ / strength;
+  }
+  const maxSpeed = player.speed * (firing ? 0.7 : 1);
+  const targetSpeed = moving ? Math.min(1, strength) * maxSpeed : 0;
+  const damping = moving ? 14 : 48;
   const decay = Math.exp(-damping * dt);
   const distance = targetSpeed * dt + (player.moveSpeed - targetSpeed) * (1 - decay) / damping;
   player.moveSpeed = targetSpeed + (player.moveSpeed - targetSpeed) * decay;
-  if (!throttle && Math.abs(player.moveSpeed) < 0.015) player.moveSpeed = 0;
+  if (!moving && player.moveSpeed < 0.015) player.moveSpeed = 0;
   const oldX = player.x, oldZ = player.z;
-  const moveX = mode === 'tank' ? player.dx : player.moveX ?? player.dx;
-  const moveZ = mode === 'tank' ? player.dz : player.moveZ ?? player.dz;
-  city.move(player, moveX * distance, moveZ * distance, player.radius);
+  city.move(player, (player.moveX ?? player.dx) * distance, (player.moveZ ?? player.dz) * distance, player.radius);
   const travelled = Math.hypot(player.x - oldX, player.z - oldZ);
-  if (Math.abs(distance) > 0.0001 && travelled < Math.abs(distance) * 0.1) player.moveSpeed = 0;
-  player.runTime += Math.sign(distance) * travelled * Math.PI * 2 / (height * 0.45);
+  if (distance > 0.0001 && travelled < distance * 0.1) player.moveSpeed = 0;
+  player.runTime += travelled * Math.PI * 2 / (height * 0.45);
   return travelled > 0.0001;
 }

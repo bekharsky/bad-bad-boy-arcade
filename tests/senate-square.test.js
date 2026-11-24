@@ -83,6 +83,77 @@ test('runner speed opens and closes the lens smoothly, pause freezes it and aren
   }
 });
 
+test('the arena camera centres at rest and looks ahead in all eight movement directions', () => {
+  for (const [width, height, touch] of [[1280, 720, false], [390, 844, true]]) {
+    const rig = createGameCamera();
+    rig.resize(width, height, touch);
+    rig.frameRunner(0, 0, true);
+    const runnerProjection = rig.camera.projectionMatrix.clone();
+    for (const [x, z] of [[0, 1], [1, 1], [1, 0], [1, -1], [0, -1], [-1, -1], [-1, 0], [-1, 1]]) {
+      const hero = { x: -5, z: 7 };
+      const screenOffset = () => {
+        rig.camera.updateMatrixWorld(true);
+        const centre = new THREE.Vector3(hero.x, 1.725, hero.z).project(rig.camera);
+        return { x: centre.x / 2, y: -centre.y / 2 };
+      };
+      rig.frameArena(hero.x, hero.z, 0, { instant: true });
+      const centre = screenOffset();
+      assert.ok(Math.hypot(centre.x, centre.y) < .01);
+      const viewAngle = rig.camera.quaternion.clone();
+
+      const dt = 1 / 60, step = 3.6 * dt / Math.hypot(x, z);
+      const dx = x * step, dz = z * step;
+      for (let i = 0; i < 90; i++) {
+        hero.x += dx;
+        hero.z += dz;
+        rig.frameArena(hero.x, hero.z, dt, { dx, dz });
+      }
+      const offset = screenOffset();
+      if (x) assert.ok(offset.x * x < -.02, 'Horizontal travel opens the leading side');
+      if (z) assert.ok(offset.y * z < -.02, 'Vertical travel opens the leading side');
+      assert.ok(rig.camera.quaternion.angleTo(viewAngle) < 1e-7);
+
+      for (let i = 0; i < 120; i++) rig.frameArena(hero.x, hero.z, dt);
+      const stopped = screenOffset();
+      assert.ok(Math.hypot(stopped.x, stopped.y) < .01);
+    }
+    rig.frameRunner(0, 0, true);
+    assert.deepEqual(rig.camera.projectionMatrix.elements, runnerProjection.elements);
+  }
+});
+
+test('the arena camera eases into starts, turns, reversals and stops', () => {
+  const rig = createGameCamera();
+  rig.resize(1280, 720);
+  rig.frameArena(0, 0, 0, { instant: true });
+  const dt = 1 / 120;
+  const hero = new THREE.Vector2();
+  const position = new THREE.Vector2(0, 15);
+  const velocity = new THREE.Vector2();
+  const nextPosition = new THREE.Vector2(), nextVelocity = new THREE.Vector2();
+  const phases = [
+    { x: 0, z: 1, frames: 180, maxAcceleration: 30 },
+    { x: 1, z: 0, frames: 180, maxAcceleration: 45 },
+    { x: -1, z: 0, frames: 180, maxAcceleration: 60 },
+    { x: 0, z: 0, frames: 240, maxAcceleration: 32 },
+  ];
+
+  for (const { x, z, frames, maxAcceleration } of phases) {
+    const dx = x * 3.6 * dt, dz = z * 3.6 * dt;
+    for (let i = 0; i < frames; i++) {
+      hero.x += dx;
+      hero.y += dz;
+      rig.frameArena(hero.x, hero.y, dt, { dx, dz });
+      nextPosition.set(rig.camera.position.x, rig.camera.position.z);
+      nextVelocity.copy(nextPosition).sub(position).divideScalar(dt);
+      assert.ok(nextVelocity.distanceTo(velocity) / dt < maxAcceleration);
+      position.copy(nextPosition);
+      velocity.copy(nextVelocity);
+    }
+  }
+  assert.ok(Math.hypot(position.x - hero.x, position.y - hero.y - 15) < .05);
+});
+
 test('mobile framing reserves space below the hero in portrait and landscape, including braking and boosting', () => {
   for (const [width, height, touch] of [[320, 780, true], [390, 844, true], [844, 390, true], [596, 780, false]]) {
     const rig = createGameCamera(); rig.resize(width, height, touch); rig.frame(0, 0, 0, true);

@@ -14,7 +14,10 @@
   <body>
     <main class="game-shell">
       <canvas id="game" tabindex="0" aria-label="Piss Deal game"></canvas>
-      <div id="hero-hud" class="hero-hud" hidden><div id="hero-power" class="hero-power" hidden></div></div>
+      <div id="hero-hud" class="hero-hud" hidden>
+        <div id="hero-power" class="hero-power" hidden></div>
+        <div id="gull-hint" class="gull-hint" role="status"></div>
+      </div>
       <svg class="menu-symbols" aria-hidden="true" focusable="false">
         <symbol id="holiday-sleigh" viewBox="0 0 96 49">
           <path d="M12 8v5m-2.5-2.5h5M82 5v12m-6-6h12M15 31v9m-4.5-4.5h9M88 28v5m-2.5-2.5h5" fill="none" stroke="currentColor" stroke-linecap="round" />
@@ -24,8 +27,14 @@
           <path d="M36 19h12v11H36zm13 3h10v8H49z" fill="#345d54" stroke="currentColor" stroke-width="1.15" stroke-linejoin="round" />
           <path d="M42 19v11m12-8v8m-12-11c-7-1-6-7-2-6 2 1 2 3 2 6 1-5 5-7 7-5 2 2-1 5-7 5Z" fill="none" stroke="currentColor" stroke-width="1.15" stroke-linejoin="round" />
         </symbol>
-        <symbol id="settings-gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="m9 3-.5 2.1-1.6.9-2.1-.6-2 3.4 1.6 1.5v1.9l-1.6 1.5 2 3.4 2.1-.6 1.6.9L9 20h4l.5-2.1 1.6-.9 2.1.6 2-3.4-1.6-1.5v-1.9l1.6-1.5-2-3.4-2.1.6-1.6-.9L13 3Z"/><circle cx="11" cy="11.5" r="3"/>
+        <symbol id="speaker-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 9v6h4l5 4V5L7 9H3m12.5.5a4 4 0 0 1 0 5m3-8a8 8 0 0 1 0 11"/>
+        </symbol>
+        <symbol id="speaker-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 9v6h4l5 4V5L7 9H3m12.5 0 6 6m0-6-6 6"/>
+        </symbol>
+        <symbol id="pause-icon" viewBox="0 0 24 24" fill="currentColor">
+          <rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>
         </symbol>
       </svg>
       <template id="holiday-screen-header">
@@ -49,8 +58,8 @@
             </g>
           </svg>
         </div>
-        <button id="pause-settings" class="settings-button pause-settings" type="button" aria-label="Pause and open Controls" aria-haspopup="dialog" aria-controls="controls-dialog">
-          <svg aria-hidden="true" focusable="false"><use href="#settings-gear" /></svg>
+        <button id="pause-game" class="icon-button pause-button" type="button" aria-label="Pause" aria-haspopup="dialog" aria-controls="pause-dialog">
+          <svg aria-hidden="true" focusable="false"><use href="#pause-icon" /></svg>
         </button>
         <div id="level-dial" class="level-dial" role="group" aria-label="Score 0000, level progress 0 percent, health 5 of 5">
           <svg viewBox="0 0 100 100" aria-hidden="true" focusable="false">
@@ -100,8 +109,8 @@
 
       <section id="start-screen" class="overlay">
         <div class="card holiday-card">
-          <button id="open-settings" class="settings-button" data-header-action type="button" aria-label="Controls" aria-haspopup="dialog" aria-controls="controls-dialog">
-            <svg aria-hidden="true" focusable="false"><use href="#settings-gear" /></svg>
+          <button id="toggle-sound" class="icon-button" data-header-action data-toggle-sound type="button" aria-label="Sound" aria-pressed="false" title="Enable sound">
+            <svg aria-hidden="true" focusable="false"><use href="#speaker-off" /></svg>
           </button>
           <h1 aria-label="Piss Deal">PISS <span class="title-accent">DEAL</span></h1>
           <p class="campaign-brief">Rebuild Joulupukki’s sleigh, one part per district.</p>
@@ -120,15 +129,19 @@
           <section class="debug-maps" data-debug-maps aria-label="Maps" hidden></section>
           <div class="start-controls" role="group" aria-label="Quick controls">
             <div class="start-control">
-              <div class="start-control-keys"><kbd>WASD</kbd><span class="start-control-or">/</span><kbd aria-label="Arrow keys">↑↓←→</kbd></div>
+              <kbd aria-label="WASD to move up, left, down and right">WASD</kbd>
               <span class="start-control-label">MOVE</span>
             </div>
             <div class="start-control">
-              <div class="start-control-keys"><kbd class="start-space-key">SPACE</kbd></div>
+              <kbd>Mouse</kbd>
+              <span class="start-control-label">AIM</span>
+            </div>
+            <div class="start-control">
+              <kbd class="start-space-key">SPACE</kbd>
               <span class="start-control-label">FIRE</span>
             </div>
             <div class="start-control">
-              <div class="start-control-keys"><kbd>E</kbd></div>
+              <kbd>E</kbd>
               <span class="start-control-label">UP</span>
             </div>
           </div>
@@ -156,23 +169,15 @@
         </div>
       </section>
 
-      <dialog id="controls-dialog" class="controls-dialog" aria-labelledby="controls-title">
-        <div class="card holiday-card controls-card">
-          <h2 id="controls-title">CONTROLS</h2>
-          <fieldset class="control-setting" aria-label="Movement">
-            <div class="control-options">
-              <label class="control-option"><input type="radio" name="game-movement" value="direct" data-control-mode /><span class="control-choice">Direct</span></label>
-              <label class="control-option"><input type="radio" name="game-movement" value="tank" data-control-mode checked /><span class="control-choice">Tank</span></label>
-            </div>
-          </fieldset>
-          <div class="control-toggles">
-            <label class="assist-setting"><input type="checkbox" data-aim-assist checked /><span class="assist-switch" aria-hidden="true"></span><span class="assist-copy"><strong>Aim assist</strong><span>Direct only</span></span></label>
-            <label class="assist-setting" hidden><input type="checkbox" data-mouse-aim checked /><span class="assist-switch" aria-hidden="true"></span><span class="assist-copy"><strong>Mouse aim</strong></span></label>
-            <label class="assist-setting"><input id="sound-setting" type="checkbox" /><span class="assist-switch" aria-hidden="true"></span><span class="assist-copy"><strong>Sound</strong></span></label>
-          </div>
-          <form method="dialog" class="controls-actions">
-            <button id="settings-done" class="primary-button" type="submit">DONE</button>
-            <button id="start-over" class="text-button" type="button" hidden>START OVER</button>
+      <dialog id="pause-dialog" class="pause-dialog" aria-labelledby="pause-title">
+        <div class="card holiday-card pause-card">
+          <button class="icon-button" data-header-action data-toggle-sound type="button" aria-label="Sound" aria-pressed="false" title="Enable sound">
+            <svg aria-hidden="true" focusable="false"><use href="#speaker-off" /></svg>
+          </button>
+          <h2 id="pause-title">PAUSED</h2>
+          <form method="dialog" class="pause-actions">
+            <button id="resume-game" class="primary-button" type="submit" autofocus>RESUME</button>
+            <button id="start-over" class="text-button" type="button">START OVER</button>
           </form>
           <section class="debug-maps" data-debug-maps aria-label="Maps" hidden></section>
           <a class="credits-link" href="./credits.html" target="_blank" rel="noopener">Models & credits ↗</a>
