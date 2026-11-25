@@ -117,6 +117,8 @@ const reticlePoint = new THREE.Vector3();
 const reticleOrigin = new THREE.Vector3();
 const reticlePosition = { x: 0, y: 0 };
 const mouseReticle = document.querySelector('#mouse-reticle');
+const reticleInset = mouseReticle.width.baseVal.value + 4;
+let reticleCharge = 0;
 const aimGround = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 const aimTargetBounds = new THREE.Sphere();
 const aimTargetHit = new THREE.Vector3();
@@ -769,10 +771,11 @@ function projectMouseAim() {
   reticlePoint.set(player.x + aimOffset.x, aimOffset.y, player.z + aimOffset.z).project(camera);
   if (reticlePoint.z < -1 || reticlePoint.z > 1) return null;
   const dx = reticlePoint.x - reticleOrigin.x, dy = reticlePoint.y - reticleOrigin.y;
-  // Keep the reticle on the projected aim line when the camera drifts near an edge.
+  const xLimit = 1 - reticleInset / viewWidth, yLimit = 1 - reticleInset / viewHeight;
+  // Keep the whole reticle in view along the projected aim line.
   const edge = Math.min(1,
-    dx > 0 ? (.985 - reticleOrigin.x) / dx : dx < 0 ? (-.985 - reticleOrigin.x) / dx : 1,
-    dy > 0 ? (.98 - reticleOrigin.y) / dy : dy < 0 ? (-.98 - reticleOrigin.y) / dy : 1);
+    dx > 0 ? (xLimit - reticleOrigin.x) / dx : dx < 0 ? (-xLimit - reticleOrigin.x) / dx : 1,
+    dy > 0 ? (yLimit - reticleOrigin.y) / dy : dy < 0 ? (-yLimit - reticleOrigin.y) / dy : 1);
   reticlePosition.x = .5 + (reticleOrigin.x + dx * edge) * .5;
   reticlePosition.y = .5 - (reticleOrigin.y + dy * edge) * .5;
   return reticlePosition;
@@ -905,11 +908,19 @@ function updateSpray(dt, firing, groundTargets, powered = false) {
 }
 
 function updateSprayFeedback(spray) {
+  updateReticleCharge(mouseAim.enabled ? spray.charge : 0);
   const range = spray.range.toFixed(1);
   const mode = spray.airborne ? 'Spraying upward; flick down to lower' : `Tap to spray, hold for range, drag to aim. Range ${range} metres. Flick up to spray at birds`;
   const label = `${mode}${spray.blocked ? ', blocked' : ''}`;
   sprayButton.dataset.blocked = String(spray.blocked);
   if (sprayZone.getAttribute('aria-label') !== label) sprayZone.setAttribute('aria-label', label);
+}
+
+function updateReticleCharge(charge) {
+  const percent = Math.round(charge * 100);
+  if (percent === reticleCharge) return;
+  reticleCharge = percent;
+  mouseReticle.style.setProperty('--reticle-charge', String(percent));
 }
 
 function updateHealth() {
@@ -1179,6 +1190,7 @@ function resetInput() {
   mouseAim.resetSteering();
   keys.clear();
   touchControls.reset();
+  updateReticleCharge(0);
   player.tapTimer = 0;
   player.mouseTap = false;
   player.upwardTap = false;

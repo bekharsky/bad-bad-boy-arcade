@@ -17,16 +17,19 @@ function approachHeading(heading, target, dt, turnRate = 14) {
   return Math.abs(angle) <= turnStep ? target : heading + Math.sign(angle) * turnStep;
 }
 
-export function smoothTouchHeading(heading, target, dt) {
-  const maxRate = 10;
-  const response = 20;
+function smoothAimHeading(heading, target, dt, maxRate, response, precision = 0) {
   const angle = Math.atan2(Math.sin(target - heading), Math.cos(target - heading));
   const distance = Math.abs(angle);
+  if (distance <= precision) return target;
   // Cap a large turn, then ease into the target at the same rate at any FPS.
   const timeAtMaxRate = Math.min(dt, Math.max(0, (distance - maxRate / response) / maxRate));
   const remaining = (distance - maxRate * timeAtMaxRate) * Math.exp(-response * (dt - timeAtMaxRate));
   const next = heading + Math.sign(angle) * (distance - remaining);
   return Math.atan2(Math.sin(next), Math.cos(next));
+}
+
+export function smoothTouchHeading(heading, target, dt) {
+  return smoothAimHeading(heading, target, dt, 10, 20);
 }
 
 export function movePlayer(player, city, { keys, touch, dt, firing, height, cursorHeading = null, shotHeading = null, touchHeading = null, steerWithMouse = false }) {
@@ -48,10 +51,8 @@ export function movePlayer(player, city, { keys, touch, dt, firing, height, curs
   } else if (touchStrength) {
     player.targetHeading = player.heading;
   } else if (mouseHeading !== null) {
-    player.heading = mouseHeading;
-    if (!turn && (mouseSteering || (!throttle && !directStrength))) player.targetHeading = mouseHeading;
-  } else if (firing && !directStrength) {
-    player.heading = player.targetHeading;
+    player.heading = smoothAimHeading(player.heading, mouseHeading, dt, 20, 45, .025);
+    if (!turn && (mouseSteering || (!throttle && !directStrength))) player.targetHeading = player.heading;
   } else {
     const turnRate = directStrength && !turn && !throttle ? 10 : 14;
     player.heading = approachHeading(player.heading, player.targetHeading, dt, turnRate);

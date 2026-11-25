@@ -47,7 +47,8 @@ button { font: inherit; }
 .game-shell { position: relative; width: 100%; height: 100%; height: 100dvh; --control-bottom: max(32px, calc(env(safe-area-inset-bottom) + 20px)); overflow: hidden; touch-action: none; overscroll-behavior: none; background: radial-gradient(ellipse at 50% 35%, #29263a, #11131b 70%); }
 #game { display: block; width: 100%; height: 100%; outline: 0; touch-action: none; }
 .mouse-reticle-active #game, .mouse-reticle-active :is(.joystick-zone, .spray-zone) { cursor: none; }
-.mouse-reticle { position: absolute; z-index: 3; width: 17px; height: 17px; transform: translate(-50%, -50%); fill: none; stroke-linecap: round; pointer-events: none; }
+.mouse-reticle { position: absolute; z-index: 3; transform: translate(-50%, -50%); fill: none; stroke-linecap: round; pointer-events: none; }
+.mouse-reticle-charge { stroke-dasharray: var(--reticle-charge, 0) 100; stroke-linecap: butt; }
 .cameo-speech { position: absolute; top: 0; left: 0; z-index: 3; width: max-content; max-width: min(210px, calc(100% - 24px)); --speech-padding: 7px 11px; padding: var(--speech-padding); border-radius: 8px; background: #fff3d8; color: #231c25; box-shadow: 0 2px 8px #12162270; font: 650 13px/1.26 Inter, sans-serif; text-align: left; overflow-wrap: anywhere; pointer-events: none; }
 .cameo-speech[hidden] { display: none; }
 .cameo-speech::before { content: attr(data-line); display: block; visibility: hidden; }

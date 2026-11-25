@@ -234,9 +234,11 @@ test('a mouse shot changes facing but preserves travel and returns facing to the
   const { player, input, step } = setup({ heading: Math.PI, codes: ['KeyW'], firing: true });
   input.shotHeading = .37;
   step();
-  assert.ok(Math.abs(player.heading - .37) < 1e-10);
+  assert.ok(player.heading > .37 && player.heading < Math.PI);
   assert.ok(player.z < 0);
   assert.ok(Math.abs(player.x) < 1e-10);
+  step(16);
+  assert.equal(player.heading, .37);
   input.shotHeading = null;
   input.firing = false;
   step(25);
@@ -244,10 +246,12 @@ test('a mouse shot changes facing but preserves travel and returns facing to the
   assert.ok(Math.abs(player.x) < 1e-10);
 });
 
-test('a standing mouse shot turns immediately and leaves that facing for the next keyboard shot', () => {
+test('a standing mouse shot turns smoothly and leaves that facing for the next keyboard shot', () => {
   const { player, input, step } = setup({ firing: true });
   input.shotHeading = -1.23;
   step();
+  assert.ok(player.heading < 0 && player.heading > -.35);
+  step(13);
   assert.ok(Math.abs(player.heading + 1.23) < 1e-10);
   assert.equal(player.x, 0);
   assert.equal(player.z, 0);
@@ -255,6 +259,27 @@ test('a standing mouse shot turns immediately and leaves that facing for the nex
   input.keys.add('Space');
   step();
   assert.ok(Math.abs(player.heading + 1.23) < 1e-10);
+});
+
+test('mouse aim limits large swings at any frame rate and follows small corrections immediately', () => {
+  for (const fps of [30, 60, 120]) {
+    const { player, input, step } = setup({ heading: Math.PI / 2, firing: true });
+    input.shotHeading = -Math.PI / 2;
+    input.dt = 1 / fps;
+    for (let frame = 0; frame < fps / 4; frame++) {
+      const before = player.heading;
+      step();
+      assert.ok(player.heading <= before && player.heading >= input.shotHeading);
+      assert.ok(before - player.heading <= 20 / fps + 1e-10);
+      assert.equal(player.root.rotation.y, player.heading);
+      assert.equal(player.dx, Math.sin(player.heading));
+      assert.equal(player.dz, Math.cos(player.heading));
+    }
+    assert.equal(player.heading, input.shotHeading);
+    input.shotHeading += .015;
+    step();
+    assert.equal(player.heading, input.shotHeading);
+  }
 });
 
 test('W keeps moving north when the mouse swings the view east and then south', () => {
@@ -278,7 +303,10 @@ test('arrow throttle still follows the mouse aim when used on its own', () => {
     input.steerWithMouse = true;
     step(20);
     assert.ok(player.x * sign > .8);
-    assert.ok(Math.abs(player.z) < 1e-10);
+    const before = { x: player.x, z: player.z };
+    step(10);
+    assert.ok((player.x - before.x) * sign > .5);
+    assert.ok(Math.abs(player.z - before.z) < 1e-10);
   }
 });
 
@@ -362,7 +390,10 @@ test('mouse shots retain arrow throttle and turning while aimed elsewhere', () =
   assert.equal(cursor.player.x, keyboard.player.x);
   assert.equal(cursor.player.z, keyboard.player.z);
   cursor.input.shotHeading = null;
+  const heading = cursor.player.heading;
   cursor.step();
+  assert.ok(cursor.player.heading < heading && heading - cursor.player.heading <= 14 / 60 + 1e-10);
+  cursor.step(15);
   assert.equal(cursor.player.heading, cursor.player.targetHeading);
 });
 
