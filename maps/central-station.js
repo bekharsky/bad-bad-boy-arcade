@@ -25,6 +25,7 @@ export const centralStationMap = {
     sleigh: [{ x: 19.5, z: -8.8 }],
     medkit: [{ x: -3, z: 18.3 }, { x: -19, z: 6.55 }, { x: -12, z: -33 }, { x: 16, z: -14 }],
     battery: [{ x: -29, z: -16 }, { x: -6, z: -38 }, { x: 13, z: 7 }, { x: 2, z: -29 }],
+    skates: [{ x: 4, z: 10 }],
   },
   create() { return createMap(centralStationMap, buildDistrict); },
 };

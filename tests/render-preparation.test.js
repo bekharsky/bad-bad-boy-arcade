@@ -25,9 +25,9 @@ function fixture(compile = async () => {}) {
       active = value;
       if (value !== originalTarget) value.addEventListener('dispose', () => disposed.add(value));
     },
-    compileAsync(scene, camera) {
-      compilations.push({ active, transparent: wall.material.transparent, glass: glass.material.transparent });
-      return compile(scene, camera);
+    compileAsync(root, camera, targetScene) {
+      compilations.push({ root, targetScene, active, transparent: wall.material.transparent, glass: glass.material.transparent });
+      return compile(root, camera);
     },
     initTexture: value => uploads.push(value),
     render() { draws.push({ active, stream: stream.visible }); },
@@ -87,4 +87,20 @@ test('a district can warm its buffers through the covered transition instead of 
   assert.equal(coveredDraws, 1);
   assert.equal(f.draws.length, 0, 'No uncovered canvas draw');
   assert.equal(f.stream.visible, false);
+});
+
+test('a detached district only compiles its materials using the live lights and both output targets', async () => {
+  const f = fixture();
+  const district = new THREE.Group();
+  district.add(f.wall);
+  await prepareScene(f.renderer, f.scene, f.camera, () => {}, { root: district });
+  assert.equal(f.compilations.length, 2);
+  for (const compile of f.compilations) {
+    assert.equal(compile.root, district);
+    assert.equal(compile.targetScene, f.scene);
+    assert.equal(compile.transparent, false);
+  }
+  assert.notEqual(f.compilations[0].active, f.originalTarget);
+  assert.equal(f.compilations[1].active, f.originalTarget);
+  assert.deepEqual(f.uploads, [f.texture]);
 });

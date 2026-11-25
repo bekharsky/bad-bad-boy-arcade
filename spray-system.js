@@ -8,7 +8,9 @@ const POWER_COLOR = '#39ff14';
 // to the side jets as well as the centre jet. Damage shares the caller's clock.
 export function createSpraySystem(scene, world, onHit, options) {
   const centre = createLiquidStream(scene, world, onHit, options);
-  const sides = [createLiquidStream(scene, world, onHit, options), createLiquidStream(scene, world, onHit, options)];
+  // The centre jet is the aiming reference. Its rays are enough for the marker.
+  const sideOptions = { ...options, showLandingMarker: false };
+  const sides = [createLiquidStream(scene, world, onHit, sideOptions), createLiquidStream(scene, world, onHit, sideOptions)];
   const streams = [centre, ...sides];
   const facing = { dx: 0, dz: 0 };
   let powered = false;

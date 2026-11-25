@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { createHero, animateHero, HERO_BASE_HEIGHT } from './hero.js';
+import { createHero, animateHero, animateSkating, HERO_BASE_HEIGHT } from './hero.js';
 import { loadHero } from './models/hero-loader.js';
 import { maps, mapOrder } from './maps/index.js';
 import { createArenaCombat } from './arena-combat.js';
@@ -15,7 +15,7 @@ import { createSleighParts } from './models/sleigh.js';
 import { createSleighAssembly } from './sleigh-assembly.js';
 import { createSleighIntro } from './sleigh-intro.js';
 import { createSleighCache, sleighGuardPosts } from './sleigh-search.js';
-import { createBatteries } from './batteries.js';
+import { createArenaBoosts } from './arena-boosts.js';
 import { loadEnemyModels, createEnemy, animateEnemy, disposeEnemy } from './enemies.js';
 import { createSpraySystem } from './spray-system.js';
 import { createBiteEffects } from './bites.js';
@@ -68,7 +68,10 @@ const leaderboard = createLeaderboard({
   retryButton: document.querySelector('#retry-score'),
 });
 const heroHud = document.querySelector('#hero-hud');
-const heroPower = document.querySelector('#hero-power');
+const boostHud = ['battery', 'skates'].map(kind => {
+  const icon = document.querySelector(`#${kind}-boost`);
+  return { icon, ring: icon.querySelector('.boost-time'), percent: 0 };
+});
 const heroHeadPosition = new THREE.Vector3();
 const scoreLabel = document.querySelector('#score');
 const levelDial = document.querySelector('#level-dial');
@@ -221,6 +224,8 @@ const player = {
   radius: 0.32 * HERO_SCALE,
   invulnerable: 0,
   powerTimer: 0,
+  skateTimer: 0,
+  skateBlend: 0,
   fireTimer: 0,
   tapTimer: 0,
   mouseTap: false,
@@ -267,7 +272,7 @@ const arenaCombat = createArenaCombat({
 const effects = createBurstEffects(scene);
 const biteEffects = createBiteEffects(scene);
 const medkits = createMedkits(scene, world);
-const batteries = createBatteries(scene, world);
+const arenaBoosts = createArenaBoosts(scene, world);
 const sprayAim = createSprayAim();
 const sprayTargets = [];
 const seagulls = createSeagulls(scene, world, {
@@ -283,6 +288,8 @@ const seagulls = createSeagulls(scene, world, {
 });
 // Battery cans are hidden in back courtyards. Exploration powers up the spray.
 const POWER_TIME = 8;
+const SKATE_TIME = 8;
+const SKATE_SPEED_MULTIPLIER = 1.35;
 let playing = false;
 let gameTime = 0;
 let score = 0;
@@ -301,6 +308,7 @@ let runnerArrival = 0;
 let runnerCrash = 0;
 let audioContext = null;
 let renderingReady = false;
+let preparedDistrict = null;
 const frameClock = createFrameClock();
 const isRunner = () => world.mode === 'runner';
 const runnerSession = createRunnerSession({
@@ -366,14 +374,14 @@ function transitionToDistrict(index) {
   syncMouseAim();
 }
 
-async function prepareGraphics() {
+async function prepareGraphics(root = scene) {
   renderingReady = false;
   startOver.disabled = true;
   try {
     await prepareScene(renderer, scene, camera, () => {
       if (mapTransition.active) transitionRenderer.render(scene, camera, mapTransition.progress, reducedMotion.matches);
       else renderer.render(scene, camera);
-    });
+    }, { root, fadeMaterials: [player.model.material] });
   } finally {
     frameClock.reset();
     startOver.disabled = false;
@@ -516,7 +524,7 @@ async function loadModels() {
     player.model = player.rig.mesh;
     player.model.scale.setScalar(HERO_SCALE);
     player.body.add(player.model);
-    placePlayerAtSpawn();
+    placePlayerAtSpawn(showSenatePreview);
     frameMenuPreview();
     // These hidden representatives retain enemy programs across districts,
     // including runs that start on a track without any arena enemies.
@@ -526,7 +534,18 @@ async function loadModels() {
     enemyPrograms.add(createEnemy('goose', 1).root);
     scene.add(enemyPrograms);
     status.textContent = 'Preparing the graphics…';
+    await sleighAssembly.prepare(renderer);
     await prepareGraphics();
+    // Keep one district ready ahead of the first pickup, while the loading
+    // screen is still up. Leave the preview scene in place until Play.
+    try {
+      const next = world.prepare(itinerary[1].id);
+      weather.prepareSurfaces(next);
+      await prepareScene(renderer, scene, camera, () => {}, { root: next });
+      preparedDistrict = next;
+    } catch (error) {
+      console.warn('Could not prepare the next district:', error);
+    }
     status.classList.add('hidden');
     startButton.disabled = false;
     startButton.textContent = 'PLAY';
@@ -616,7 +635,7 @@ function enterDistrict({ index }) {
     runnerReward.place(index, world.runner.length);
     runnerSession.start(world.runner);
   } else {
-    batteries.reset(player);
+    arenaBoosts.reset(player);
     const [cache] = world.pickupPoints('sleigh', .85);
     if (!cache) throw new Error(`Missing reachable sleigh part in ${district.id}`);
     sleighCache.place(cache, index);
@@ -650,8 +669,9 @@ function enterDistrict({ index }) {
       spawnEnemies(cache, openingArena ? 3 : 6, strength, { minPlayerDistance: openingArena ? 11 : 8 });
     }
   }
-  if (changedMap && renderingReady) {
-    prepareGraphics().catch(error => {
+  if (changedMap && world.root === preparedDistrict) preparedDistrict = null;
+  else if (changedMap && renderingReady) {
+    prepareGraphics(world.root).catch(error => {
       console.warn('Could not prepare district graphics:', error);
       renderingReady = true;
     });
@@ -727,6 +747,7 @@ function updateMovement(dt, firing) {
   const heading = mouseAim.aiming && (mouseFiring || mouseAim.following) ? Math.atan2(aimOffset.x, aimOffset.z) : null;
   return movePlayer(player, world, {
     keys, touch: touchControls.input, dt, firing, height: HERO_HEIGHT,
+    speedMultiplier: player.skateTimer > 0 ? SKATE_SPEED_MULTIPLIER : 1,
     cursorHeading: heading,
     shotHeading: mouseFiring ? heading : null,
     touchHeading: (usingTouchControls ? touchControls.aimHeading : null)
@@ -841,12 +862,16 @@ function update(dt) {
   if (moving) player.runAngle = Math.atan2(player.x - oldX, player.z - oldZ) - player.heading;
   player.runBlend = THREE.MathUtils.damp(player.runBlend, moving ? 1 : 0, 18, dt);
   player.body.position.y = (Math.abs(Math.sin(player.runTime)) * 0.035 * player.runBlend + Math.sin(gameTime * 1.5) * 0.008 * (1 - player.runBlend)) * HERO_SCALE;
-  const stride = player.runBlend * THREE.MathUtils.clamp(player.moveSpeed / player.speed, -1, 1);
+  const stride = player.runBlend * THREE.MathUtils.clamp(player.moveSpeed / player.speed, -1, player.skateTimer > 0 ? SKATE_SPEED_MULTIPLIER : 1);
   player.body.rotation.z = Math.cos(player.runTime) * 0.025 * player.runBlend - Math.sin(player.runAngle) * .06 * stride;
   player.body.rotation.x = 0.07 * Math.cos(player.runAngle) * stride;
   animateHero(player.rig, player.runTime, player.runBlend, player.runAngle);
+  player.skateBlend = THREE.MathUtils.damp(player.skateBlend, Number(player.skateTimer > 0), 20, dt);
+  if (player.skateBlend > .005) {
+    animateSkating(player.rig, player.body, player.runTime * .32, Math.min(1, stride), player.runAngle, player.skateBlend);
+  }
   medkits.update(dt, player, collectMedkit);
-  batteries.update(dt, player, collectBattery);
+  arenaBoosts.update(dt, player, collectBoost);
 
   // Each parcel starts at the hands, then follows its own ballistic trajectory.
   seagulls.update(dt, player);
@@ -858,6 +883,7 @@ function update(dt) {
   const spray = updateSpray(dt, firing, enemies, player.powerTimer > 0);
   player.tapTimer = Math.max(0, player.tapTimer - dt);
   player.powerTimer = Math.max(0, player.powerTimer - dt);
+  player.skateTimer = Math.max(0, player.skateTimer - dt);
   updateSprayFeedback(spray);
   player.fireTimer -= dt;
   if (firing && player.fireTimer <= 0) {
@@ -980,25 +1006,40 @@ function updateDialLabel() {
   if (levelDial.getAttribute('aria-label') !== label) levelDial.setAttribute('aria-label', label);
 }
 
-// Anchors temporary power and encounter hints above the hero.
+function updateBoostHud() {
+  const show = playing && !gameInterlude();
+  const remaining = [player.powerTimer / POWER_TIME, player.skateTimer / SKATE_TIME];
+  for (const [index, boost] of boostHud.entries()) {
+    const fraction = show ? remaining[index] : 0;
+    const hidden = fraction <= 0;
+    if (boost.icon.hasAttribute('hidden') !== hidden) boost.icon.toggleAttribute('hidden', hidden);
+    const percent = Math.min(100, Math.ceil(fraction * 100));
+    if (!hidden && boost.percent !== percent) {
+      boost.percent = percent;
+      boost.ring.setAttribute('stroke-dasharray', `${percent} 100`);
+    }
+  }
+}
+
+// Anchors encounter hints above the hero using the current viewport dimensions.
 function updateHeroOverlay() {
-  const powered = player.powerTimer > 0;
-  const label = powered ? `BATTERY ${Math.ceil(player.powerTimer)}s` : '';
-  if (heroPower.textContent !== label) heroPower.textContent = label;
-  heroPower.hidden = !powered;
-  if (!playing || (!powered && encounterHint.hidden)) { heroHud.hidden = true; return; }
+  if (!playing || encounterHint.hidden || gameInterlude()) { heroHud.hidden = true; return; }
   heroHeadPosition.set(player.x, HERO_HEIGHT + 0.5, player.z).project(camera);
   const onScreen = heroHeadPosition.z < 1;
   heroHud.hidden = !onScreen;
   if (!onScreen) return;
-  const shell = heroHud.offsetParent.getBoundingClientRect();
-  const rect = canvas.getBoundingClientRect();
-  const x = rect.left - shell.left + (heroHeadPosition.x * 0.5 + 0.5) * rect.width;
-  const y = rect.top - shell.top + (-heroHeadPosition.y * 0.5 + 0.5) * rect.height;
+  const x = (heroHeadPosition.x * 0.5 + 0.5) * viewWidth;
+  const y = (-heroHeadPosition.y * 0.5 + 0.5) * viewHeight;
   heroHud.style.transform = `translate(${x - 32}px, ${y}px)`;
 }
 
-function collectBattery() {
+function collectBoost(kind) {
+  if (kind === 'skates') {
+    player.skateTimer += SKATE_TIME;
+    showToast('SPEED SKATES!');
+    blip(990, .15);
+    return;
+  }
   player.powerTimer += POWER_TIME;
   showToast('BATTERY POWER!');
   blip(880, .15);
@@ -1011,7 +1052,7 @@ function collectMedkit(amount) {
   blip(740, .12);
 }
 
-function placePlayerAtSpawn() {
+function placePlayerAtSpawn(menuPreview = false) {
   player.x = world.spawn.x;
   player.z = world.spawn.z;
   player.heading = world.spawn.heading ?? Math.PI;
@@ -1030,7 +1071,8 @@ function placePlayerAtSpawn() {
   player.root.position.set(player.x, 0, player.z);
   player.body.position.set(0, 0, 0);
   player.body.rotation.set(0, 0, 0);
-  if (isRunner()) cameraRig.frameRunner(0, 0, true);
+  if (menuPreview) cameraRig.frameMenu(player.x, player.z);
+  else if (isRunner()) cameraRig.frameRunner(0, 0, true);
   else cameraRig.frameArena(player.x, player.z, 0, { instant: true });
   animateHero(player.rig, 0, 0);
 }
@@ -1110,7 +1152,9 @@ function clearArena() {
   medkits.clear();
   player.tapTimer = 0;
   player.powerTimer = 0;
-  batteries.clear();
+  player.skateTimer = 0;
+  player.skateBlend = 0;
+  arenaBoosts.clear();
   sleighCache.clear();
   runnerReward.clear();
   arenaCameos.clear();
@@ -1170,6 +1214,7 @@ function animate(now) {
     transitionRenderer.render(scene, camera, mapTransition.progress, reducedMotion.matches);
   } else renderer.render(scene, camera);
   updateHeroOverlay();
+  updateBoostHud();
   updateCameoSpeech();
   drawMouseReticle();
 }

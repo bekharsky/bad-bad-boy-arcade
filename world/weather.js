@@ -145,8 +145,7 @@ export function createWeather(scene, fill, sun, { compact = false } = {}) {
     material.needsUpdate = true;
   }
 
-  function enter(kind, mapRoot) {
-    const look = conditions[kind];
+  function prepareSurfaces(mapRoot) {
     // Traffic templates and occupied slots keep their painted figure finish.
     function visit(node) {
       if (node.userData.runnerTraffic) return;
@@ -157,6 +156,11 @@ export function createWeather(scene, fill, sun, { compact = false } = {}) {
       node.children.forEach(visit);
     }
     visit(mapRoot);
+  }
+
+  function enter(kind, mapRoot) {
+    const look = conditions[kind];
+    prepareSurfaces(mapRoot);
     for (const key of ['sky','horizon','cloud']) sky.material.uniforms[key].value.set(look[key]);
     fog.color.set(look.horizon); fog.near = look.near; fog.far = look.far;
     scene.background = fog.color; scene.fog = fog;
@@ -168,7 +172,7 @@ export function createWeather(scene, fill, sun, { compact = false } = {}) {
     field.material.uniforms.seconds.value = 0; travel.value = 0;
   }
   return {
-    enter,
+    enter, prepareSurfaces,
     update(dt, distance) { field.material.uniforms.seconds.value += dt; travel.value = distance; },
     dispose() {
       for (const mesh of [sky, field]) { mesh.removeFromParent(); mesh.geometry.dispose(); mesh.material.dispose(); }

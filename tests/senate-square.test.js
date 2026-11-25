@@ -83,7 +83,7 @@ test('runner speed opens and closes the lens smoothly, pause freezes it and aren
   }
 });
 
-test('the arena camera centres at rest and looks ahead in all eight movement directions', () => {
+test('the arena camera returns to its resting frame and looks ahead in all eight movement directions', () => {
   for (const [width, height, touch] of [[1280, 720, false], [390, 844, true]]) {
     const rig = createGameCamera();
     rig.resize(width, height, touch);
@@ -91,15 +91,14 @@ test('the arena camera centres at rest and looks ahead in all eight movement dir
     const runnerProjection = rig.camera.projectionMatrix.clone();
     for (const [x, z] of [[0, 1], [1, 1], [1, 0], [1, -1], [0, -1], [-1, -1], [-1, 0], [-1, 1]]) {
       const hero = { x: -5, z: 7 };
-      const screenOffset = () => {
+      const screenOffset = (anchorY = touch ? .5 : .55) => {
         rig.camera.updateMatrixWorld(true);
         const centre = new THREE.Vector3(hero.x, 1.725, hero.z).project(rig.camera);
-        return { x: centre.x / 2, y: -centre.y / 2 };
+        return { x: centre.x / 2, y: (1 - centre.y) / 2 - anchorY };
       };
       rig.frameArena(hero.x, hero.z, 0, { instant: true });
-      const centre = screenOffset();
+      const centre = screenOffset(touch ? .6 : .68);
       assert.ok(Math.hypot(centre.x, centre.y) < .01);
-      const viewAngle = rig.camera.quaternion.clone();
 
       const dt = 1 / 60, step = 3.6 * dt / Math.hypot(x, z);
       const dx = x * step, dz = z * step;
@@ -111,11 +110,13 @@ test('the arena camera centres at rest and looks ahead in all eight movement dir
       const offset = screenOffset();
       if (x) assert.ok(offset.x * x < -.02, 'Horizontal travel opens the leading side');
       if (z) assert.ok(offset.y * z < -.02, 'Vertical travel opens the leading side');
-      assert.ok(rig.camera.quaternion.angleTo(viewAngle) < 1e-7);
+      assert.ok(Math.abs(THREE.MathUtils.radToDeg(rig.camera.rotation.x) + 35) < .01);
+      const viewAngle = rig.camera.quaternion.clone();
 
       for (let i = 0; i < 120; i++) rig.frameArena(hero.x, hero.z, dt);
       const stopped = screenOffset();
       assert.ok(Math.hypot(stopped.x, stopped.y) < .01);
+      assert.ok(rig.camera.quaternion.angleTo(viewAngle) < 1e-7);
     }
     rig.frameRunner(0, 0, true);
     assert.deepEqual(rig.camera.projectionMatrix.elements, runnerProjection.elements);
@@ -128,7 +129,8 @@ test('the arena camera eases into starts, turns, reversals and stops', () => {
   rig.frameArena(0, 0, 0, { instant: true });
   const dt = 1 / 120;
   const hero = new THREE.Vector2();
-  const position = new THREE.Vector2(0, 15);
+  const distance = rig.camera.position.z;
+  const position = new THREE.Vector2(0, distance);
   const velocity = new THREE.Vector2();
   const nextPosition = new THREE.Vector2(), nextVelocity = new THREE.Vector2();
   const phases = [
@@ -151,7 +153,35 @@ test('the arena camera eases into starts, turns, reversals and stops', () => {
       velocity.copy(nextVelocity);
     }
   }
-  assert.ok(Math.hypot(position.x - hero.x, position.y - hero.y - 15) < .05);
+  assert.ok(Math.hypot(position.x - hero.x, position.y - hero.y - distance) < .05);
+});
+
+test('the higher arena view frames the hero and the street beyond', () => {
+  const spawn = { x: 0, z: 0 };
+  const groundRatio = camera => {
+    const origin = new THREE.Vector3().project(camera);
+    const right = new THREE.Vector3(.01, 0, 0).project(camera);
+    const down = new THREE.Vector3(0, 0, .01).project(camera);
+    return Math.abs((down.y - origin.y) / ((right.x - origin.x) * camera.aspect));
+  };
+  const rig = createGameCamera();
+  for (const [width, height, touch] of [[1280, 720, false], [390, 844, true], [844, 390, true]]) {
+    rig.resize(width, height, touch);
+    rig.frameMenu(0, 0);
+    const original = heroProjection(rig.camera, spawn);
+    const originalRatio = groundRatio(rig.camera);
+    const originalHeight = rig.camera.position.y;
+    rig.frameArena(0, 0, 0, { instant: true });
+    rig.frameArena(.05, 0, 1 / 60, { dx: .05 });
+    for (let i = 0; i < 120; i++) rig.frameArena(.05, 0, 1 / 60);
+    const arena = heroProjection(rig.camera, { x: .05, z: 0 });
+    assert.ok(Math.abs(THREE.MathUtils.radToDeg(rig.camera.rotation.x) + 35) < .01);
+    assert.ok(rig.camera.position.y > originalHeight);
+    assert.ok(groundRatio(rig.camera) > originalRatio * 1.15);
+    assert.ok(arena.height > original.height * .75 && arena.height < original.height * .85);
+    const acrossStreet = new THREE.Vector3(0, 2.4, -23).project(rig.camera);
+    assert.ok(acrossStreet.y < 1, 'Facades across the street should be visible from spawn');
+  }
 });
 
 test('mobile framing reserves space below the hero in portrait and landscape, including braking and boosting', () => {
@@ -254,7 +284,7 @@ test('the square tram clears actors, blocks liquid while passing and resets its 
   map.dispose();
 });
 
-test('the cathedral fits the shared camera and real map switches dispose their own geometry', () => {
+test('the cathedral fits the opening arena view and real map switches dispose their own geometry', () => {
   const scene = new THREE.Scene();
   const world = createMapManager(scene, maps, .736);
   world.activate('senate-square');
@@ -266,12 +296,26 @@ test('the cathedral fits the shared camera and real map switches dispose their o
   const box = new THREE.Box3().setFromObject(church);
   assert.ok(box.max.y > 17, 'The cathedral rises above the town');
   const rig = createGameCamera();
-  rig.resize(577, 774, true);
-  rig.frame(world.spawn.x, world.spawn.z, 0, true);
   const { camera } = rig;
-  camera.updateMatrixWorld(true);
-  const top = new THREE.Vector3(0, box.max.y, -35).project(camera);
-  assert.ok(top.y < .95 && top.y > -.9, 'The main dome stays in frame on a portrait screen');
+  for (const [width, height, touch] of [[1280, 720, false], [390, 844, true], [844, 390, true]]) {
+    rig.resize(width, height, touch);
+    const { x, z } = world.spawn;
+    const dt = 1 / 60;
+    rig.frameArena(x, z, 0, { instant: true });
+    const top = new THREE.Vector3(0, box.max.y, -35).project(camera);
+    assert.ok(Math.abs(top.x) < 1 && top.y < .98 && top.y > -.9, 'The main dome stays in frame at spawn');
+    const openingFov = camera.fov;
+    for (let i = 0; i < 120; i++) rig.frameArena(x, z, dt);
+    assert.equal(camera.fov, openingFov);
+    assert.ok(Math.abs(THREE.MathUtils.radToDeg(camera.rotation.x) + 20) < .01);
+    rig.frameArena(x + .05, z, dt, { dx: .05 });
+    for (let i = 0; i < 30; i++) rig.frameArena(x + .05, z, dt);
+    const midPitch = -THREE.MathUtils.radToDeg(camera.rotation.x);
+    assert.ok(midPitch > 20 && midPitch < 35);
+    for (let i = 0; i < 120; i++) rig.frameArena(x + .05, z, dt);
+    assert.ok(Math.abs(THREE.MathUtils.radToDeg(camera.rotation.x) + 35) < .01);
+    assert.ok(camera.fov < openingFov);
+  }
   const geometry = church.children[0].geometry;
   let disposed = 0;
   geometry.addEventListener('dispose', () => disposed++);

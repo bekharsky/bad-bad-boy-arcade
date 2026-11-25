@@ -33,6 +33,15 @@ test('3D queries respect height, radius, grazing faces and world boundaries', ()
   assert.equal(nav.lineClear(0, 3, 10, 3, .01), false);
 });
 
+test('short rays and expanded radii still find a collider crossing a spatial bucket boundary', () => {
+  const nav = createNavigation({ bounds, colliders: [{ minX: -4.05, maxX: -3.95, minZ: -5, maxZ: -3, height: 2 }] });
+  assert.equal(nav.lineClear3D(point(-4.2, .5, -4.5), point(-4.01, .5, -4.5)), false);
+  assert.equal(nav.lineClear3D(point(-3.9, .5, -3.5), point(-3.8, .5, -3.5), .06), false);
+  assert.equal(nav.lineClear3D(point(-4.2, .5, -4), point(-3.8, .5, -4)), false);
+  assert.equal(nav.lineClear3D(point(-4.2, 2.1, -4), point(-3.8, 2.1, -4)), true);
+  assert.equal(nav.canStandAt(-3.9, -3.5, .04), true);
+});
+
 test('dynamic collision data is read once per segment and reflects moving obstacles', () => {
   let calls = 0, active = [];
   const nav = createNavigation({ bounds, dynamicColliders() { calls++; return active; } });

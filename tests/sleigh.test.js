@@ -15,6 +15,7 @@ test('every arena keeps its sleigh cache reachable, hidden and surrounded by val
     try {
       const [cache, extra] = world.pickupPoints('sleigh', .85);
       assert.ok(cache && !extra, district.id);
+      assert.equal(world.pickupPoints('skates', .86).length, 1, `${district.id} has reachable speed skates`);
       const view = createGameCamera();
       view.frame(world.spawn.x, world.spawn.z, 0, true);
       const pickupHeight = { ...cache, y: 1.8 };

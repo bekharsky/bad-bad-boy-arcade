@@ -26,12 +26,33 @@ function crosses(c, x, y, z, tx, ty, tz, r) {
 
 // Gameplay queries use simple collision data, independently of rendered meshes.
 export function createNavigation({ bounds, colliders = [], dynamicColliders = () => [] }) {
+  // Most spray segments and movement steps are much shorter than a block.
+  // Use the block's static colliders when the whole expanded query fits in it.
+  const bucketSize = 6;
+  const bucketWidth = Math.ceil((bounds.maxX - bounds.minX) / bucketSize) + 1;
+  const bucketDepth = Math.ceil((bounds.maxZ - bounds.minZ) / bucketSize) + 1;
+  const buckets = Array.from({ length: bucketWidth * bucketDepth }, () => []);
+  const bucketX = x => Math.floor((x - bounds.minX) / bucketSize);
+  const bucketZ = z => Math.floor((z - bounds.minZ) / bucketSize);
+  for (const collider of colliders) {
+    const x0 = Math.max(0, bucketX(collider.minX)), x1 = Math.min(bucketWidth - 1, bucketX(collider.maxX));
+    const z0 = Math.max(0, bucketZ(collider.minZ)), z1 = Math.min(bucketDepth - 1, bucketZ(collider.maxZ));
+    for (let z = z0; z <= z1; z++) {
+      for (let x = x0; x <= x1; x++) buckets[z * bucketWidth + x].push(collider);
+    }
+  }
+  function localColliders(minX, minZ, maxX, maxZ) {
+    const x = bucketX(minX), z = bucketZ(minZ);
+    if (x < 0 || z < 0 || x >= bucketWidth || z >= bucketDepth
+      || x !== bucketX(maxX) || z !== bucketZ(maxZ)) return colliders;
+    return buckets[z * bucketWidth + x];
+  }
   function outside(x, z, r) {
     return x - r < bounds.minX || x + r > bounds.maxX || z - r < bounds.minZ || z + r > bounds.maxZ;
   }
   function blocked(x, z, r = .4, y = null) {
-    return outside(x, z, r)
-      || colliders.some(c => overlaps(c, x, z, r, y)) || dynamicColliders().some(c => overlaps(c, x, z, r, y));
+    return outside(x, z, r) || localColliders(x - r, z - r, x + r, z + r).some(c => overlaps(c, x, z, r, y))
+      || dynamicColliders().some(c => overlaps(c, x, z, r, y));
   }
   function move(entity, dx, dz, r) {
     const x = clamp(entity.x + dx, bounds.minX + r, bounds.maxX - r);
@@ -50,7 +71,8 @@ export function createNavigation({ bounds, colliders = [], dynamicColliders = ()
   function segmentClear(x, y, z, tx, ty, tz, r, allowOutsideOrigin = false) {
     // Gameplay stays inside the map. A camera can look in from beyond its edge.
     if ((!allowOutsideOrigin && outside(x, z, r)) || outside(tx, tz, r)) return false;
-    for (const c of colliders) if (crosses(c, x, y, z, tx, ty, tz, r)) return false;
+    const nearby = localColliders(Math.min(x, tx) - r, Math.min(z, tz) - r, Math.max(x, tx) + r, Math.max(z, tz) + r);
+    for (const c of nearby) if (crosses(c, x, y, z, tx, ty, tz, r)) return false;
     for (const c of dynamicColliders()) if (crosses(c, x, y, z, tx, ty, tz, r)) return false;
     return true;
   }

@@ -49,16 +49,14 @@ button { font: inherit; }
 .mouse-reticle-active #game, .mouse-reticle-active :is(.joystick-zone, .spray-zone) { cursor: none; }
 .mouse-reticle { position: absolute; z-index: 3; transform: translate(-50%, -50%); fill: none; stroke-linecap: round; pointer-events: none; }
 .mouse-reticle-charge { stroke-dasharray: var(--reticle-charge, 0) 100; stroke-linecap: butt; }
-.cameo-speech { position: absolute; top: 0; left: 0; z-index: 3; width: max-content; max-width: min(210px, calc(100% - 24px)); --speech-padding: 7px 11px; padding: var(--speech-padding); border-radius: 8px; background: #fff3d8; color: #231c25; box-shadow: 0 2px 8px #12162270; font: 650 13px/1.26 Inter, sans-serif; text-align: left; overflow-wrap: anywhere; pointer-events: none; }
+.cameo-speech { position: absolute; top: 0; left: 0; z-index: 3; width: max-content; max-width: min(182px, calc(100% - 24px)); --speech-padding: 5px 8px; --speech-background: #fff3d8d4; padding: var(--speech-padding); border-radius: 6px; background: var(--speech-background); color: #231c25; box-shadow: 0 2px 5px #1216224d; font: 650 12px/1.24 Inter, sans-serif; text-align: left; overflow-wrap: anywhere; pointer-events: none; }
 .cameo-speech[hidden] { display: none; }
 .cameo-speech::before { content: attr(data-line); display: block; visibility: hidden; }
 .cameo-speech > span { position: absolute; inset: var(--speech-padding); }
 .cameo-speech > span::after { content: attr(data-rest); visibility: hidden; }
-.cameo-speech::after { content: ''; position: absolute; left: clamp(8px, calc(50% + var(--speech-tail-x, 0px)), calc(100% - 8px)); top: calc(100% - 1px); transform: translateX(-50%); border: 6px solid transparent; border-top-color: #fff3d8; }
+.cameo-speech::after { content: ''; position: absolute; left: clamp(7px, calc(50% + var(--speech-tail-x, 0px)), calc(100% - 7px)); top: 100%; transform: translateX(-50%); border: 5px solid transparent; border-top-color: var(--speech-background); }
 .hero-hud { position: absolute; left: 0; top: 0; width: 64px; height: 7px; pointer-events: none; }
-.hero-power { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 4px; font-size: 13px; font-weight: 800; white-space: nowrap; color: #39ff14; text-shadow: 0 0 6px #39ff14aa; }
 .encounter-hint { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 4px; padding: 5px 9px; border-radius: 6px; background: #121622ed; color: var(--gold); font: 700 13px/1.3 Inter, sans-serif; white-space: nowrap; }
-.hero-power:not([hidden]) + .encounter-hint { margin-bottom: 22px; }
 .mouse-hint-icon { display: block; width: 24px; height: 34px; fill: none; stroke: #fff2d6; stroke-width: 1.6; stroke-linejoin: round; }
 .encounter-hint:not([data-button]) .mouse-hint-icon { display: none; }
 .encounter-hint[data-button] { padding: 5px 7px; border-radius: 9px; }
@@ -82,6 +80,13 @@ button { font: inherit; }
 #sleigh-segments .collected { stroke: #ffd069; }
 .sleigh-silhouette { fill: #554836a6; }
 .sleigh-filled { fill: #ffdb80; }
+.boost-hud { grid-column: 1; grid-row: 2; justify-self: center; display: flex; gap: 4px; margin-top: -7px; }
+.boost-hud:not(:has(svg:not([hidden]))) { display: none; }
+.boost-hud svg { width: 28px; height: 28px; }
+#battery-boost { color: #a3f17c; }
+#skates-boost { color: #a1e6ff; }
+.boost-bg { fill: #121d29e8; stroke: #eaf1ff46; stroke-width: 1.5; }
+.boost-time { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
 .level-dial { position: relative; grid-column: 3; grid-row: 1; justify-self: end; width: 72px; height: 72px; display: grid; place-items: center; }
 .level-dial svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 .level-arc-track, .health-arc-track, .level-progress-arc, .health-progress-arc { fill: none; stroke-linecap: round; stroke-width: 5; }

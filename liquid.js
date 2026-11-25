@@ -16,10 +16,14 @@ const MAX_PARCELS = 360;
 const MAX_DROPS = 160;
 const SIDES = 8;
 const UP = new THREE.Vector3(0, 1, 0);
+const RING_POINTS = Array.from({ length: SIDES }, (_, i) => {
+  const angle = i / SIDES * Math.PI * 2;
+  return [Math.cos(angle), Math.sin(angle)];
+});
 
 // Flight, rendering, and damage all use the same parcels of liquid. Once a
 // parcel leaves the emitter, turning the character cannot redirect it.
-export function createLiquidStream(scene, city, onHit, { scale = 1, refraction = true, getHitTime = null } = {}) {
+export function createLiquidStream(scene, city, onHit, { scale = 1, refraction = true, getHitTime = null, showLandingMarker = true } = {}) {
   const radius = RADIUS * scale;
   // Tune the appearance separately from the collision and aiming radius.
   const visualRadius = radius * VISUAL_WIDTH;
@@ -78,13 +82,15 @@ export function createLiquidStream(scene, city, onHit, { scale = 1, refraction =
   droplets.visible = false;
   scene.add(droplets);
 
-  const landingMarker = new THREE.Mesh(
+  const landingMarker = showLandingMarker ? new THREE.Mesh(
     new THREE.RingGeometry(0.24, 0.3, 32),
     new THREE.MeshBasicMaterial({ color: '#fff0a1', transparent: true, opacity: 0.65, depthWrite: false, side: THREE.DoubleSide }),
-  );
-  landingMarker.rotation.x = -Math.PI / 2;
-  landingMarker.visible = false;
-  scene.add(landingMarker);
+  ) : null;
+  if (landingMarker) {
+    landingMarker.rotation.x = -Math.PI / 2;
+    landingMarker.visible = false;
+    scene.add(landingMarker);
+  }
 
   function flightTime(height, verticalSpeed) {
     return (verticalSpeed + Math.sqrt(verticalSpeed * verticalSpeed + 2 * GRAVITY * Math.max(0, height - groundHeight))) / GRAVITY;
@@ -265,7 +271,7 @@ export function createLiquidStream(scene, city, onHit, { scale = 1, refraction =
   }
 
   function render(firing) {
-    let ring = 0, indexCount = 0, dropCount = 0, previous = null;
+    let ring = 0, indexCount = 0, dropCount = 0, previousPosition, previousId, previousBatch;
     function addRing(position, velocity, age, id, batchId, charge) {
       tangent.copy(velocity).normalize();
       side.crossVectors(tangent, UP).normalize();
@@ -274,15 +280,15 @@ export function createLiquidStream(scene, city, onHit, { scale = 1, refraction =
       const pulse = 1 + 0.12 * Math.sin(id * 1.8 - time * 9) + 0.07 * Math.sin(id * 0.6 + time * 17);
       const ringRadius = visualRadius * (.85 + charge * .65) * pulse * (1 + age * 0.3);
       for (let j = 0; j < SIDES; j++) {
-        const angle = j / SIDES * Math.PI * 2;
-        radial.copy(side).multiplyScalar(Math.cos(angle)).addScaledVector(normal, Math.sin(angle));
+        const [cos, sin] = RING_POINTS[j];
+        radial.copy(side).multiplyScalar(cos).addScaledVector(normal, sin);
         const offset = (ring * SIDES + j) * 3;
         vertices[offset] = position.x + radial.x * ringRadius;
         vertices[offset + 1] = position.y + radial.y * ringRadius;
         vertices[offset + 2] = position.z + radial.z * ringRadius;
         normals[offset] = radial.x; normals[offset + 1] = radial.y; normals[offset + 2] = radial.z;
       }
-      if (previous && previous.batch === batchId && id === previous.id + 1 && previous.position.distanceToSquared(position) < 0.26 ** 2) {
+      if (previousPosition && previousBatch === batchId && id === previousId + 1 && previousPosition.distanceToSquared(position) < 0.26 ** 2) {
         for (let j = 0; j < SIDES; j++) {
           const a = (ring - 1) * SIDES + j, b = (ring - 1) * SIDES + (j + 1) % SIDES;
           const c = ring * SIDES + j, d = ring * SIDES + (j + 1) % SIDES;
@@ -290,7 +296,7 @@ export function createLiquidStream(scene, city, onHit, { scale = 1, refraction =
           indices[indexCount++] = b; indices[indexCount++] = d; indices[indexCount++] = c;
         }
       }
-      previous = { position, id, batch: batchId };
+      previousPosition = position; previousId = id; previousBatch = batchId;
       ring++;
     }
     for (const parcel of parcels) {
@@ -370,7 +376,7 @@ export function createLiquidStream(scene, city, onHit, { scale = 1, refraction =
     }
     for (const ripple of ripples) ripple.age += dt;
     render(firing);
-    updateLandingMarker(firing);
+    if (landingMarker) updateLandingMarker(firing);
     previousOrigin.copy(origin);
     wasFiring = firing;
     return state;
@@ -381,7 +387,7 @@ export function createLiquidStream(scene, city, onHit, { scale = 1, refraction =
     accumulator = emission = 0; wasFiring = false;
     heldTime = 0; state.charge = 0; state.blocked = false; state.airborne = false; aimTarget = null;
     surface.visible = false; droplets.count = 0; droplets.visible = false;
-    landingMarker.visible = false;
+    if (landingMarker) landingMarker.visible = false;
     for (const ripple of ripples) { ripple.age = 1; ripple.mesh.visible = false; }
   }
   // Tints the stream and its droplets. Glow is the emissive colour.

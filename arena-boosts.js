@@ -1,10 +1,14 @@
 import * as THREE from 'three';
+import { createSpeedSkates } from './models/speed-skate.js';
+import { disposeObject } from './world/dispose.js';
 
-export function createBatteries(scene, world) {
+export function createArenaBoosts(scene, world) {
   const root = new THREE.Group();
-  root.name = 'Battery pickups';
-  scene.add(root);
-  const batteries = [];
+  root.name = 'Arena boost pickups';
+  const templates = new THREE.Group();
+  templates.visible = false;
+  scene.add(root, templates);
+  const pickups = [];
   // Battery energy drink can: black body, gold label. The side carries the label; the ends are plain black.
   function makeCanLabel() {
     const canvasLabel = document.createElement('canvas');
@@ -29,28 +33,31 @@ export function createBatteries(scene, world) {
   const canEnd = new THREE.MeshStandardMaterial({ color: '#111', roughness: 0.35, metalness: 0.4 });
   const batteryMaterials = [new THREE.MeshStandardMaterial({ map: makeCanLabel(), roughness: 0.35, metalness: 0.4 }), canEnd, canEnd];
 
+  const models = { battery: new THREE.Mesh(batteryGeometry, batteryMaterials), skates: createSpeedSkates([-.13, .13]) };
+  templates.add(...Object.values(models));
+
   function clear() {
     root.clear();
-    batteries.length = 0;
+    pickups.length = 0;
   }
   function reset(player) {
     clear();
-    for (const point of world.pickupPoints('battery', player.radius + .12)) {
-      const mesh = new THREE.Mesh(batteryGeometry, batteryMaterials);
-      mesh.position.set(point.x, .3, point.z);
-      root.add(mesh);
-      batteries.push({ ...point, mesh });
+    for (const [kind, model] of Object.entries(models)) for (const point of world.pickupPoints(kind, player.radius + .12)) {
+      const object = model.clone();
+      object.position.set(point.x, .3, point.z);
+      root.add(object);
+      pickups.push({ ...point, kind, object });
     }
   }
   function update(dt, player, onPickup) {
-    for (let i = batteries.length - 1; i >= 0; i--) {
-      const battery = batteries[i];
-      battery.mesh.rotation.y += dt * 2;
-      if (Math.hypot(player.x - battery.x, player.z - battery.z) > player.radius + .4) continue;
-      if (!world.lineClear(player.x, player.z, battery.x, battery.z, .12)) continue;
-      battery.mesh.removeFromParent();
-      batteries.splice(i, 1);
-      onPickup();
+    for (let i = pickups.length - 1; i >= 0; i--) {
+      const { x, z, kind, object } = pickups[i];
+      object.rotation.y += dt * 2;
+      if (Math.hypot(player.x - x, player.z - z) > player.radius + .4) continue;
+      if (!world.lineClear(player.x, player.z, x, z, .12)) continue;
+      object.removeFromParent();
+      pickups.splice(i, 1);
+      onPickup(kind);
     }
   }
   return {
@@ -58,11 +65,7 @@ export function createBatteries(scene, world) {
     dispose() {
       clear();
       root.removeFromParent();
-      batteryGeometry.dispose();
-      for (const material of new Set(batteryMaterials)) {
-        material.map?.dispose();
-        material.dispose();
-      }
+      disposeObject(templates);
     },
   };
 }

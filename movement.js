@@ -32,7 +32,7 @@ export function smoothTouchHeading(heading, target, dt) {
   return smoothAimHeading(heading, target, dt, 10, 20);
 }
 
-export function movePlayer(player, city, { keys, touch, dt, firing, height, cursorHeading = null, shotHeading = null, touchHeading = null, steerWithMouse = false }) {
+export function movePlayer(player, city, { keys, touch, dt, firing, height, speedMultiplier = 1, cursorHeading = null, shotHeading = null, touchHeading = null, steerWithMouse = false }) {
   const touchStrength = Math.hypot(touch.x, touch.z);
   const x = touchStrength ? touch.x : Number(keys.has('KeyD')) - Number(keys.has('KeyA'));
   const z = touchStrength ? touch.z : Number(keys.has('KeyS')) - Number(keys.has('KeyW'));
@@ -69,7 +69,7 @@ export function movePlayer(player, city, { keys, touch, dt, firing, height, curs
   const moveZ = z / directScale + throttle * Math.cos(player.targetHeading);
   const strength = Math.hypot(moveX, moveZ);
   const moving = strength > 1e-6;
-  const maxSpeed = player.speed * (firing ? 0.7 : 1);
+  const maxSpeed = player.speed * speedMultiplier * (firing ? 0.7 : 1);
   const targetSpeed = moving ? Math.min(1, strength) * maxSpeed : 0;
   const oldSpeed = player.moveSpeed;
   const directionX = moving ? moveX / strength : (player.moveX ?? player.dx);

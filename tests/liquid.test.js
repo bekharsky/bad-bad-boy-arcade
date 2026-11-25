@@ -116,7 +116,7 @@ test('off-target ground splashes do less damage than a direct short burst', () =
 test('a newly powered side stream shares the main jet cooldown despite a younger simulation clock', () => {
   let now = 100;
   const main = setup(true, { getHitTime: () => now });
-  const side = setup(true, { getHitTime: () => now });
+  const side = setup(true, { getHitTime: () => now, showLandingMarker: false });
   const enemy = target(0, .7);
   main.advance(5, true, [enemy]);
   main.advance(60, false, [enemy]);

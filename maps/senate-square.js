@@ -29,6 +29,7 @@ export const senateSquareMap = {
     sleigh: [{ x: 5, z: 30.8 }],
     medkit: [{ x: -8, z: -3 }, hidden(-32.3, -7), hidden(32.3, -8), hidden(-17, 31), hidden(7, 31)],
     battery: [hidden(-32.3, 5), hidden(32.3, 5), hidden(-6, 31), hidden(20, 31)],
+    skates: [{ x: 17, z: 12 }],
   },
   create() { return createMap(senateSquareMap, buildSenateSquare); },
 };

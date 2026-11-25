@@ -82,6 +82,7 @@ export function createSleighAssembly(parts, overlay) {
 
   return {
     get active() { return index >= 0; },
+    prepare(renderer) { return renderer.compileAsync(scene, camera); },
     start(partIndex, reducedMotion, points) {
       index = partIndex;
       elapsed = 0;

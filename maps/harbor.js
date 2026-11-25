@@ -30,6 +30,7 @@ export const harborMap = {
     sleigh: [{ x: 24.4, z: 6.3 }],
     medkit: [{ x: 3.5, z: 9.5 }, ...courtyards.slice(0, 4).map(hiddenPoint)],
     battery: courtyards.slice(4).map(hiddenPoint),
+    skates: [{ x: -2, z: 18 }],
   },
   create() { return createMap(harborMap, buildHarbor); },
 };

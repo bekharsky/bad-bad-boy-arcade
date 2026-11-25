@@ -14,7 +14,7 @@ const THREE = await import('three');
 const { createMap } = await import('../world/map.js');
 const { createMapManager } = await import('../world/map-manager.js');
 const { createNavigation } = await import('../world/navigation.js');
-const { createBatteries } = await import('../batteries.js');
+const { createArenaBoosts } = await import('../arena-boosts.js');
 const { createMedkits } = await import('../medkits.js');
 
 function fixture(id, offset = 0, blockedSpawn = false) {
@@ -87,32 +87,55 @@ test('unknown maps and blocked spawns leave the playable map intact', () => {
   world.dispose();
 });
 
-test('existing medkit and Battery systems reset against the new map anchors', () => {
+test('medkits and arena boosts reset against the new map anchors', () => {
   const scene = new THREE.Scene(), first = fixture('first'), second = fixture('second', 30);
   second.definition.pickups.medkit = [[26, 1], [26, -1], [25.5, 0], [26.5, 0], [25.5, 1.5], [26.5, 1.5]].map(([x, z]) => ({ x, z }));
+  second.definition.pickups.skates = [{ x: 25, z: 1.5 }];
   const world = createMapManager(scene, [first.definition, second.definition], .736);
   world.activate('first');
-  const medkits = createMedkits(scene, world), batteries = createBatteries(scene, world);
+  const medkits = createMedkits(scene, world), boosts = createArenaBoosts(scene, world);
   const player = { x: -4, z: 1, radius: .736, hp: 3, maxHp: 5 };
-  medkits.reset(player); batteries.reset(player);
+  medkits.reset(player); boosts.reset(player);
   world.activate('second');
-  medkits.reset(player); batteries.reset(player);
+  medkits.reset(player); boosts.reset(player);
   assert.equal(scene.children.filter(mesh => mesh.isInstancedMesh && mesh.count === 6).length, 3, 'Capacity covers maps with more than five medkits');
-  let healed = 0, powered = 0;
+  let healed = 0;
+  const picked = [], collectBoost = kind => picked.push(kind);
   const collect = amount => { healed += amount; player.hp += amount; };
   medkits.update(0, player, collect);
-  batteries.update(0, player, () => powered++);
+  boosts.update(0, player, collectBoost);
   assert.equal(healed, 0, 'The first map has no remaining medkit');
   player.x = 26;
   medkits.update(0, player, collect);
   assert.equal(healed, 2);
   player.z = -1;
-  batteries.update(0, player, () => powered++);
-  batteries.update(0, player, () => powered++);
-  assert.equal(powered, 1, 'A new-map pickup is collected once');
-  batteries.reset(player);
-  assert.equal(scene.getObjectByName('Battery pickups').children.length, 1);
-  medkits.clear(); batteries.dispose(); world.dispose();
+  boosts.update(0, player, collectBoost);
+  boosts.update(0, player, collectBoost);
+  player.x = 25; player.z = 1.5;
+  boosts.update(0, player, collectBoost);
+  assert.deepEqual(picked, ['battery', 'skates']);
+  boosts.reset(player);
+  assert.equal(scene.getObjectByName('Arena boost pickups').children.length, 2);
+  medkits.clear(); boosts.dispose(); world.dispose();
+});
+
+test('a prepared district stays detached until needed and is disposed with the campaign', () => {
+  const scene = new THREE.Scene(), menu = fixture('menu'), first = fixture('first', 30), next = fixture('next', 60);
+  const world = createMapManager(scene, [menu.definition, first.definition, next.definition]);
+  world.activate('menu');
+  const root = world.prepare('next');
+  assert.equal(world.prepare('next'), root);
+  assert.deepEqual(scene.children, [menu.instances[0].root]);
+  world.activate('first');
+  assert.equal(next.disposed.length, 0);
+  world.activate('next');
+  assert.equal(world.root, root);
+  assert.equal(next.instances.length, 1);
+  world.prepare('menu');
+  world.dispose();
+  assert.equal(menu.disposed.length, 8);
+  assert.equal(next.disposed.length, 4);
+  assert.equal(scene.children.length, 0);
 });
 
 test('spawn fallback on a small shifted map stays reachable and inside its own bounds', () => {

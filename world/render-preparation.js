@@ -3,14 +3,15 @@ import * as THREE from 'three';
 // Compile hidden effects too. Refraction and district transitions render into a
 // linear target, so their shader variants must be prepared as well as the canvas.
 // Keep ordinary animation paused until this promise settles.
-export async function prepareScene(renderer, scene, camera, draw = () => renderer.render(scene, camera)) {
+export async function prepareScene(renderer, scene, camera, draw = () => renderer.render(scene, camera), { root = scene, fadeMaterials = null } = {}) {
   const target = new THREE.WebGLRenderTarget(1, 1);
   const previousTarget = renderer.getRenderTarget();
   const opaqueMaterials = new Set(), textures = new Set(), transmissionMeshes = [];
-  scene.traverse(node => {
+  root.traverse(node => {
     if (!node.isMesh) return;
     for (const material of Array.isArray(node.material) ? node.material : [node.material]) {
-      if (!material.transparent && !material.alphaHash) opaqueMaterials.add(material);
+      if (root === scene && !material.transparent && !material.alphaHash
+        && (!fadeMaterials || fadeMaterials.includes(material))) opaqueMaterials.add(material);
       for (const value of Object.values(material)) if (value?.isTexture) textures.add(value);
       if (material.transmission > 0 && !node.visible) transmissionMeshes.push(node);
     }
@@ -18,7 +19,7 @@ export async function prepareScene(renderer, scene, camera, draw = () => rendere
   try {
     // Materials with alpha hashing already use one program at every opacity.
     // Warm both passes for the remaining effects, including the hero's hit flash.
-    for (const transparent of [true, false]) {
+    for (const transparent of opaqueMaterials.size ? [true, false] : [false]) {
       for (const material of opaqueMaterials) {
         material.transparent = transparent;
         material.needsUpdate = true;
@@ -27,7 +28,7 @@ export async function prepareScene(renderer, scene, camera, draw = () => rendere
         let compilation;
         try {
           renderer.setRenderTarget(output);
-          compilation = renderer.compileAsync(scene, camera);
+          compilation = renderer.compileAsync(root, camera, scene);
         } finally {
           renderer.setRenderTarget(previousTarget);
         }
