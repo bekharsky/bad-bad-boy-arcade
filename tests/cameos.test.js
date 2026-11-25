@@ -10,12 +10,16 @@ registerHooks({ resolve(specifier, context, next) {
 const THREE = await import('three');
 const { baanaMap } = await import('../maps/baana.js');
 const { aleksanterinkatuMap } = await import('../maps/aleksanterinkatu.js');
-const { createRunnerRun, riderHealth } = await import('../runner/course.js');
+const { createRunnerRun, riderHealth, trafficProfile } = await import('../runner/course.js');
 const { createRunnerTraffic } = await import('../runner/track-renderer.js');
 const { disposeObject } = await import('../world/dispose.js');
 const { CAMEO_KINDS, isCameo } = await import('../runner/cameo-roster.js');
 const { createCameoModel, animateCameo } = await import('../runner/cameo-models.js');
 const seeded = seed => () => ((seed = seed * 16807 % 2147483647) - 1) / 2147483646;
+
+test('campaign cameo roster includes the seven retained characters', () => {
+  assert.deepEqual(CAMEO_KINDS, ['purra', 'orpo', 'marin', 'stubb', 'macron', 'merz', 'lepen']);
+});
 
 test('both runner maps vary the roadside roster across seeds and agree across frame rates', () => {
   for (const map of [baanaMap, aleksanterinkatuMap]) {
@@ -39,14 +43,14 @@ test('both runner maps vary the roadside roster across seeds and agree across fr
           for (const agent of cameos) if (!seen.has(agent.id)) {
             seen.add(agent.id); appearances.push([agent.id, agent.x, agent.kind]);
             if (lastCameoDistance === null) {
-              assert.ok(run.state.distance >= 60, 'The opening stretch is clear of joggers');
+              assert.ok(run.state.distance >= 22 && run.state.distance < 23, 'The first jogger joins the opening stretch');
             } else {
               assert.ok(agent.x * appearances.at(-2)[1] < 0, 'The next jogger uses the other shoulder');
-              assert.ok(run.state.distance - lastCameoDistance >= 51.5, 'Joggers have a stretch of road between appearances');
+              assert.ok(run.state.distance - lastCameoDistance >= 39.5, 'Joggers have a stretch of road between appearances');
             }
             lastCameoDistance = run.state.distance;
             assert.equal(agent.alive, true);
-            assert.equal(Math.abs(agent.x), Math.abs(run.lanes[0]) + .85);
+            assert.ok(Math.abs(agent.x - Math.sign(agent.x) * map.runner.cameoShoulder) < .001);
             assert.ok(agent.age < .08);
             assert.ok(agent.progress - run.state.distance > (run.state.speed + agent.speed) * 1.7);
           }
@@ -66,6 +70,30 @@ test('both runner maps vary the roadside roster across seeds and agree across fr
     }
     assert.ok(firstKinds.size > 1);
     assert.deepEqual([...kinds].sort(), [...CAMEO_KINDS].sort(), map.id);
+  }
+});
+
+test('runner cameos join from the sidewalk and stay outside traffic at all three paces', () => {
+  for (const map of [baanaMap, aleksanterinkatuMap]) for (const seed of [2, 5, 19, 27]) for (const throttle of [-1, 0, 1]) {
+    const run = createRunnerRun({ ...map.runner, random: seeded(seed) });
+    run.setThrottle(throttle);
+    let joinedRoad = false;
+    while (!run.state.finished) {
+      run.update(1 / 60);
+      const guest = run.state.traffic.find(agent => isCameo(agent.kind));
+      if (!guest) continue;
+      joinedRoad ||= Math.abs(guest.x) < map.runner.cameoShoulder - .5;
+      for (const agent of run.state.traffic) {
+        if (agent === guest || agent.cleared || agent.recoiling) continue;
+        const profile = trafficProfile(agent.kind);
+        const width = profile.width + .07;
+        const depth = profile.halfLength + (guest.stumbleTime === undefined ? .47 : 2.8);
+        const overlaps = Math.abs(guest.x - agent.x) < (agent.crossing ? depth : width)
+          && Math.abs(guest.progress - agent.progress) < (agent.crossing ? width : depth);
+        assert.equal(overlaps, false, `${map.id}: ${guest.kind} passes ${agent.kind} at ${run.state.distance.toFixed(1)} m`);
+      }
+    }
+    assert.ok(joinedRoad, map.id);
   }
 });
 
@@ -157,8 +185,8 @@ test('shirt, tie, lapels and buttons sit flush on the two suits', () => {
   }
 });
 
-function encounter(kind, lane = 1) {
-  const run = createRunnerRun();
+function encounter(kind, lane = 1, options) {
+  const run = createRunnerRun(options);
   const agent = { id: -1, kind, color: 'blue', lane, progress: 5, speed: 5.2, hp: riderHealth(kind), alive: true, passed: false, hit: false };
   run.state.traffic.push(agent);
   return { run, agent };
@@ -183,7 +211,7 @@ test('runner passers-by are harmless and run away from the first splash', () => 
 });
 
 test('a stumbling jogger stays on the ground as the road scrolls, then runs to the shoulder', () => {
-  const { run, agent } = encounter('purra', 0);
+  const { run, agent } = encounter('purra', 0, { length: 60 });
   agent.progress = 48;
   agent.age = 0;
   agent.tripAt = .1;
@@ -278,6 +306,9 @@ test('pooled cameo animates without new resources, keeps hit flashes local and r
   assert.equal(slots[0].visible, false);
   assert.equal(slots[1].visible, true);
   assert.equal(slots[1].children[0], survivingBike);
+  state.traffic.push({ id: 4, kind: 'purra', lane: 2, progress: 12, age: 1 });
+  renderer.update(state);
+  assert.equal(slots[0].children[0], cameo, 'A returning cameo reuses its rig');
   const disposals = new Map();
   for (const resource of resources) resource.addEventListener('dispose', () => disposals.set(resource, (disposals.get(resource) ?? 0) + 1));
   disposeObject(root);

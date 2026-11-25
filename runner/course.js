@@ -17,9 +17,11 @@ export const RUN_LANES = Object.freeze([-3, 0, 3]);
 export const TRAM_LANES = Object.freeze([-2.2, 2.2]);
 export const TRAFFIC_COLORS = Object.freeze(['green', 'blue', 'red']);
 export const TRAFFIC_CAPACITY = 24;
-const PASSERBY_LANE_OFFSET = .85;
+export const RUNNER_IMPACT_PAUSE = .2;
+const CONTACT_MARGIN = .025;
+const PASSERBY_LANE_OFFSET = 1.35;
 const CAMEO_JOG_SPEED = 2.8;
-const FIRST_BUSY_CAMEO_DISTANCE = 60;
+const FIRST_BUSY_CAMEO_DISTANCE = 22;
 
 export const ROADWORK_TYPES = Object.freeze(['cone', 'tractor', 'barrier', 'trench']);
 const PROFILES = {
@@ -50,17 +52,20 @@ export function trafficRoutesConflict(a, b) {
 // Swept collision in the runner's moving frame: quick lane changes and a long
 // frame cannot jump through a cyclist between two rendered positions.
 export function trafficContact(x0, gap0, x1, gap1, laneX, width = 1.05, depth = 1.65) {
-  let enter = 0, leave = 1;
-  for (const [from, to, min, max] of [[x0, x1, laneX - width, laneX + width], [gap0, gap1, -depth, depth]]) {
-    const change = to - from;
-    if (Math.abs(change) < 1e-9) { if (from < min || from > max) return false; }
-    else {
-      const a = (min - from) / change, b = (max - from) / change;
-      enter = Math.max(enter, Math.min(a, b)); leave = Math.min(leave, Math.max(a, b));
-      if (enter > leave) return false;
-    }
-  }
-  return true;
+  return contactFraction(x0 - laneX, gap0, x1 - laneX, gap1, width, depth) !== null;
+}
+
+function contactFraction(x0, gap0, x1, gap1, width, depth) {
+  // Most traffic is far from the hero. Reject it without allocating a slab array.
+  if ((x0 < -width && x1 < -width) || (x0 > width && x1 > width)
+    || (gap0 < -depth && gap1 < -depth) || (gap0 > depth && gap1 > depth)) return null;
+  const dx = x1 - x0, dz = gap1 - gap0;
+  const xNear = dx ? (-(Math.sign(dx) * width) - x0) / dx : -Infinity;
+  const xFar = dx ? (Math.sign(dx) * width - x0) / dx : Infinity;
+  const zNear = dz ? (-(Math.sign(dz) * depth) - gap0) / dz : -Infinity;
+  const zFar = dz ? (Math.sign(dz) * depth - gap0) / dz : Infinity;
+  const enter = Math.max(0, xNear, zNear);
+  return enter <= Math.min(1, xFar, zFar) ? enter : null;
 }
 
 export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, riderKinds = ['bike', 'scooter'], lanes = RUN_LANES, tramChance = 0, tramRoute = null, roadworkKinds = ROADWORK_TYPES, crossingPoints = [], startSpeed = 9, speedLimit = 17, acceleration = .08, variety = false, cameoShoulder, busy = false } = {}) {
@@ -84,7 +89,7 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
   const crossings = crossingPoints.map((progress, i) => ({ progress, side: i % 2 ? 1 : -1, phase: 'approach', launched: 0, launchAt: Infinity, nextLaunchAt: Infinity }));
   const maxSpeed = speedLimit * RUNNER_BOOST;
   const firstCameoDistance = busy ? FIRST_BUSY_CAMEO_DISTANCE : 0;
-  const state = { distance: 0, elapsed: 0, speed: startSpeed, cruiseSpeed: startSpeed, throttle: 0, x: lanes[startLane], lane: startLane, invulnerable: 0, passed: 0, cleared: 0, bonus: 0, finished: false, traffic: [], crossings };
+  const state = { distance: 0, elapsed: 0, speed: startSpeed, cruiseSpeed: startSpeed, throttle: 0, x: lanes[startLane], lane: startLane, invulnerable: 0, hitStop: 0, passed: 0, cleared: 0, bonus: 0, finished: false, traffic: [], crossings };
   let nextSpawn = 0, nextId = 0, safeLane = startLane, nextCameo = firstCameoDistance, lastCameoSide = 0;
   let nextGeese = 0; // Start with a goose row, subject to the usual traffic spacing.
   const oldPose = {}, pose = {};
@@ -97,21 +102,23 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
     return 2 * distance / (state.speed + Math.sqrt(Math.max(0, state.speed ** 2 + 2 * acceleration * distance)));
   }
   function tramContact(agent, oldProgress, oldX, oldDistance) {
+    let first = null;
     for (const offset of [-TRAM_CAR_OFFSET, TRAM_CAR_OFFSET]) {
       tramRoute(oldProgress + offset, lanes[agent.lane], oldPose);
       tramRoute(agent.progress + offset, lanes[agent.lane], pose);
       const dx0 = oldX - oldPose.x, dz0 = -oldDistance - oldPose.z;
       const dx1 = state.x - pose.x, dz1 = -state.distance - pose.z;
       const c0 = Math.cos(oldPose.heading), s0 = Math.sin(oldPose.heading), c1 = Math.cos(pose.heading), s1 = Math.sin(pose.heading);
-      if (trafficContact(dx0 * c0 - dz0 * s0, dx0 * s0 + dz0 * c0, dx1 * c1 - dz1 * s1, dx1 * s1 + dz1 * c1, 0, PROFILES.tram.width, PROFILES.tram.depth - TRAM_CAR_OFFSET)) return true;
+      const fraction = contactFraction(dx0 * c0 - dz0 * s0, dx0 * s0 + dz0 * c0, dx1 * c1 - dz1 * s1, dx1 * s1 + dz1 * c1, PROFILES.tram.width, PROFILES.tram.depth - TRAM_CAR_OFFSET);
+      if (fraction !== null && (first === null || fraction < first)) first = fraction;
     }
-    return false;
+    return first;
   }
   const choose = count => Math.min(count - 1, Math.max(0, Math.floor(random() * count)));
   function reserveCameoWindow() {
     if (!cameoRiders.length) return false;
     const active = state.traffic.find(agent => isCameo(agent.kind));
-    if (active) return !busy && !active.passed && (Number.isFinite(active.tripAt) || Math.abs(active.x) < cameoShoulder - .05);
+    if (active) return !busy && !active.passed && ((active.age < 1.25 && active.panicSide === undefined) || Number.isFinite(active.tripAt) || Math.abs(active.x) < cameoShoulder - .05);
     if (state.distance < nextCameo) return false;
     if (!busy && crossings.some(entry => entry.phase === 'warning' || entry.phase === 'crossing')) return true;
     const approachSpeed = Math.max(state.speed, state.cruiseSpeed * .75);
@@ -125,27 +132,33 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
     const minimumLead = (boostSpeed + CAMEO_JOG_SPEED) * 2.2;
     const lead = Math.min(room, length - state.distance - 1, Math.max(minimumLead, closingSpeed * 3.4));
     if (lead < minimumLead) return false;
-    const progress = state.distance + lead;
+    let progress = state.distance + lead;
+    // A jogger placed on a crossing line cannot yield before the first scooter.
+    for (const crossing of crossings) for (const pass of crossing.passes) {
+      if (Math.abs(pass.progress - progress) < 3) progress = pass.progress + 3;
+    }
+    if (progress >= length) return false;
     // On the campaign routes, the shoulder joggers can share the street with traffic.
     if (!busy && state.traffic.some(agent => !agent.cleared && !agent.passed)) return true;
     if (state.traffic.length >= TRAFFIC_CAPACITY) return !busy;
     if (!availableCameos.length) availableCameos.push(...cameoRiders);
     const [kind] = availableCameos.splice(choose(availableCameos.length), 1);
     const profile = trafficProfile(kind);
-    // The shoulder starts within reach of a ground splash from the outer lane.
+    // Join the road from the sidewalk, staying outside the outer traffic lane.
     lastCameoSide = lastCameoSide ? -lastCameoSide : choose(2) ? 1 : -1;
-    const x = lastCameoSide > 0 ? lanes.at(-1) + PASSERBY_LANE_OFFSET : lanes[0] - PASSERBY_LANE_OFFSET;
+    const x = lastCameoSide * cameoShoulder;
+    const jogX = lastCameoSide > 0 ? lanes.at(-1) + PASSERBY_LANE_OFFSET : lanes[0] - PASSERBY_LANE_OFFSET;
     const varietyRoll = random();
     const canTrip = varietyRoll < .24 && distanceBeforeWarning > lead * 3 + boostSpeed * 3;
     state.traffic.push({
-      id: nextId++, kind, progress, speed: CAMEO_JOG_SPEED, x, heading: 0,
+      id: nextId++, kind, progress, speed: CAMEO_JOG_SPEED, x, jogX, heading: 0,
       z: state.distance - progress, size: profile.size, hitHeight: profile.hitHeight,
       hp: riderHealth(kind), alive: true, passed: false, hitUntil: 0, age: 0, gait: 0,
       tripAt: canTrip ? .85 + varietyRoll : Infinity,
       paceTime: canTrip ? 0 : .8,
     });
     // On streets with cross traffic, leave a longer stretch for ordinary traffic.
-    nextCameo = state.distance + (busy ? (crossings.length ? 60 : 52) : (crossings.length ? 56 : 40)) + 10 * varietyRoll;
+    nextCameo = state.distance + (busy ? (crossings.length ? 46 : 40) : (crossings.length ? 56 : 40)) + 10 * varietyRoll;
     return !busy;
   }
   function resetCrossings() {
@@ -157,7 +170,7 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
   }
   resetCrossings();
   function reset() {
-    Object.assign(state, { distance: 0, elapsed: 0, speed: startSpeed, cruiseSpeed: startSpeed, throttle: 0, x: lanes[startLane], lane: startLane, invulnerable: 0, passed: 0, cleared: 0, bonus: 0, finished: false });
+    Object.assign(state, { distance: 0, elapsed: 0, speed: startSpeed, cruiseSpeed: startSpeed, throttle: 0, x: lanes[startLane], lane: startLane, invulnerable: 0, hitStop: 0, passed: 0, cleared: 0, bonus: 0, finished: false });
     encounters.reset(); resetCrossings();
     state.traffic.length = 0; nextSpawn = 0; nextId = 0; safeLane = startLane; nextCameo = firstCameoDistance; lastCameoSide = 0; nextGeese = 0;
     availableCameos.splice(0, availableCameos.length, ...cameoRiders);
@@ -185,12 +198,19 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
       arrival = Math.max(arrival, requiredGap / (state.speed + speed));
     }
     if (arrival > 5 || state.traffic.length + 2 > TRAFFIC_CAPACITY) return;
+    const guest = state.traffic.find(agent => isCameo(agent.kind) && !agent.passed);
     const candidates = [];
     for (let lane = 0; lane < lanes.length; lane++) {
       if (!tram && !roadworks && !goose && !regularRiders.length) continue;
       const kind = tram ? 'tram' : roadworks ? roadworkKinds[choose(roadworkKinds.length)] : goose ? 'goose' : regularRiders[choose(regularRiders.length)];
       const profile = trafficProfile(kind), progress = state.distance + arrival * (state.speed + speed) + (tramChance > 0 ? profile.depth : 0);
       if (kind !== 'tram' && progress > length) continue;
+      if (guest && Math.abs(guest.x - lanes[lane]) < profile.width + .55) {
+        const gap = progress - guest.progress;
+        const arrivalGap = gap - speed * Math.max(1, STUMBLE_DURATION - (guest.stumbleTime ?? STUMBLE_DURATION));
+        const clearance = profile.halfLength + 3.5;
+        if (Math.min(gap, arrivalGap) < clearance && Math.max(gap, arrivalGap) > -clearance) continue;
+      }
       // Keep a clear window around cross traffic. A tram must not close the
       // only escape lane while a scooter shoots out of a side street.
       const gap = progress - state.distance;
@@ -216,6 +236,87 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
     return true;
   }
 
+  function clearToStumble(guest) {
+    if (crossings.some(crossing => Math.abs(crossing.progress - guest.progress) < 22)) return false;
+    return !state.traffic.some(agent => agent !== guest && !agent.cleared && !agent.recoiling && !isCameo(agent.kind)
+      && Math.abs(agent.x - guest.x) < trafficProfile(agent.kind).width + .75
+      && Math.abs(agent.progress - guest.progress) < trafficProfile(agent.kind).halfLength + 4 + agent.speed * STUMBLE_DURATION);
+  }
+  function yieldAtCrossing(advance, step, gap, x, vx, startsIn, nearX, farX) {
+    const nearTime = startsIn + (nearX - x) / vx, farTime = startsIn + (farX - x) / vx;
+    if (Math.max(nearTime, farTime) < -.18 || Math.min(nearTime, farTime) > 2.6) return advance;
+    const clearance = 1.8;
+    if (Math.abs(gap) < clearance) {
+      return -(Math.sign(gap) || -1) * Math.min(CAMEO_JOG_SPEED * step, clearance - Math.abs(gap));
+    }
+    if (gap < 0 && advance < 0) return Math.max(advance, gap + clearance);
+    if (gap > 0 && advance > 0) return Math.min(advance, gap - clearance);
+    return advance;
+  }
+  function moveCameo(traffic, step, oldDistance) {
+    traffic.age = (traffic.age ?? 1.2) + step;
+    const oldLateral = traffic.x ?? lanes[traffic.lane], previousProgress = traffic.progress;
+    traffic.x = oldLateral;
+    let advance = -traffic.speed * step;
+    const besideRunner = Math.abs(state.x - oldLateral) < 2.6 || traffic.speed < 0;
+    if (traffic.panicSide === undefined && traffic.paceTime > 0 && besideRunner && previousProgress - oldDistance < 5) {
+      const crossing = crossings.find(entry => entry.phase !== 'clear');
+      const room = (crossing?.progress ?? Infinity) - state.distance;
+      const boostSpeed = Math.min(speedLimit, state.cruiseSpeed + 5 * acceleration) * RUNNER_BOOST;
+      if (room > boostSpeed * (2.5 + traffic.paceTime + .9) + 5) {
+        traffic.paceTime = Math.max(0, traffic.paceTime - step);
+        traffic.speed = -CAMEO_JOG_SPEED;
+        advance = state.distance - oldDistance;
+      } else traffic.paceTime = 0;
+    }
+    const shouldTrip = traffic.panicSide === undefined && traffic.age >= traffic.tripAt;
+    if (traffic.stumbleTime !== undefined || (shouldTrip && clearToStumble(traffic))) {
+      traffic.stumbleTime = (traffic.stumbleTime ?? 0) + step;
+      traffic.z = state.distance - traffic.progress;
+      traffic.passed = traffic.z > 2;
+      if (traffic.stumbleTime < STUMBLE_DURATION) return;
+      delete traffic.stumbleTime;
+      fleeToShoulder(traffic);
+      advance = -traffic.speed * step;
+    }
+    if (traffic.jogX !== undefined || traffic.panicSide !== undefined) {
+      const shoulder = (traffic.panicSide ?? Math.sign(traffic.jogX)) * cameoShoulder;
+      let targetX = traffic.age < .12 || traffic.panicSide !== undefined ? shoulder : traffic.jogX;
+      for (const other of state.traffic) {
+        if (other === traffic || other.cleared || other.recoiling || isCameo(other.kind)) continue;
+        const gap = other.progress - previousProgress;
+        if (other.crossing) {
+          advance = yieldAtCrossing(advance, step, gap, other.x, other.vx, 0, targetX, shoulder);
+        } else {
+          const profile = trafficProfile(other.kind);
+          const futureGap = gap - (other.speed + advance / step) * 1.7;
+          const clearance = profile.halfLength + 1.65;
+          if (Math.min(gap, futureGap) < clearance && Math.max(gap, futureGap) > -clearance
+            && Math.abs(targetX - other.x) < profile.width + .55) targetX = shoulder;
+        }
+      }
+      for (const crossing of crossings) if (crossing.phase === 'warning' || crossing.phase === 'crossing') {
+        for (let i = crossing.launched; i < crossing.passes.length; i++) {
+          const pass = crossing.passes[i];
+          advance = yieldAtCrossing(advance, step, pass.progress - previousProgress, crossing.side * 14, -crossing.side * pass.speed,
+            pass.launchAt - state.elapsed, targetX, shoulder);
+        }
+      }
+      const dx = targetX - oldLateral, lateralSpeed = traffic.panicSide === undefined ? 2.8 : 4.4;
+      traffic.x += Math.sign(dx) * Math.min(Math.abs(dx), lateralSpeed * step);
+    }
+    if (Math.abs(advance) + Math.abs(traffic.x - oldLateral) > 1e-8) {
+      const heading = traffic.heading ?? 0;
+      const turn = Math.atan2(traffic.x - oldLateral, -advance) - heading;
+      traffic.heading = heading + Math.atan2(Math.sin(turn), Math.cos(turn)) * (1 - Math.exp(-10 * step));
+    }
+    traffic.progress = Math.min(length, previousProgress + advance);
+    traffic.z = state.distance - traffic.progress;
+    traffic.passed = traffic.z > 2;
+    const moved = Math.hypot(traffic.x - oldLateral, traffic.progress - previousProgress);
+    traffic.waiting = moved < 1e-8;
+    traffic.gait = (traffic.gait ?? 0) + cameoGaitForDistance(moved, true);
+  }
   function fleeToShoulder(agent) {
     if (agent.panicSide !== undefined) return;
     const x = agent.x ?? lanes[agent.lane];
@@ -252,12 +353,23 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
     },
     update(dt) {
       if (!Number.isFinite(dt) || dt < 0) throw new Error('Runner dt must be non-negative');
-      let hits = 0, passed = 0, dodged = 0, warning = null;
+      const impacts = [];
+      let hits = 0, passed = 0, dodged = 0, warning = null, crash = null;
       // Fixed maximum steps make collision, scoring and acceleration stable at
       // different refresh rates, including low-frame-rate mobile browsers.
       for (let remaining = dt; remaining > 1e-9 && !state.finished;) {
         const step = Math.min(remaining, 1 / 120); remaining -= step;
         const oldX = state.x, oldDistance = state.distance;
+        if (state.hitStop > 0) {
+          state.hitStop = Math.max(0, state.hitStop - step);
+          if (state.hitStop < 1e-9) {
+            state.hitStop = 0;
+            for (let i = state.traffic.length - 1; i >= 0; i--) {
+              if (state.traffic[i].recoiling) state.traffic.splice(i, 1);
+            }
+          }
+          continue;
+        }
         state.invulnerable = Math.max(0, state.invulnerable - step);
         state.elapsed += step;
         state.cruiseSpeed = Math.min(speedLimit, startSpeed + state.elapsed * acceleration);
@@ -301,50 +413,12 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
           if (crossing.phase === 'crossing' && crossing.launched === 2 && gap < -10 &&
               !state.traffic.some(agent => agent.crossing && !agent.passed)) crossing.phase = 'clear';
         }
+        let contact = null;
         for (const traffic of state.traffic) {
+          traffic.stepX = traffic.x ?? lanes[traffic.lane];
+          traffic.stepProgress = traffic.progress;
           if (isCameo(traffic.kind)) {
-            traffic.age = (traffic.age ?? 1.2) + step;
-            if (traffic.stumbleTime !== undefined || (traffic.panicSide === undefined && traffic.age >= traffic.tripAt)) {
-              traffic.stumbleTime = (traffic.stumbleTime ?? 0) + step;
-              traffic.z = state.distance - traffic.progress;
-              traffic.passed = traffic.z > 2;
-              if (traffic.stumbleTime < STUMBLE_DURATION) continue;
-              delete traffic.stumbleTime;
-              fleeToShoulder(traffic);
-            }
-            const oldLateral = traffic.x ?? lanes[traffic.lane];
-            traffic.x = oldLateral;
-            if (traffic.panicSide !== undefined) {
-              const edge = cameoShoulder;
-              traffic.x += traffic.panicSide * Math.min(4.4 * step, Math.max(0, edge - traffic.panicSide * oldLateral));
-              const targetHeading = Math.atan2(traffic.x - oldLateral, traffic.speed * step);
-              const heading = traffic.heading ?? 0;
-              const turn = targetHeading - heading;
-              traffic.heading = heading + Math.atan2(Math.sin(turn), Math.cos(turn)) * (1 - Math.exp(-10 * step));
-            }
-            const previousProgress = traffic.progress;
-            let advance = -traffic.speed * step;
-            const besideRunner = Math.abs(state.x - oldLateral) < 2.6 || traffic.speed < 0;
-            if (traffic.panicSide === undefined && traffic.paceTime > 0 && besideRunner && previousProgress - oldDistance < 5) {
-              const crossing = crossings.find(entry => entry.phase !== 'clear');
-              const room = (crossing?.progress ?? Infinity) - state.distance;
-              // Leave enough road to clear the cameo before the crossing warning.
-              const boostSpeed = Math.min(speedLimit, state.cruiseSpeed + 5 * acceleration) * RUNNER_BOOST;
-              if (room > boostSpeed * (2.5 + traffic.paceTime + .9) + 5) {
-                traffic.paceTime = Math.max(0, traffic.paceTime - step);
-                traffic.speed = -CAMEO_JOG_SPEED;
-                advance = state.distance - oldDistance;
-              } else traffic.paceTime = 0;
-            }
-            if (traffic.panicSide === undefined && traffic.speed < 0) {
-              const heading = Math.sign(oldLateral) * Math.PI;
-              traffic.heading += (heading - traffic.heading) * (1 - Math.exp(-11 * step));
-            }
-            traffic.progress = Math.min(length, previousProgress + advance);
-            traffic.z = state.distance - traffic.progress;
-            traffic.passed = traffic.z > 2;
-            traffic.gait = (traffic.gait ?? 0) + cameoGaitForDistance(
-              Math.hypot(traffic.x - oldLateral, traffic.progress - previousProgress), true);
+            moveCameo(traffic, step, oldDistance);
             continue;
           }
           const oldProgress = traffic.progress;
@@ -360,25 +434,62 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
             traffic.x = pose.x; traffic.z = state.distance + pose.z; traffic.heading = pose.heading;
           }
           const profile = trafficProfile(traffic.kind), width = traffic.crossing ? profile.depth : profile.width, depth = traffic.crossing ? profile.width : profile.depth;
-          if (!traffic.cleared && !traffic.hit && (routedTram ? tramContact(traffic, oldProgress, oldX, oldDistance) : trafficContact(oldX - oldTrafficX, oldGap, state.x - traffic.x, gap, 0, width, depth))) {
-            traffic.hit = true;
-            if (state.invulnerable <= 0) { hits++; state.invulnerable = traffic.crossing ? .45 : 1.2; }
-          }
-          const crossedAway = traffic.crossing && (traffic.vx > 0 ? traffic.x > lanes.at(-1) + width + .6 : traffic.x < lanes[0] - width - .6);
-          if (!traffic.passed && (gap < -depth - .6 || crossedAway)) {
-            traffic.passed = true;
-            if (!traffic.hit && !traffic.cleared) {
-              passed++; state.passed++;
-              const rider = RIDER_KINDS.includes(traffic.kind);
-              if (rider) dodged++;
-              state.bonus += rider ? RIDER_DODGE_BONUS : OBSTACLE_PASS_BONUS;
+          if (!traffic.cleared && !traffic.hit) {
+            const fraction = routedTram ? tramContact(traffic, oldProgress, oldX, oldDistance)
+              : contactFraction(oldX - oldTrafficX, oldGap, state.x - traffic.x, gap, width, depth);
+            if (fraction !== null && (!contact || fraction < contact.fraction)) {
+              contact = { traffic, fraction, oldTrafficX, oldProgress };
             }
           }
         }
-        for (let i = state.traffic.length - 1; i >= 0; i--) if (state.traffic[i].progress - state.distance < -12 || (state.traffic[i].crossing && Math.abs(state.traffic[i].x) > 19) || (state.traffic[i].cleared && state.elapsed - state.traffic[i].clearedAt > .6)) state.traffic.splice(i, 1);
+        if (contact) {
+          const { traffic, fraction, oldTrafficX, oldProgress } = contact;
+          const dx = state.x - oldX, dz = state.distance - oldDistance;
+          const relativeTravel = Math.hypot(dx - (traffic.x - oldTrafficX), dz - (traffic.progress - oldProgress));
+          const stop = Math.max(0, fraction - CONTACT_MARGIN / Math.max(CONTACT_MARGIN, relativeTravel));
+          state.x = oldX + dx * stop;
+          state.distance = oldDistance + dz * stop;
+          state.elapsed -= step * (1 - stop);
+          traffic.hit = true;
+          for (const agent of state.traffic) {
+            agent.progress = agent.stepProgress + (agent.progress - agent.stepProgress) * stop;
+            if (agent.kind === 'tram' && tramRoute) {
+              tramRoute(agent.progress, lanes[agent.lane], pose);
+              agent.x = pose.x; agent.z = state.distance + pose.z; agent.heading = pose.heading;
+            } else {
+              agent.x = agent.stepX + (agent.x - agent.stepX) * stop;
+              agent.z = state.distance - agent.progress;
+            }
+          }
+          const impact = { x: (state.x + traffic.x) / 2, z: Math.max(-1.2, Math.min(.35, traffic.z)), kind: traffic.kind };
+          impacts.push(impact);
+          if (ROADWORK_TYPES.includes(traffic.kind)) { crash = impact; break; }
+          traffic.recoiling = true;
+          state.hitStop = RUNNER_IMPACT_PAUSE;
+          if (state.invulnerable <= 0) { hits++; state.invulnerable = traffic.crossing ? .45 : 1.2; }
+        }
+        for (let i = state.traffic.length - 1; i >= 0; i--) {
+          const agent = state.traffic[i], gap = agent.progress - state.distance;
+          if (!isCameo(agent.kind) && !agent.passed) {
+            const profile = trafficProfile(agent.kind);
+            const depth = agent.crossing ? profile.width : profile.depth;
+            const crossedAway = agent.crossing && (agent.vx > 0
+              ? agent.x > lanes.at(-1) + profile.depth + .6 : agent.x < lanes[0] - profile.depth - .6);
+            if (gap < -depth - .6 || crossedAway) {
+              agent.passed = true;
+              if (!agent.hit && !agent.cleared) {
+                passed++; state.passed++;
+                const rider = RIDER_KINDS.includes(agent.kind);
+                if (rider) dodged++;
+                state.bonus += rider ? RIDER_DODGE_BONUS : OBSTACLE_PASS_BONUS;
+              }
+            }
+          }
+          if (gap < -12 || (agent.crossing && Math.abs(agent.x) > 19) || (agent.cleared && state.elapsed - agent.clearedAt > .6)) state.traffic.splice(i, 1);
+        }
         state.finished = state.distance >= length;
       }
-      return { hits, passed, dodged, warning, finished: state.finished };
+      return { hits, impacts, crash, passed, dodged, warning, finished: state.finished };
     },
   };
 }

@@ -23,7 +23,7 @@ function fixture({ start = true } = {}) {
   const world = { ...createNavigation({ bounds: { minX: -25, maxX: 25, minZ: -25, maxZ: 25 } }), mode: 'arena',
     pedestrianRoutes: [0, -8, 8, 16].map(x => [[x, -6], [x, 1]]) };
   const cameos = createArenaCameos(scene, world, () => 0); cameos.reset();
-  if (start) cameos.update(8, player);
+  if (start) cameos.update(1.25, player);
   return { scene, world, player, cameos };
 }
 
@@ -38,8 +38,8 @@ test('passers-by walk towards the square and stay calm close to the player', () 
   for (let i = 0; i < 120; i++) { cameos.update(1 / 60, player); waves.update(1 / 60, enemies.length); }
   assert.ok(walker.z > -6 && walker.z < -5.3, 'A pedestrian approaches but leaves room for the player');
   player.x = 3;
-  for (let i = 0; i < 90; i++) cameos.update(1 / 60, player);
-  assert.ok(walker.z > -4, 'A pedestrian resumes the route after the path clears');
+  for (let i = 0; i < 90 && walker.phase !== 'watch'; i++) cameos.update(1 / 60, player);
+  assert.equal(walker.phase, 'watch', 'The pedestrian now approaches the player when the path clears');
   for (const actor of cameos.actors) {
     assert.equal(actor.fleeing, false);
     assert.equal(actor.civilian, true); assert.equal(actor.alive, true);
@@ -49,41 +49,48 @@ test('passers-by walk towards the square and stay calm close to the player', () 
   cameos.dispose();
 });
 
-test('arena guests arrive individually after a quiet opening and use separate routes', () => {
+test('arena guests arrive early and continue to use separate routes', () => {
   const { cameos, player } = fixture({ start: false });
-  cameos.update(7.5, player);
+  cameos.update(1, player);
   assert.equal(cameos.actors.length, 0);
-  cameos.update(.5, player);
+  cameos.update(.25, player);
   assert.equal(cameos.actors.length, 1);
   const [first] = cameos.actors;
-  cameos.update(10.5, player);
+  cameos.update(3.1, player);
   assert.equal(cameos.actors.length, 1);
   cameos.update(.5, player);
   assert.equal(cameos.actors.length, 2);
   assert.equal(cameos.actors[0], first);
   assert.notEqual(cameos.actors[1].route, first.route);
-  assert.ok(Math.hypot(first.x - cameos.actors[1].x, first.z - cameos.actors[1].z) >= 7);
+  assert.ok(Math.hypot(first.x - cameos.actors[1].x, first.z - cameos.actors[1].z) >= 5);
   cameos.dispose();
 });
 
 test('a politician repeatedly runs up, watches the hero, and backs off without contact', () => {
   const { player, cameos } = fixture();
   player.z = 6;
-  const guest = cameos.actors[0], phases = [];
+  const guest = cameos.actors[0], phases = [], approachFrames = [];
   for (let frame = 0; frame < 1200; frame++) {
     const oldDistance = Math.hypot(guest.x - player.x, guest.z - player.z);
     const phase = guest.phase;
+    const approaches = guest.approaches;
     cameos.update(1 / 60, player, { x: 20, z: -5 });
     const engaging = cameos.actors.filter(actor => actor.phase === 'approach' || actor.phase === 'watch');
-    assert.ok(engaging.length <= 1);
-    if (guest.phase !== phase) phases.push(guest.phase);
+    assert.ok(engaging.length <= 2);
+    if (guest.phase !== phase) {
+      phases.push(guest.phase);
+      if (guest.phase === 'approach') approachFrames.push(frame);
+    }
+    assert.equal(guest.approaches, approaches + Number(guest.phase === 'approach' && phase !== 'approach'));
     const distance = Math.hypot(guest.x - player.x, guest.z - player.z);
     assert.ok(distance >= guest.standoff - 1e-8);
     if (guest.phase === phase && phase === 'approach') assert.ok(distance < oldDistance);
     if (guest.phase === phase && phase === 'retreat') assert.ok(distance > oldDistance);
     if (phase === 'watch') assert.ok(Math.abs(guest.heading) < .1, 'The guest looks at the hero');
   }
-  assert.deepEqual(phases.slice(0, 8), ['lookout', 'approach', 'watch', 'retreat', 'lookout', 'approach', 'watch', 'retreat']);
+  assert.deepEqual(phases.slice(0, 4), ['approach', 'watch', 'retreat', 'lookout']);
+  assert.ok(phases.slice(4).includes('approach'));
+  assert.ok(approachFrames[1] - approachFrames[0] < 6 * 60, 'The same guest comes back within six seconds');
   assert.equal(player.hp, 5);
   cameos.dispose();
 });
@@ -119,7 +126,7 @@ test('Central Station guests can repeat the approach from their routes while the
   const cameos = createArenaCameos(scene, world, () => 0);
   const player = { ...world.spawn, hp: 5, radius: .74, root: new THREE.Group() };
   cameos.reset();
-  cameos.update(8, player);
+  cameos.update(1.25, player);
   const firstGuests = [...cameos.actors], visits = new Map();
   for (let frame = 0; frame < 44 * 60; frame++) {
     const phases = firstGuests.map(actor => actor.phase);
@@ -162,7 +169,7 @@ test('pause, restart and switching to a runner reuse the pool without stale acto
   cameos.update(0, player); assert.deepEqual([actor.x, actor.z, actor.gait], before);
   cameos.splash(actor); actor.nextJetHit = 100;
   cameos.clear(); assert.equal(cameos.actors.length, 0); assert.equal(actor.root.visible, false); assert.equal(cameos.splash(actor), false);
-  cameos.reset(); cameos.update(8, player);
+  cameos.reset(); cameos.update(1.25, player);
   assert.equal(cameos.actors[0], actor); assert.equal(actor.nextJetHit, 0); assert.equal(actor.panic, 0);
   world.mode = 'runner'; cameos.reset(); cameos.update(30, player); assert.equal(cameos.actors.length, 0);
   world.mode = 'arena'; cameos.reset();
@@ -182,13 +189,18 @@ test('each arena samples reachable passers-by and moving trams keep them clear',
     const player = { ...world.spawn, hp: 5, radius: .74, root: new THREE.Group() };
     const cameraRig = createGameCamera();
     cameraRig.frame(player.x, player.z, 0, true);
-    for (const route of world.pedestrianRoutes) {
+    for (const route of [world.openingCameoRoute, ...world.pedestrianRoutes]) {
       const [[x, z]] = route;
       const from = cameraRig.camera.position;
       assert.equal(world.canStandAt(x, z, .6), true, definition.id);
-      for (const offset of [-.45, 0, .45]) {
-        assert.equal(world.lineClear3D(from, { x: x + offset, y: 3.1, z }, .015), false,
-          definition.id + ' pedestrian entrance is hidden from the starting camera');
+      if (route === world.openingCameoRoute) {
+        assert.equal(world.lineClear3D(from, { x, y: 3.3, z }, .05, { allowOutsideOrigin: true }), false,
+          definition.id + ' opening entrance is hidden from the starting camera');
+      } else {
+        for (const offset of [-.45, 0, .45]) {
+          assert.equal(world.lineClear3D(from, { x: x + offset, y: 3.1, z }, .015), false,
+            definition.id + ' pedestrian entrance is hidden from the starting camera');
+        }
       }
       for (let i = 1; i < route.length; i++) {
         assert.equal(world.lineClear(...route[i - 1], ...route[i], .6), true, definition.id);
@@ -198,7 +210,7 @@ test('each arena samples reachable passers-by and moving trams keep them clear',
     for (let attempt = 0; attempt < 100; attempt++) {
       cameos.reset();
       assert.equal(cameos.actors.length, 0, definition.id);
-      cameos.update(8, player);
+      cameos.update(1.25, player);
       assert.equal(cameos.actors.length, 1, definition.id);
       seen.add(cameos.actors[0].kind);
     }
@@ -214,18 +226,43 @@ test('each arena samples reachable passers-by and moving trams keep them clear',
       const previous = new Map(cameos.actors.map(actor => [actor, [actor.x, actor.z]]));
       cameos.update(1 / 60, player);
       for (const actor of cameos.actors) {
-        assert.equal(world.canStandAt(actor.x, actor.z, actor.size), true, `${definition.id}, ${actor.kind}, frame ${frame}`);
+        assert.equal(world.canStandAt(actor.x, actor.z, actor.radius), true, `${definition.id}, ${actor.kind}, frame ${frame}`);
         const position = previous.get(actor);
         if (position) moved += Math.hypot(actor.x - position[0], actor.z - position[1]);
         else arrivals++;
       }
       departures += [...previous.keys()].filter(actor => !actor.alive).length;
-      assert.ok(cameos.actors.length <= 3);
-      if (frame === 899) assert.equal(arrivals, 1, definition.id + ' introduces guests gradually');
+      assert.ok(cameos.actors.length <= 6);
+      if (frame === 899) assert.ok(arrivals >= 3 && arrivals <= 4, definition.id + ' introduces several guests early');
     }
     assert.ok(moved > 20, `${definition.id}: civilians can move through the district`);
     assert.ok(departures > 0 && arrivals >= 3, definition.id + ' keeps welcoming guests as others leave');
     assert.equal(player.hp, 5);
+  }
+  cameos.dispose(); world.dispose();
+});
+
+test('the first politician runs into view within four seconds on each arena', () => {
+  const scene = new THREE.Scene(), world = createMapManager(scene, maps), cameos = createArenaCameos(scene, world, () => 0);
+  const { camera, frameArena, resize } = createGameCamera();
+  resize(1280, 820);
+  for (const map of maps.filter(map => map.mode !== 'runner')) {
+    world.activate(map.id);
+    const player = { ...world.spawn, hp: 5, radius: .74 };
+    const towards = new THREE.Vector3();
+    frameArena(player.x, player.z, 0, { instant: true });
+    cameos.reset();
+    let met = false;
+    for (let i = 0; i < 4 * 60; i++) {
+      cameos.update(1 / 60, player, camera.position);
+      const [guest] = cameos.actors;
+      if (!guest || !['approach', 'watch'].includes(guest.phase) || Math.hypot(guest.x - player.x, guest.z - player.z) >= 4.2) continue;
+      towards.set(guest.x, 3.3, guest.z);
+      if (!world.lineClear3D(camera.position, towards, .05, { allowOutsideOrigin: true })) continue;
+      towards.project(camera);
+      if (Math.abs(towards.x) < 1 && Math.abs(towards.y) < 1 && Math.abs(towards.z) < 1) { met = true; break; }
+    }
+    assert.equal(met, true, map.id);
   }
   cameos.dispose(); world.dispose();
 });

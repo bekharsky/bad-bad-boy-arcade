@@ -15,6 +15,7 @@ export const senateSquareMap = {
   name: 'Senate Square',
   spawn: { x: -5.5, z: 6.8, heading: Math.PI },
   bounds: { minX: -34, maxX: 34, minZ: -19.5, maxZ: 34 },
+  openingCameoRoute: [[-16, 9.5], [-15, 9.5]],
   // Hidden entrances lead around the cathedral and the neighbouring blocks.
   pedestrianRoutes: [
     [[-11, 23], [-9, 12], [-8, 11], [-9, 5], [-11, 1]],

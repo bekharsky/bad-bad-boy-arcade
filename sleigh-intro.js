@@ -3,10 +3,15 @@ import { senateSquareMap } from './maps/senate-square.js';
 import { createSleighParts } from './models/sleigh.js';
 import { createJoulupukki } from './models/joulupukki.js';
 import { createSceneryModel } from './maps/scenery-model.js';
+import { createBurstEffects } from './burst-effects.js';
 import { disposeObject } from './world/dispose.js';
+import harborPortrait from './assets/intro-harbor-portrait.mp4';
+import harborWide from './assets/intro-harbor-wide.mp4';
 
 const { lerp, smoothstep } = THREE.MathUtils;
-const BREAK = 4.8, END = 9.2;
+const IMPACT = 4.18, BREAK = 4.8;
+const FLIGHT_RATE = .78, WITNESS_RATE = .68;
+const DRONE_SCALE = .76, ROTOR_OFFSET = 1.15, ROTOR_HEIGHT = .30, BLADE_LENGTH = 1.14;
 const debrisVelocity = [
   [-5.1, .75, 1.75], [5.7, 1.45, 3.8], [-2.7, -2.35, -2.6],
   [2.45, -.45, 5.1], [3.7, 2.05, -3.5], [-4.3, 2.65, -5.6],
@@ -28,6 +33,37 @@ function fadeModel(model, materials, opacity) {
     material.opacity = opacity;
     material.depthWrite = opacity === 1;
   }
+}
+
+function createIntroDrone() {
+  const frame = createSceneryModel('Delivery drone');
+  frame.box('#465264', 0, 0, 0, 1.52, .48, 1.08);
+  frame.box('#b8cad6', 0, .18, 0, 1.30, .19, .89);
+  frame.box('#d67549', 0, -.35, .04, 1.20, .33, .91);
+  for (const yaw of [-Math.PI / 4, Math.PI / 4]) {
+    frame.box('#718596', 0, .02, 0, .13, .15, 3.48, yaw);
+  }
+  const root = frame.finish();
+  root.scale.setScalar(DRONE_SCALE);
+  const rotors = [];
+  const motorMaterial = new THREE.MeshStandardMaterial({ color: '#9fafba', metalness: .45 });
+  const motor = new THREE.CylinderGeometry(.19, .22, .23, 10);
+  const blade = new THREE.BoxGeometry(.17, .039, BLADE_LENGTH);
+  const bladeMaterial = new THREE.MeshStandardMaterial({ color: '#c5d1e4', roughness: .45 });
+  const light = new THREE.SphereGeometry(.093, 8, 6);
+  const red = new THREE.MeshBasicMaterial({ color: '#ff473b' });
+  const white = new THREE.MeshBasicMaterial({ color: '#a3ebff' });
+  for (const x of [-ROTOR_OFFSET, ROTOR_OFFSET]) for (const z of [-ROTOR_OFFSET, ROTOR_OFFSET]) {
+    const housing = new THREE.Mesh(motor, motorMaterial);
+    housing.position.set(x, .16, z);
+    const propeller = new THREE.Mesh(blade, bladeMaterial);
+    propeller.position.set(x, ROTOR_HEIGHT, z);
+    const lamp = new THREE.Mesh(light, z > 0 ? red : white);
+    lamp.position.set(x, .03, z);
+    root.add(housing, propeller, lamp);
+    rotors.push(propeller);
+  }
+  return { root, rotors, materials: fadeMaterials(root) };
 }
 
 function addSky(scene) {
@@ -128,7 +164,7 @@ function lightCity(scene) {
   scene.add(flood, flood.target);
 }
 
-export function createSleighIntro(overlay, { reducedMotion, onBreak }) {
+export function createSleighIntro(overlay, { reducedMotion, onImpact }) {
   const scene = new THREE.Scene();
   scene.fog = new THREE.FogExp2('#283956', .006);
   const camera = new THREE.PerspectiveCamera(52, 1, .2, 520);
@@ -146,6 +182,11 @@ export function createSleighIntro(overlay, { reducedMotion, onBreak }) {
   const rider = createJoulupukki();
   const riderMaterials = fadeMaterials(rider.root);
   sleigh.add(rider.root);
+  const drone = createIntroDrone();
+  const droneFlight = new THREE.Group();
+  droneFlight.add(drone.root);
+  scene.add(droneFlight);
+  const impactSparks = createBurstEffects(scene, 32);
   const pieces = createSleighParts().map(({ model }, index) => {
     // Pieces share source materials, but their fades need independent opacity.
     const ownedMaterials = new Map();
@@ -185,19 +226,48 @@ export function createSleighIntro(overlay, { reducedMotion, onBreak }) {
   sleigh.add(wind);
 
   let elapsed = 0;
-  const duration = reducedMotion ? 4.6 : END;
+  const witness = overlay.querySelector('#intro-witness');
+  const witnessStart = reducedMotion ? 3.65 : (BREAK + 1.95) / FLIGHT_RATE;
+  const duration = witnessStart + (reducedMotion ? 1.8 : 2.7);
   const color = new THREE.Color('#ffbf73');
   const target = new THREE.Vector3();
+  const railContact = new THREE.Vector3(1.22, 2.08, 1.85);
+  // The leading rotor strikes the outside rail. The drone's centre stays on the far side of it.
+  const droneAtImpact = railContact.clone().add(new THREE.Vector3(
+    ROTOR_OFFSET + BLADE_LENGTH / 2, -ROTOR_HEIGHT, -ROTOR_OFFSET,
+  ).multiplyScalar(DRONE_SCALE));
+  const approach = new THREE.Vector3(9.5, 1.3, 4.6);
+  const deflection = new THREE.Vector3(9.6, .45, -5.4);
+  // Anchor the flight in world space at impact, independently of the sleigh's jolt.
+  poseSleigh(IMPACT);
+  droneFlight.position.copy(sleigh.position);
+  droneFlight.quaternion.copy(sleigh.quaternion);
+  const droneContact = droneFlight.localToWorld(railContact.clone());
+  const flash = new THREE.PointLight('#ffba70', 0, 9);
+  flash.position.copy(droneContact);
+  scene.add(flash);
+  let witnessSource = '', witnessReady = false;
+  function showWitnessStill() {
+    if (witness.hidden || witness.readyState < 2) return;
+    witness.currentTime = .75;
+    witnessReady = true;
+  }
 
-  function pose(time) {
-    const close = smoothstep(time, 1.25, 3.35), pullBack = smoothstep(time, 4.73, 8.25);
-    const jolt = smoothstep(time, 3.95, 4.38), rebound = smoothstep(time, 4.39, 4.73);
+  function poseSleigh(time) {
+    const pullBack = smoothstep(time, 4.73, 8.25);
+    const jolt = smoothstep(time, IMPACT, 4.49), rebound = smoothstep(time, 4.49, 4.77);
     const scatter = Math.max(0, time - BREAK);
     const flight = time - scatter * .57;
     const turbulence = jolt * (1 - pullBack);
     sleigh.position.set(-18 + flight * 5.1, 22.3 + flight * .66 + Math.sin(time * 2.1) * .35 - 3.5 * jolt + 1.4 * rebound, -12 + flight * 1.6);
     sleigh.rotation.set(.028 * Math.sin(time * 3.2) + .26 * jolt - .38 * rebound,
       1.2 + .045 * Math.sin(time * 1.55) - .2 * turbulence, -.13 * Math.sin(time * 1.8) - .57 * jolt + .86 * rebound);
+    return { pullBack, scatter, turbulence };
+  }
+
+  function pose(time) {
+    const { pullBack, scatter, turbulence } = poseSleigh(time);
+    const close = smoothstep(time, 1.25, 3.35);
     const { x, y, z } = sleigh.position;
     const portrait = camera.aspect < .8;
     const widen = portrait ? 1.36 : 1;
@@ -209,6 +279,15 @@ export function createSleighIntro(overlay, { reducedMotion, onBreak }) {
       lerp(-29, z, close) - pullBack * 4.5);
     camera.lookAt(target);
     if (!reducedMotion) camera.rotateZ(.072 * Math.sin(time * 26) * turbulence * (1 - smoothstep(time, 4.5, 5.25)));
+
+    const beforeImpact = Math.max(0, IMPACT - time);
+    const afterImpact = Math.max(0, time - IMPACT);
+    drone.root.position.copy(droneAtImpact).addScaledVector(approach, beforeImpact).addScaledVector(deflection, afterImpact);
+    drone.root.position.y -= 3.2 * afterImpact ** 2;
+    drone.root.rotation.set(-.15 * Math.min(1, beforeImpact) + afterImpact * 2.9, -afterImpact * 2.4, -.2 * Math.min(1, beforeImpact) - afterImpact * 3.4);
+    drone.rotors.forEach((rotor, i) => { rotor.rotation.y = i * Math.PI / 2 + (time - IMPACT) * 45 * (i % 2 ? 1 : -1); });
+    fadeModel(drone.root, drone.materials, smoothstep(time, 2.25, 2.75) * (1 - smoothstep(afterImpact, 1.04, 1.62)));
+    flash.intensity = time >= IMPACT ? 175 * (1 - smoothstep(afterImpact, .03, .24)) : 0;
 
     rider.root.position.set(.95 * scatter, 1.77 + 2.7 * scatter - 1.55 * scatter ** 2, .09 - 2.8 * scatter);
     rider.root.rotation.set(-.24 * turbulence - .61 * scatter, -.3 * scatter, -.82 * scatter + .25 * turbulence);
@@ -253,20 +332,52 @@ export function createSleighIntro(overlay, { reducedMotion, onBreak }) {
       camera.aspect = width / height;
       camera.fov = camera.aspect < .8 ? 57 : 52;
       camera.updateProjectionMatrix();
+      const source = width < height ? harborPortrait : harborWide;
+      if (elapsed < witnessStart && source !== witnessSource) {
+        witnessSource = source;
+        witness.src = source;
+        witness.load();
+      }
     },
     update(dt) {
       const last = elapsed;
       elapsed += dt;
-      const time = reducedMotion ? (elapsed < 2.35 ? 2.83 : 5.87) : elapsed;
-      pose(time);
-      const fade = Math.max(1 - smoothstep(elapsed, 0, .64), smoothstep(elapsed, duration - .85, duration));
+      const time = reducedMotion ? (elapsed < 2.35 ? 3.68 : 5.87) : elapsed * FLIGHT_RATE;
+      if (!witnessReady || elapsed < witnessStart + .24) pose(time);
+      if (!reducedMotion && last * FLIGHT_RATE < IMPACT && time >= IMPACT) {
+        impactSparks.burst(droneContact.x, droneContact.y, droneContact.z, '#ffb963', 24, null, 1.75);
+        onImpact();
+      }
+      if (!reducedMotion && time >= IMPACT && time < IMPACT + 1) impactSparks.update(dt);
+      if (last < witnessStart && elapsed >= witnessStart) {
+        witness.hidden = false;
+        if (reducedMotion) {
+          if (witness.readyState >= 2) showWitnessStill();
+          else witness.addEventListener('loadeddata', showWitnessStill, { once: true });
+        } else {
+          witness.playbackRate = WITNESS_RATE;
+          witness.play().then(() => { witnessReady = true; }).catch(showWitnessStill);
+        }
+      }
+      const fade = Math.max(1 - smoothstep(elapsed, 0, .75), smoothstep(elapsed, duration - .45, duration));
       const cut = reducedMotion ? Math.max(0, 1 - Math.abs(elapsed - 2.35) / .19) : 0;
       overlay.style.setProperty('--intro-shade', Math.max(fade, cut).toFixed(3));
-      overlay.style.setProperty('--intro-caption', (smoothstep(elapsed, .6, 1.12) * (1 - smoothstep(elapsed, 2.05, 2.9))).toFixed(3));
-      if (!reducedMotion && last < BREAK && elapsed >= BREAK) onBreak();
+      overlay.style.setProperty('--witness-opacity', witnessReady ? smoothstep(elapsed, witnessStart, witnessStart + .24).toFixed(3) : '0');
+      overlay.style.setProperty('--intro-caption', (smoothstep(elapsed, .6, 1.12) * (1 - smoothstep(elapsed, 2.4, 3.28))).toFixed(3));
       return elapsed >= duration;
     },
-    render(renderer) { renderer.render(scene, camera); },
-    dispose() { district.dispose(); disposeObject(scene); },
+    render(renderer) {
+      if (!witnessReady || elapsed < witnessStart + .24) renderer.render(scene, camera);
+    },
+    dispose() {
+      witness.pause();
+      witness.hidden = true;
+      witness.removeEventListener('loadeddata', showWitnessStill);
+      witness.removeAttribute('src');
+      witness.load();
+      overlay.style.removeProperty('--witness-opacity');
+      district.dispose();
+      disposeObject(scene);
+    },
   };
 }

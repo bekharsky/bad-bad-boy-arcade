@@ -192,7 +192,7 @@ test('runner liquid clears approaching riders while roadwork obstacles survive a
 
 test('runner liquid can startle either passer-by from the adjacent outer lane', async () => {
   const { createBaanaRun, trafficProfile, riderHealth } = await import('../runner/baana-run.js');
-  for (const [kind, side] of [['zelenskyy', -1], ['kadyrov', 1]]) {
+  for (const [kind, side] of [['macron', -1], ['lepen', 1]]) {
     const run = createBaanaRun({ riderKinds: [kind], roadworkKinds: [] }), { hitHeight, size } = trafficProfile(kind);
     const lane = side < 0 ? 0 : 2;
     run.dodge(side);

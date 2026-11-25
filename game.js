@@ -82,7 +82,21 @@ const skipIntro = document.querySelector('#skip-intro');
 const missionScreen = document.querySelector('#mission-screen');
 const beginSearch = document.querySelector('#begin-search');
 const passerbyCard = document.querySelector('.passerby');
+const cameoSpeechTemplate = document.querySelector('#cameo-speech');
+const cameoSpeeches = new Map();
+const cameoSpeechPoint = new THREE.Vector3();
+const CAMEO_LINES = [
+  'We’re deeply concerned',
+  'We’re monitoring the situation',
+  'We take this very seriously',
+  'We call for restraint',
+  'All options are on the table',
+  'We remain committed to dialogue',
+  'We’ll review the matter in due course',
+  'We’ll consider the appropriate steps',
+];
 let shownCameo = null;
+let nextLine = 0;
 const toast = document.querySelector('#toast');
 const encounterHint = document.querySelector('#encounter-hint');
 const sprayTutorial = createSprayTutorial(document.querySelector('#spray-tutorial'), encounterHint);
@@ -97,19 +111,25 @@ const mouseSupported = window.matchMedia('(any-pointer: fine)').matches;
 const aimRay = new THREE.Raycaster();
 const aimScreen = new THREE.Vector2();
 const aimPoint = new THREE.Vector3();
+const aimOffset = new THREE.Vector3();
+const reticlePoint = new THREE.Vector3();
+const reticleOrigin = new THREE.Vector3();
+const reticlePosition = { x: 0, y: 0 };
+const mouseReticle = document.querySelector('#mouse-reticle');
 const aimGround = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 const aimTargetBounds = new THREE.Sphere();
 const aimTargetHit = new THREE.Vector3();
 const enemyPoint = new THREE.Vector3();
 const enemyScreen = new THREE.Vector3();
-const mouseAim = createMouseAim({ canvas });
+const mouseAim = createMouseAim({ canvas, onAim: updateMouseAim, projectAim: projectMouseAim });
 const touchControls = createTouchControls({
   zone: document.querySelector('#joystick-zone'),
   stick: document.querySelector('#joystick'),
   thumb: document.querySelector('#joystick-thumb'),
   home: document.querySelector('.joystick-hint'),
   fireButton: document.querySelector('#mobile-fire'),
-  onFireStart: beginSpray,
+  fireHome: document.querySelector('#spray-home'),
+  onFireStart: (airborne, heading, fresh) => beginSpray(false, airborne, heading, fresh),
   onInput() {
     canvas.focus({ preventScroll: true });
     if (!usingTouchControls) { usingTouchControls = true; syncMouseAim(); }
@@ -200,6 +220,7 @@ const player = {
   tapTimer: 0,
   mouseTap: false,
   upwardTap: false,
+  touchTapHeading: null,
   runTime: 0,
   runBlend: 0,
   runAngle: 0,
@@ -270,7 +291,9 @@ let foundParts = 0;
 let intro = null;
 let introSeen = false;
 const FINISH_HOLD = .85;
+const CRASH_HOLD = .45;
 let runnerArrival = 0;
+let runnerCrash = 0;
 let audioContext = null;
 let renderingReady = false;
 const frameClock = createFrameClock();
@@ -279,11 +302,19 @@ const runnerSession = createRunnerSession({
   world, player, cameraRig, seagulls, medkits, touchControls, keys,
   heroHeight: HERO_HEIGHT, heroScale: HERO_SCALE,
   isPlaying: () => playing,
+  onImpact({ x, z }, fatal) {
+    burst(x, HERO_HEIGHT * (fatal ? .32 : .42), z, 0xff343e, fatal ? 42 : 22, null, fatal ? 2.7 : 1.8);
+  },
+  onCrash() {
+    runnerCrash = CRASH_HOLD;
+    resetInput();
+    stream.clear();
+    touchControls.setEnabled(false);
+  },
   onDamage(hits) {
     const lost = Math.min(player.hp, hits);
     player.hp -= lost;
     recordHealthLost(lost); blip(110, .12);
-    burst(player.x, HERO_HEIGHT * .4, 0, 0xe85e55, 16, null, 2);
     if (player.hp === 0) { endGame(); return false; }
     return true;
   },
@@ -296,7 +327,7 @@ const runnerSession = createRunnerSession({
     runnerReward.update(distance, elapsed, reducedMotion.matches);
     const crossingWarning = crossings.some(crossing => crossing.phase === 'warning' || crossing.phase === 'crossing');
     const passerby = traffic.find(agent => isCameo(agent.kind) && agent.age >= .3 && !agent.passed && agent.panicSide === undefined);
-    showCameo(crossingWarning ? null : passerby?.kind ?? null);
+    showCameo(crossingWarning ? null : passerby);
   },
   onFinish() {
     runnerArrival = FINISH_HOLD;
@@ -314,7 +345,7 @@ const runnerInput = bindRunnerInput({
 const transitionRenderer = createTransitionRenderer(renderer);
 const mapTransition = createMapTransition({ onSwap: enterDistrict, onFinish: finishMapTransition });
 
-function gameInterlude() { return intro !== null || mapTransition.active || sleighAssembly.active || runnerArrival > 0; }
+function gameInterlude() { return intro !== null || mapTransition.active || sleighAssembly.active || runnerArrival > 0 || runnerCrash > 0; }
 
 function finishMapTransition() {
   gameShell.classList.remove('map-changing');
@@ -345,7 +376,8 @@ async function prepareGraphics() {
   renderingReady = true;
 }
 
-function showCameo(kind) {
+function showCameo(actor) {
+  const kind = actor?.kind ?? null;
   if (kind === shownCameo) return;
   shownCameo = kind;
   passerbyCard.hidden = !kind;
@@ -355,12 +387,91 @@ function showCameo(kind) {
   }
 }
 
+function updateCameoSpeech() {
+  if (!playing || pauseDialog.open || gameInterlude()) {
+    for (const { bubble } of cameoSpeeches.values()) bubble.hidden = true;
+    return;
+  }
+  const runner = isRunner();
+  const runnerGuest = runner && runnerSession.state.traffic.find(actor =>
+    isCameo(actor.kind) && actor.alive && !actor.passed && actor.z >= -30
+      && actor.stumbleTime === undefined && actor.panicSide === undefined);
+  const inEncounter = actor => actor.approaches > 0
+    && (actor.phase === 'approach' || actor.phase === 'watch' || actor.phase === 'retreat');
+
+  for (const [actor, speech] of cameoSpeeches) {
+    if (!actor.alive || (runner ? actor !== runnerGuest : actor.approaches === 0)) {
+      speech.bubble.remove();
+      cameoSpeeches.delete(actor);
+    }
+  }
+  const candidates = runner ? (runnerGuest ? [runnerGuest] : []) : arenaCameos.actors;
+  for (const actor of candidates) {
+    const previous = cameoSpeeches.get(actor);
+    if (previous && previous.approach === actor.approaches) continue;
+    if (!runner && (!inEncounter(actor) || actor.fleeing || gameTime < actor.nextSpeechAt)) continue;
+    previous?.bubble.remove();
+    const bubble = cameoSpeechTemplate.content.firstElementChild.cloneNode(true);
+    const line = CAMEO_LINES[nextLine];
+    nextLine = (nextLine + 1) % CAMEO_LINES.length;
+    bubble.dataset.line = line;
+    bubble.setAttribute('aria-label', line);
+    cameoSpeechTemplate.before(bubble);
+    cameoSpeeches.set(actor, { bubble, line, approach: actor.approaches, start: null, letters: 0 });
+  }
+  if (!cameoSpeeches.size) return;
+  const w = viewWidth, h = viewHeight;
+  for (const [actor, speech] of cameoSpeeches) {
+    const { bubble, line } = speech;
+    const canFinishLine = speech.start !== null && actor.phase === 'lookout';
+    if ((!runner && (actor.fleeing || (!inEncounter(actor) && !canFinishLine)))
+      || (speech.start !== null && gameTime - speech.start >= 4)) {
+      bubble.hidden = true;
+      continue;
+    }
+    cameoSpeechPoint.set(actor.x, 3.3, actor.z);
+    if (!runner && !world.lineClear3D(camera.position, cameoSpeechPoint, .05, { allowOutsideOrigin: true })) {
+      bubble.hidden = true;
+      continue;
+    }
+    cameoSpeechPoint.project(camera);
+    const { x, y, z } = cameoSpeechPoint;
+    if (Math.abs(x) >= 1 || Math.abs(y) >= 1 || Math.abs(z) >= 1) { bubble.hidden = true; continue; }
+
+    // Off-screen time shouldn't use up a line before the player sees it.
+    if (speech.start === null) {
+      speech.start = gameTime;
+      if (!runner) actor.nextSpeechAt = gameTime + 6 + 2 * CAMEO_KINDS.indexOf(actor.kind) / (CAMEO_KINDS.length - 1);
+    }
+    const letters = reducedMotion.matches ? line.length : Math.min(line.length, 1 + Math.floor((gameTime - speech.start) * 24));
+    if (letters !== speech.letters) {
+      speech.letters = letters;
+      const text = bubble.firstElementChild;
+      text.textContent = line.slice(0, letters);
+      text.dataset.rest = line.slice(letters);
+    }
+    bubble.hidden = false;
+    // The hidden full line sets the size independently of the typing.
+    if (speech.viewWidth !== w) {
+      speech.viewWidth = w;
+      speech.halfWidth = bubble.getBoundingClientRect().width / 2;
+    }
+    const screenX = (x + 1) * w / 2, screenY = (1 - y) * h / 2;
+    const inset = speech.halfWidth + 8;
+    const bubbleX = THREE.MathUtils.clamp(screenX, inset, w - inset);
+    bubble.style.transform = `translate3d(${bubbleX}px, ${screenY - 10}px, 0) translate(-50%, -100%)`;
+    bubble.style.setProperty('--speech-tail-x', `${screenX - bubbleX}px`);
+  }
+}
+
 function syncLevelUI() {
   const runner = isRunner();
   showCameo(null);
+  for (const { bubble } of cameoSpeeches.values()) bubble.remove();
+  cameoSpeeches.clear();
   toast.hidden = runner;
   gameShell.classList.toggle('runner-mode', runner);
-  document.querySelector('#joystick-zone').setAttribute('aria-label', runner ? 'Left/right to dodge; up to accelerate, down to brake' : 'Drag to move and aim');
+  document.querySelector('#joystick-zone').setAttribute('aria-label', runner ? 'Left/right to dodge; up to accelerate, down to brake' : 'Drag to move');
 }
 
 if (debugMaps) {
@@ -514,6 +625,8 @@ function enterDistrict({ index }) {
         [-5.5, 26.5, 6.5], // Behind the southern apartment building
         [-22, -24, 6.5], // Behind the west warehouse
         [18.5, 22.5, 6.5], // Behind Cafe Helmi
+        [6, 15, 6], // South of the plaza
+        [14.5, -24, 6.5], // By the terminal
       ];
       for (const [x, z, range] of harborPosts) {
         const post = world.pickupPoint({ x, z }, .65);
@@ -605,23 +718,29 @@ function blip(frequency, duration) {
 }
 
 function updateMovement(dt, firing) {
-  const mouseFiring = keys.has('Fire') || (player.mouseTap && player.tapTimer > 0);
-  const heading = mouseFiring || mouseAim.following ? mouseHeading() : null;
+  const mouseFiring = isMouseFiring();
+  const heading = mouseAim.aiming && (mouseFiring || mouseAim.following) ? Math.atan2(aimOffset.x, aimOffset.z) : null;
   return movePlayer(player, world, {
     keys, touch: touchControls.input, dt, firing, height: HERO_HEIGHT,
     cursorHeading: heading,
     shotHeading: mouseFiring ? heading : null,
+    touchShotHeading: player.tapTimer > 0 ? player.touchTapHeading : null,
     steerWithMouse: mouseAim.following,
   });
 }
 
-function mouseHeading() {
-  if (!mouseAim.aiming) return null;
-  aimScreen.set(mouseAim.position.x * 2 - 1, 1 - mouseAim.position.y * 2);
+function isMouseFiring() {
+  return keys.has('Fire') || (player.mouseTap && player.tapTimer > 0);
+}
+
+function updateMouseAim({ x, y }) {
+  camera.updateMatrixWorld();
+  aimScreen.set(x * 2 - 1, 1 - y * 2);
   aimRay.setFromCamera(aimScreen, camera);
   const { ray } = aimRay;
   const ground = ray.intersectPlane(aimGround, aimPoint);
-  let closest = ground ? ray.origin.distanceToSquared(ground) : Infinity;
+  const groundDistance = ground ? ray.origin.distanceToSquared(ground) : Infinity;
+  let closest = groundDistance < camera.far ** 2 ? groundDistance : Infinity;
   // A goose under the crosshair is above the ground plane. Use its hitbox
   // so the cursor over its body aims at the goose instead of the pavement.
   for (const enemy of enemies) {
@@ -632,17 +751,42 @@ function mouseHeading() {
     const distance = ray.origin.distanceToSquared(aimTargetHit);
     if (distance >= closest || !world.lineClear3D(ray.origin, aimTargetHit, .04)) continue;
     closest = distance;
-    aimPoint.copy(aimTargetBounds.center);
+    aimPoint.copy(aimTargetHit);
   }
-  if (closest === Infinity) ray.at(camera.far, aimPoint);
+  if (closest === Infinity) ray.at(camera.far * .85, aimPoint);
   const dx = aimPoint.x - player.x, dz = aimPoint.z - player.z;
-  return dx * dx + dz * dz > .01 ? Math.atan2(dx, dz) : player.heading;
+  if (dx * dx + dz * dz > .01) aimOffset.set(dx, aimPoint.y, dz);
+  else aimOffset.set(player.dx * .1, 0, player.dz * .1);
+}
+
+function projectMouseAim() {
+  camera.updateMatrixWorld();
+  reticleOrigin.set(player.x, 0, player.z).project(camera);
+  reticlePoint.set(player.x + aimOffset.x, aimOffset.y, player.z + aimOffset.z).project(camera);
+  if (reticlePoint.z < -1 || reticlePoint.z > 1) return null;
+  const dx = reticlePoint.x - reticleOrigin.x, dy = reticlePoint.y - reticleOrigin.y;
+  // Keep the reticle on the projected aim line when the camera drifts near an edge.
+  const edge = Math.min(1,
+    dx > 0 ? (.985 - reticleOrigin.x) / dx : dx < 0 ? (-.985 - reticleOrigin.x) / dx : 1,
+    dy > 0 ? (.98 - reticleOrigin.y) / dy : dy < 0 ? (-.98 - reticleOrigin.y) / dy : 1);
+  reticlePosition.x = .5 + (reticleOrigin.x + dx * edge) * .5;
+  reticlePosition.y = .5 - (reticleOrigin.y + dy * edge) * .5;
+  return reticlePosition;
+}
+
+function drawMouseReticle() {
+  const point = mouseAim.aiming && (mouseAim.following || isMouseFiring()) ? projectMouseAim() : null;
+  mouseReticle.toggleAttribute('hidden', !point);
+  gameShell.classList.toggle('mouse-reticle-active', !!point);
+  if (!point) return;
+  mouseReticle.style.left = `${point.x * 100}%`;
+  mouseReticle.style.top = `${point.y * 100}%`;
 }
 
 function syncMouseAim() {
   const enabled = mouseSupported && !usingTouchControls && playing && !pauseDialog.open && !isRunner() && !gameInterlude();
   mouseAim.setEnabled(enabled);
-  gameShell.classList.toggle('mouse-aim-enabled', enabled);
+  drawMouseReticle();
 }
 
 function update(dt) {
@@ -666,7 +810,12 @@ function update(dt) {
   gameTime += dt;
   // Finish the final bite's splash even after the round ends.
   biteEffects.update(dt);
-  effects.update(dt, playing && isRunner() ? runnerSession.state.speed : 0);
+  effects.update(dt, playing && isRunner() && !runnerCrash ? player.moveSpeed : 0);
+  if (runnerCrash > 0) {
+    runnerCrash = Math.max(0, runnerCrash - dt);
+    if (runnerCrash === 0) endGame(false, { crashed: true });
+    return;
+  }
   if (!playing) return;
   if (isRunner()) { runnerSession.update(dt); return; }
   searchTime += dt;
@@ -680,7 +829,7 @@ function update(dt) {
   arenaCameos.update(dt, player, camera.position);
   const follower = arenaCameos.actors.find(actor => (actor.phase === 'approach' || actor.phase === 'watch')
     && !actor.fleeing && Math.hypot(actor.x - player.x, actor.z - player.z) < 4.2);
-  showCameo(follower?.kind ?? null);
+  showCameo(follower);
   if (sleighCache.update(gameTime, player, reducedMotion.matches)) { collectSleighPart(); return; }
   if (moving) player.runAngle = Math.atan2(player.x - oldX, player.z - oldZ) - player.heading;
   player.runBlend = THREE.MathUtils.damp(player.runBlend, moving ? 1 : 0, 18, dt);
@@ -733,7 +882,8 @@ function nearbyGooseVisible() { return enemies.some(enemyVisible); }
 function nearbyGullVisible() { return seagulls.birds.some(enemyVisible); }
 
 function sprayAimingUp() {
-  return aimingUp(keys, touchControls.input, player.tapTimer > 0 && player.upwardTap);
+  const upwardTap = player.tapTimer > 0 && player.upwardTap && (player.touchTapHeading === null || !touchControls.input.firing);
+  return aimingUp(keys, touchControls.input, upwardTap);
 }
 
 function updateSpray(dt, firing, groundTargets, powered = false) {
@@ -749,7 +899,7 @@ function updateSpray(dt, firing, groundTargets, powered = false) {
 
 function updateSprayFeedback(spray) {
   const range = spray.range.toFixed(1);
-  const mode = spray.airborne ? 'Spraying upwards; drag back to lower' : `Fire spray, range ${range} metres; drag up to aim at birds`;
+  const mode = spray.airborne ? 'Spraying upward; flick down to lower' : `Drag to aim and spray, range ${range} metres; flick up to aim at birds`;
   const label = `${mode}${spray.blocked ? ', blocked' : ''}`;
   sprayButton.dataset.blocked = String(spray.blocked);
   if (sprayButton.getAttribute('aria-label') !== label) sprayButton.setAttribute('aria-label', label);
@@ -883,7 +1033,7 @@ function playFromMenu() {
   }
   introSeen = true;
   try {
-    intro = createSleighIntro(introOverlay, { reducedMotion: reducedMotion.matches, onBreak: () => blip(133, .32) });
+    intro = createSleighIntro(introOverlay, { reducedMotion: reducedMotion.matches, onImpact: () => blip(133, .32) });
     intro.resize(canvas.clientWidth, canvas.clientHeight);
     intro.update(0);
     startScreen.classList.add('hidden');
@@ -911,6 +1061,7 @@ function startGame({ transition = false } = {}) {
   if (!player.model || !renderingReady) return;
   playing = false;
   runnerArrival = 0;
+  runnerCrash = 0;
   sleighAssembly.clear();
   gameShell.classList.remove('sleigh-assembling');
   mapTransition.cancel(); finishMapTransition();
@@ -950,7 +1101,7 @@ function clearArena() {
   enemies.length = 0;
 }
 
-function endGame(won = false) {
+function endGame(won = false, { crashed = false } = {}) {
   showCameo(null);
   sprayTutorial.reset();
   updateScore();
@@ -963,7 +1114,7 @@ function endGame(won = false) {
   player.moveSpeed = 0;
   player.turnSpeed = 0;
   endScreen.classList.remove('hidden');
-  document.querySelector('#end-title').textContent = won ? 'SLEIGH COMPLETE' : 'WASTED';
+  document.querySelector('#end-title').textContent = won ? 'SLEIGH COMPLETE' : crashed ? 'CRASHED' : 'WASTED';
   document.querySelector('#end-score').textContent = score.toLocaleString();
   restartButton.textContent = 'PLAY AGAIN';
   leaderboard.submit(score, levelIndex + 1);
@@ -973,9 +1124,10 @@ function endGame(won = false) {
   keys.clear();
 }
 
+let viewWidth = 0, viewHeight = 0;
 function resize() {
-  const width = canvas.clientWidth;
-  const height = canvas.clientHeight;
+  const width = viewWidth = canvas.clientWidth;
+  const height = viewHeight = canvas.clientHeight;
   renderer.setSize(width, height, false);
   cameraRig.resize(width, height, window.matchMedia('(pointer: coarse)').matches);
   if (!playing && (!startScreen.classList.contains('hidden') || !missionScreen.hidden)) frameMenuPreview();
@@ -991,6 +1143,7 @@ function animate(now) {
     return !pauseDialog.open && renderingReady;
   });
   if (!renderingReady) return;
+  if (isRunner()) runnerSession.present();
   if (!pauseDialog.open && !gameInterlude()) weather.update(dt, isRunner() ? runnerSession.state.distance : 0);
   if (player.model && !sleighAssembly.active && !intro) world.updateVisibility(camera, player.root, HERO_HEIGHT, dt);
   if (intro) intro.render(renderer);
@@ -999,14 +1152,17 @@ function animate(now) {
     transitionRenderer.render(scene, camera, mapTransition.progress, reducedMotion.matches);
   } else renderer.render(scene, camera);
   updateHeroOverlay();
+  updateCameoSpeech();
+  drawMouseReticle();
 }
 
-function beginSpray(mouse = false, upward = false) {
+function beginSpray(mouse = false, upward = false, touchHeading = null, fresh = true) {
   if (gameInterlude()) return;
   player.tapTimer = 0.075;
   player.mouseTap = mouse;
   player.upwardTap = upward;
-  stream.resetPressure();
+  player.touchTapHeading = touchHeading;
+  if (fresh) stream.resetPressure();
 }
 
 function resetInput() {
@@ -1019,6 +1175,7 @@ function resetInput() {
   player.tapTimer = 0;
   player.mouseTap = false;
   player.upwardTap = false;
+  player.touchTapHeading = null;
   player.moveSpeed = 0;
   player.turnSpeed = 0;
   player.targetHeading = player.heading;
@@ -1027,7 +1184,7 @@ function resetInput() {
 }
 
 function pauseGame() {
-  if (!playing || pauseDialog.open) return;
+  if (!playing || pauseDialog.open || runnerCrash > 0) return;
   resetInput();
   pauseDialog.showModal();
   syncMouseAim();

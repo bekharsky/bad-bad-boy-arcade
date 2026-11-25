@@ -15,6 +15,7 @@ export const kamppiSquareMap = {
   name: 'Kamppi · Narinkkatori',
   spawn: { x: -5.5, z: 7.5, heading: Math.PI },
   bounds: { minX: -43, maxX: 43, minZ: -43, maxZ: 68.5 },
+  openingCameoRoute: [[-12, 3.5], [-11, 3.5]],
   // Hidden entrances lead into and around Narinkkatori.
   pedestrianRoutes: [
     [[-16, 12], [-13, 8], [-10, 7], [-6, 4], [2, 3.5]],

@@ -17,26 +17,31 @@ function approachHeading(heading, target, dt, turnRate = 14) {
   return Math.abs(angle) <= turnStep ? target : heading + Math.sign(angle) * turnStep;
 }
 
-export function movePlayer(player, city, { keys, touch, dt, firing, height, cursorHeading = null, shotHeading = null, steerWithMouse = false }) {
+export function movePlayer(player, city, { keys, touch, dt, firing, height, cursorHeading = null, shotHeading = null, touchShotHeading = null, steerWithMouse = false }) {
   const touchStrength = Math.hypot(touch.x, touch.z);
   const x = touchStrength ? touch.x : Number(keys.has('KeyD')) - Number(keys.has('KeyA'));
   const z = touchStrength ? touch.z : Number(keys.has('KeyS')) - Number(keys.has('KeyW'));
   const turn = touchStrength ? 0 : Number(keys.has('ArrowLeft')) - Number(keys.has('ArrowRight'));
   const throttle = touchStrength ? 0 : Number(keys.has('ArrowUp')) - Number(keys.has('ArrowDown'));
   const directStrength = Math.hypot(x, z);
+  const wasd = !touchStrength && directStrength > 0;
+  const touchAim = touch.aimX || touch.aimZ ? Math.atan2(touch.aimX, touch.aimZ) : touchShotHeading;
   const mouseSteering = steerWithMouse && !touchStrength;
   const mouseHeading = touchStrength ? null : shotHeading ?? (mouseSteering ? cursorHeading : null);
   player.targetHeading ??= player.heading;
   turnPlayer(player, turn * (firing ? 1.7 : 3.2), dt);
   if (!turn && !throttle && directStrength && !mouseSteering) player.targetHeading = Math.atan2(x, z);
 
-  if (mouseHeading !== null) {
+  if (touchAim !== null) {
+    player.heading = player.targetHeading = touchAim;
+  } else if (mouseHeading !== null) {
     player.heading = mouseHeading;
     if (!turn && (mouseSteering || (!throttle && !directStrength))) player.targetHeading = mouseHeading;
-  } else if (firing && !touchStrength) {
+  } else if (firing && !touchStrength && !directStrength) {
     player.heading = player.targetHeading;
   } else {
-    player.heading = approachHeading(player.heading, player.targetHeading, dt, touchStrength ? 22 : 14);
+    const turnRate = touchStrength ? 22 : wasd && !turn && !throttle ? 10 : 14;
+    player.heading = approachHeading(player.heading, player.targetHeading, dt, turnRate);
   }
 
   player.heading = Math.atan2(Math.sin(player.heading), Math.cos(player.heading));
@@ -50,20 +55,42 @@ export function movePlayer(player, city, { keys, touch, dt, firing, height, curs
   const moveZ = z / directScale + throttle * Math.cos(player.targetHeading);
   const strength = Math.hypot(moveX, moveZ);
   const moving = strength > 1e-6;
-  if (moving) {
-    player.moveX = moveX / strength;
-    player.moveZ = moveZ / strength;
-  }
   const maxSpeed = player.speed * (firing ? 0.7 : 1);
   const targetSpeed = moving ? Math.min(1, strength) * maxSpeed : 0;
-  const damping = moving ? 14 : 48;
+  const oldSpeed = player.moveSpeed;
+  const directionX = moving ? moveX / strength : (player.moveX ?? player.dx);
+  const directionZ = moving ? moveZ / strength : (player.moveZ ?? player.dz);
+  const blendWasd = wasd && moving && oldSpeed > 0 && player.moveX !== undefined;
+  const redirecting = blendWasd && player.moveX * directionX + player.moveZ * directionZ < .999;
+  const damping = moving ? (redirecting ? 8 : 14) : 48;
   const decay = Math.exp(-damping * dt);
-  const distance = targetSpeed * dt + (player.moveSpeed - targetSpeed) * (1 - decay) / damping;
-  player.moveSpeed = targetSpeed + (player.moveSpeed - targetSpeed) * decay;
+  const easingTime = (1 - decay) / damping;
+  let travelX, travelZ;
+  // Blend WASD velocity through corners and brake before reversing.
+  if (blendWasd) {
+    const targetX = directionX * targetSpeed, targetZ = directionZ * targetSpeed;
+    const deltaX = player.moveX * oldSpeed - targetX, deltaZ = player.moveZ * oldSpeed - targetZ;
+    travelX = targetX * dt + deltaX * easingTime;
+    travelZ = targetZ * dt + deltaZ * easingTime;
+    const vx = targetX + deltaX * decay, vz = targetZ + deltaZ * decay;
+    player.moveSpeed = Math.hypot(vx, vz);
+    if (player.moveSpeed) {
+      player.moveX = vx / player.moveSpeed;
+      player.moveZ = vz / player.moveSpeed;
+    }
+  } else {
+    const distance = targetSpeed * dt + (oldSpeed - targetSpeed) * easingTime;
+    travelX = directionX * distance;
+    travelZ = directionZ * distance;
+    player.moveSpeed = targetSpeed + (oldSpeed - targetSpeed) * decay;
+    player.moveX = directionX;
+    player.moveZ = directionZ;
+  }
   if (!moving && player.moveSpeed < 0.015) player.moveSpeed = 0;
   const oldX = player.x, oldZ = player.z;
-  city.move(player, (player.moveX ?? player.dx) * distance, (player.moveZ ?? player.dz) * distance, player.radius);
+  city.move(player, travelX, travelZ, player.radius);
   const travelled = Math.hypot(player.x - oldX, player.z - oldZ);
+  const distance = Math.hypot(travelX, travelZ);
   if (distance > 0.0001 && travelled < distance * 0.1) player.moveSpeed = 0;
   player.runTime += travelled * Math.PI * 2 / (height * 0.45);
   return travelled > 0.0001;

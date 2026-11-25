@@ -5,10 +5,11 @@ import { createTrafficModel } from './runner/traffic-models.js';
 import { animateCameo } from './runner/cameo-models.js';
 import { disposeObject } from './world/dispose.js';
 
-const FIRST_ARRIVAL_DELAY = 8;
-const ARRIVAL_INTERVAL = 11;
-const MAX_GUESTS = 3;
-const GUEST_SPACING = 7;
+const FIRST_ARRIVAL_DELAY = 1.25;
+const ARRIVAL_INTERVAL = 3.6;
+const MAX_GUESTS = 6;
+const GUEST_SPACING = 5;
+const WALK_CLEARANCE = .66;
 const NOTICE_RANGE = 18;
 
 // The session owns this small pool of civilians across district changes and restarts.
@@ -19,16 +20,22 @@ export function createArenaCameos(scene, world, random = Math.random) {
     const root = new THREE.Group(), model = createTrafficModel(kind, 'cameo');
     root.name = `Civilian: ${kind}`; root.add(model); root.visible = false; group.add(root);
     const materials = prepareFadingMaterials(model);
-    return { kind, civilian: true, root, model, materials, size: .55, hitHeight: kind === 'stubb' ? 1.6 : 1.45,
-      speed: 3.9 + index * .12, standoff: 2.12 + (index % 4) * .24, glance: .85 + (index % 5) * .19, alive: false };
+    return { kind, civilian: true, root, model, materials, size: .55, radius: WALK_CLEARANCE, hitHeight: kind === 'stubb' ? 1.6 : 1.45,
+      speed: 3.9 + index * .12, standoff: 2.12 + (index % 4) * .24, linger: 1.9 + (index % 5) * .18, alive: false };
   });
   let disposed = false, running = false, untilArrival = FIRST_ARRIVAL_DELAY;
+  let firstArrival = true;
 
   function clear() {
     running = false;
     untilArrival = FIRST_ARRIVAL_DELAY;
+    firstArrival = true;
     actors.length = 0;
-    for (const actor of pool) { actor.alive = false; actor.root.visible = false; }
+    for (const actor of pool) {
+      actor.alive = false;
+      actor.nextSpeechAt = 0;
+      actor.root.visible = false;
+    }
   }
 
   function pose(actor, moving, running, lookAt) {
@@ -41,20 +48,30 @@ export function createArenaCameos(scene, world, random = Math.random) {
 
   function welcomeGuest(viewPosition, player) {
     const available = pool.filter(actor => !actor.alive);
-    const routes = world.pedestrianRoutes.filter(route => {
-      const [x, z] = route[0], [endX, endZ] = route.at(-1);
-      return Math.hypot(player.x - x, player.z - z) >= GUEST_SPACING && actors.every(actor => {
+    if (!available.length) return;
+    const routeAvailable = route => {
+      const [[x, z], [nextX, nextZ]] = route, [endX, endZ] = route.at(-1);
+      if (Math.hypot(player.x - x, player.z - z) < 6
+        || !world.canStandAt(x, z, WALK_CLEARANCE)
+        || !world.lineClear(x, z, nextX, nextZ, WALK_CLEARANCE)) return false;
+      return actors.every(actor => {
         const [otherX, otherZ] = actor.route.at(-1);
         return Math.hypot(actor.x - x, actor.z - z) >= GUEST_SPACING
           && Math.hypot(otherX - endX, otherZ - endZ) >= GUEST_SPACING;
       });
-    });
-    if (!available.length || !routes.length) return;
-    const route = routes[Math.floor(random() * routes.length)];
+    };
+    const entrance = firstArrival ? world.openingCameoRoute : null;
+    let route = entrance && routeAvailable(entrance) ? entrance : null;
+    if (!route) {
+      const routes = world.pedestrianRoutes.filter(routeAvailable);
+      if (!routes.length) return;
+      route = routes[Math.floor(random() * routes.length)];
+    }
+    firstArrival = false;
     const actor = available[Math.floor(random() * available.length)];
     const [[x, z], [nextX, nextZ]] = route;
     const heading = Math.atan2(nextX - x, nextZ - z);
-    Object.assign(actor, { x, z, alive: true, fleeing: false, panic: 0, flash: 0, decision: 0, gait: 0, nextJetHit: 0,
+    Object.assign(actor, { x, z, alive: true, fleeing: false, approaches: 0, panic: 0, flash: 0, decision: 0, gait: 0, nextJetHit: 0,
       age: 0, heading, route, waypoint: 1, phase: 'arrival', phaseTime: 0, leaveAt: Infinity, escapeFrom: null,
       runUntilTrip: 3 + (1 - random()) * 26 });
     actor.root.position.set(actor.x, 0, actor.z); actor.root.rotation.y = actor.heading;
@@ -67,7 +84,7 @@ export function createArenaCameos(scene, world, random = Math.random) {
     const separation = Math.hypot(actor.x - player.x, actor.z - player.z);
     const nextSeparation = Math.hypot(actor.x + dx - player.x, actor.z + dz - player.z);
     if (nextSeparation >= separation || nextSeparation > actor.size + player.radius + .22) {
-      world.move(actor, dx, dz, actor.size);
+      world.move(actor, dx, dz, actor.radius);
     }
   }
 
@@ -82,6 +99,7 @@ export function createArenaCameos(scene, world, random = Math.random) {
   }
 
   function changePhase(actor, phase) {
+    if (phase === 'approach') actor.approaches++;
     actor.phase = phase;
     actor.phaseTime = 0;
     actor.decision = 0;
@@ -96,7 +114,7 @@ export function createArenaCameos(scene, world, random = Math.random) {
     }
     const step = actor.speed * dt;
     const dx = actor.direction.x * step, dz = actor.direction.z * step;
-    if (actor.panic > 0) world.move(actor, dx, dz, actor.size);
+    if (actor.panic > 0) world.move(actor, dx, dz, actor.radius);
     else moveWithRoom(actor, player, dx, dz);
   }
 
@@ -106,11 +124,22 @@ export function createArenaCameos(scene, world, random = Math.random) {
     for (let i = 0; i < actor.route.length; i++) {
       const [x, z] = actor.route[i];
       const distance = Math.hypot(actor.x - x, actor.z - z);
-      if (distance >= nearest || !world.lineClear(actor.x, actor.z, x, z, actor.size)) continue;
+      if (distance >= nearest || !world.lineClear(actor.x, actor.z, x, z, actor.radius)) continue;
       actor.waypoint = i;
       nearest = distance;
     }
     changePhase(actor, nearest < Infinity ? 'departure' : 'fade');
+  }
+
+  function seesPlayer(actor, player, distance) {
+    return distance < NOTICE_RANGE && world.lineClear(actor.x, actor.z, player.x, player.z, actor.radius);
+  }
+
+  function approachIfFree(actor) {
+    if (actors.filter(guest => guest.phase === 'approach' || guest.phase === 'watch').length >= 2) return false;
+    actor.leaveAt = Math.min(actor.leaveAt, actor.age + 19 + 3 * actor.linger);
+    changePhase(actor, 'approach');
+    return true;
   }
 
   function act(actor, player, dt) {
@@ -121,22 +150,23 @@ export function createArenaCameos(scene, world, random = Math.random) {
     const gap = Math.max(actor.standoff, player.radius + actor.size + .6);
     switch (actor.phase) {
       case 'arrival':
+        if (actor.age >= .35 && distance > gap + .25 && seesPlayer(actor, player, distance) && approachIfFree(actor)) break;
         if (walkRoute(actor, player, dt)) actor.waypoint++;
         if (actor.waypoint === actor.route.length) {
-          actor.leaveAt = actor.age + 19 + 3 * actor.glance;
+          actor.leaveAt = actor.age + 19 + 3 * actor.linger;
           changePhase(actor, 'lookout');
         } else if (actor.phaseTime > 28) beginDeparture(actor);
         break;
       case 'lookout':
         if (distance < player.radius + actor.size + .8) {
-          changePhase(actor, 'retreat');
+          if (!seesPlayer(actor, player, distance) || !approachIfFree(actor)) changePhase(actor, 'retreat');
           break;
         }
         actor.decision -= dt;
         if (actor.decision > 0) break;
         actor.decision = .2;
-        if (actor.phaseTime >= actor.glance && distance < NOTICE_RANGE && world.lineClear(actor.x, actor.z, player.x, player.z, actor.size)) {
-          if (!actors.some(guest => guest.phase === 'approach' || guest.phase === 'watch')) changePhase(actor, 'approach');
+        if (actor.phaseTime >= .45 && seesPlayer(actor, player, distance)) {
+          approachIfFree(actor);
         } else if (actor.phaseTime > 5) beginDeparture(actor);
         break;
       case 'approach': {
@@ -144,7 +174,7 @@ export function createArenaCameos(scene, world, random = Math.random) {
           changePhase(actor, 'lookout');
           break;
         }
-        const sight = world.lineClear(actor.x, actor.z, player.x, player.z, actor.size);
+        const sight = world.lineClear(actor.x, actor.z, player.x, player.z, actor.radius);
         if (distance <= gap + .05 && sight) changePhase(actor, 'watch');
         else {
           const direction = sight ? { x: dx, z: dz } : world.chase(actor.x, actor.z, player.x, player.z);
@@ -156,10 +186,10 @@ export function createArenaCameos(scene, world, random = Math.random) {
       }
       case 'watch':
         if (distance > gap + .65) changePhase(actor, 'approach');
-        else if (distance < player.radius + actor.size + .55 || actor.phaseTime >= actor.glance) changePhase(actor, 'retreat');
+        else if (distance < player.radius + actor.size + .55 || actor.phaseTime >= actor.linger) changePhase(actor, 'retreat');
         break;
       case 'retreat':
-        if (actor.phaseTime >= 1.35 || (distance > 10 && actor.phaseTime >= .7)) changePhase(actor, 'lookout');
+        if (actor.phaseTime >= .95 || (distance > 10 && actor.phaseTime >= .7)) changePhase(actor, 'lookout');
         else retreat(actor, player, dt);
         break;
       case 'stumble':
@@ -204,7 +234,7 @@ export function createArenaCameos(scene, world, random = Math.random) {
             actor.runUntilTrip = 8 + random() * 22;
             const endX = actor.x + Math.sin(actor.heading) * 3.4;
             const endZ = actor.z + Math.cos(actor.heading) * 3.4;
-            if (world.lineClear(actor.x, actor.z, endX, endZ, actor.size)
+            if (world.lineClear(actor.x, actor.z, endX, endZ, actor.radius)
               && Math.hypot(endX - player.x, endZ - player.z) > player.radius + actor.size
               && !actors.some(guest => guest.phase === 'stumble')) {
               changePhase(actor, 'stumble');
@@ -223,7 +253,7 @@ export function createArenaCameos(scene, world, random = Math.random) {
     untilArrival -= dt;
     if (untilArrival <= 0) {
       if (actors.length < MAX_GUESTS) welcomeGuest(viewPosition, player);
-      untilArrival = ARRIVAL_INTERVAL;
+      untilArrival = actors.length >= MAX_GUESTS ? .7 : ARRIVAL_INTERVAL;
     }
   }
 

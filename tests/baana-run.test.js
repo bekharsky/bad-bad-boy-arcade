@@ -5,13 +5,13 @@ import { createBaanaRun, trafficContact, TRAFFIC_CAPACITY, RUN_LANES, trafficPro
 const seeded = seed => () => ((seed = seed * 16807 % 2147483647) - 1) / 2147483646;
 
 test('continuous movement accelerates, lane changes are bounded and reset clears a run', () => {
-  const run = createBaanaRun({ random: seeded(42) });
+  const run = createBaanaRun({ random: seeded(42), roadworkKinds: [] });
   run.dodge(-1); run.dodge(-1); run.update(.3);
   assert.equal(run.state.x, -3); assert.equal(run.state.lane, 0);
   run.dodge(1); run.dodge(1); run.dodge(1); run.update(.5);
   assert.equal(run.state.x, 3); assert.equal(run.state.lane, 2);
   run.update(5);
-  assert.ok(run.state.distance > 50); assert.ok(run.state.speed > 9);
+  assert.ok(run.state.distance > run.state.elapsed * 9); assert.ok(run.state.speed > 9);
   assert.ok(run.state.traffic.length > 0);
   run.reset();
   assert.equal(run.state.distance, 0); assert.equal(run.state.x, 0);
@@ -30,7 +30,10 @@ test('swept contact detects crossing a vehicle, including a lateral dodge, witho
 test('one contact costs one hit, grace prevents stacked damage and collided traffic earns no dodge points', () => {
   const run = createBaanaRun({ random: seeded(1) });
   for (let id = 0; id < 2; id++) run.state.traffic.push({ id, lane: 1, progress: 2, speed: 5.2, hit: false, passed: false });
-  assert.equal(run.update(.3).hits, 1);
+  const contact = run.update(.3);
+  assert.equal(contact.hits, 1);
+  assert.equal(contact.impacts.length, 2, 'Contacts protected by health invulnerability still produce feedback');
+  assert.equal(contact.crash, null);
   assert.equal(run.update(.3).hits, 0);
   assert.equal(run.state.passed, 0);
   assert.ok(run.state.invulnerable > 0);
@@ -72,7 +75,7 @@ test('spraying clears riders, charged hits are stronger and clearing prevents da
   run.update(.01);
   for (const kind of ['bike', 'scooter']) {
     const agent = run.state.traffic[0];
-    Object.assign(agent, { kind, hp: RIDER_HEALTH, alive: true, cleared: false, lane: 1, progress: run.state.distance + 3 });
+    Object.assign(agent, { kind, hp: RIDER_HEALTH, alive: true, cleared: false, lane: 1, progress: run.state.distance + 5 });
     assert.equal(run.sprayHit(agent.id, { charge: 0, damage: .5 }), false);
     assert.ok(agent.hitUntil > run.state.elapsed);
     const before = run.state.bonus;
@@ -90,11 +93,19 @@ test('all roadworks are solid obstacles immune to repeated fully charged spray',
   for (const kind of ['cone', 'tractor', 'barrier', 'trench']) {
     const run = createBaanaRun({ random: seeded(42) }); run.update(.01);
     const agent = run.state.traffic[0];
-    Object.assign(agent, { kind, hp: 4, alive: true, lane: 1, progress: run.state.distance + 3 });
+    Object.assign(agent, { kind, hp: 4, alive: true, lane: 1, progress: run.state.distance + 5 });
     for (let hit = 0; hit < 100; hit++) assert.equal(run.sprayHit(agent.id, { damage: 10, charge: 1 }), false);
     assert.equal(agent.hp, 4); assert.equal(agent.alive, true); assert.equal(agent.hitUntil, 0);
     assert.equal(run.state.bonus, 0); assert.equal(run.state.cleared, 0);
-    assert.equal(run.update(.3).hits, 1, `${kind} still collides`);
+    run.state.invulnerable = 1;
+    const result = run.update(.6);
+    assert.equal(result.hits, 0, `${kind} does not cause ordinary damage`);
+    assert.equal(result.crash?.kind, kind, `${kind} ends the run even during invulnerability`);
+    assert.deepEqual(result.impacts, [result.crash]);
+    const depth = trafficProfile(kind).depth;
+    assert.ok(agent.progress - run.state.distance >= depth, `${kind}: stops outside the contact volume`);
+    assert.ok(agent.progress - run.state.distance < depth + .12, `${kind}: stops at the contact surface`);
+    assert.equal(result.finished, false);
   }
 });
 

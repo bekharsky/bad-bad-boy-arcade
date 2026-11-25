@@ -44,12 +44,12 @@ export function createNavigation({ bounds, colliders = [], dynamicColliders = ()
   function lineClear(x, z, tx, tz, r = .5) {
     return segmentClear(x, null, z, tx, null, tz, r);
   }
-  function lineClear3D(from, to, radius = 0) {
-    return segmentClear(from.x, from.y, from.z, to.x, to.y, to.z, radius);
+  function lineClear3D(from, to, radius = 0, { allowOutsideOrigin = false } = {}) {
+    return segmentClear(from.x, from.y, from.z, to.x, to.y, to.z, radius, allowOutsideOrigin);
   }
-  function segmentClear(x, y, z, tx, ty, tz, r) {
-    // The bounds are convex, so checking both ends covers the whole segment.
-    if (outside(x, z, r) || outside(tx, tz, r)) return false;
+  function segmentClear(x, y, z, tx, ty, tz, r, allowOutsideOrigin = false) {
+    // Gameplay stays inside the map. A camera can look in from beyond its edge.
+    if ((!allowOutsideOrigin && outside(x, z, r)) || outside(tx, tz, r)) return false;
     for (const c of colliders) if (crosses(c, x, y, z, tx, ty, tz, r)) return false;
     for (const c of dynamicColliders()) if (crosses(c, x, y, z, tx, ty, tz, r)) return false;
     return true;

@@ -12,6 +12,7 @@ export function createMapManager(scene, definitions, playerRadius = .4) {
     get mode() { return active?.mode ?? 'arena'; },
     get runner() { return active?.runner; },
     get spawn() { return active.spawn; },
+    get openingCameoRoute() { return active.openingCameoRoute; },
     get pedestrianRoutes() { return active.pedestrianRoutes; },
     pickupCapacity(kind) {
       return Math.max(0, ...definitions.map(definition => definition.pickups?.[kind]?.length ?? 0));

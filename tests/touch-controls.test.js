@@ -21,24 +21,39 @@ class Element extends EventTarget {
   }
 }
 
-function pointer(element, type, pointerId = 1, clientX = 100, clientY = 200) {
+function pointer(element, type, pointerId = 1, clientX = 100, clientY = 200, timeStamp) {
   const event = new Event(type, { cancelable: true });
   Object.assign(event, { pointerId, clientX, clientY, button: 0 });
+  if (timeStamp !== undefined) Object.defineProperty(event, 'timeStamp', { value: timeStamp });
   element.dispatchEvent(event);
 }
 
 function setup({ withHome = false } = {}) {
   globalThis.window = new EventTarget();
   globalThis.document = new EventTarget();
-  const zone = new Element(), stick = new Element(), thumb = new Element(), fireButton = new Element();
+  const zone = new Element(), stick = new Element(), thumb = new Element(), fireButton = new Element(), fireHome = new Element();
   const home = withHome ? new Element() : undefined;
   if (home) home.getBoundingClientRect = () => ({ left: 40, top: 220, width: 112, height: 112 });
   zone.parentElement = new Element();
+  fireButton.parentElement = zone.parentElement;
+  zone.parentElement.getBoundingClientRect = () => ({ left: 0, top: 0, right: 400, bottom: 460 });
+  fireButton.getBoundingClientRect = fireHome.getBoundingClientRect = () => ({ left: 256, top: 256, width: 88, height: 88 });
   let bursts = 0;
   let inputs = 0;
-  const controls = createTouchControls({ zone, stick, thumb, home, fireButton, onFireStart: () => bursts++, onInput: () => inputs++ });
+  const shots = [];
+  const controls = createTouchControls({
+    zone, stick, thumb, home, fireButton, fireHome,
+    onFireStart(airborne, heading, fresh) { shots.push({ airborne, heading }); if (fresh) bursts++; },
+    onInput: () => inputs++,
+  });
   controls.setEnabled(true);
-  return { controls, zone, stick, thumb, fireButton, bursts: () => bursts, inputs: () => inputs };
+  return { controls, zone, stick, thumb, fireButton, shots, bursts: () => bursts, inputs: () => inputs };
+}
+
+const idle = { x: 0, z: 0, aimX: 0, aimZ: 0, firing: false, airborne: false };
+
+function pressAim(button, id) {
+  pointer(button, 'pointerdown', id, 330, 300);
 }
 
 test('joystick starts under the finger, ignores jitter, and supports analog speed', () => {
@@ -99,7 +114,7 @@ test('movement and spray keep separate pointers, including extra fingers and rel
   const { zone, controls, fireButton, bursts } = setup();
   pointer(zone, 'pointerdown');
   pointer(zone, 'pointermove', 1, 144, 200);
-  pointer(fireButton, 'pointerdown', 2);
+  pressAim(fireButton, 2);
   pointer(fireButton, 'pointerdown', 3);
   pointer(fireButton, 'pointerup', 3);
   pointer(zone, 'pointerdown', 4);
@@ -111,7 +126,7 @@ test('movement and spray keep separate pointers, including extra fingers and rel
   pointer(fireButton, 'pointerup', 2);
   assert.equal(controls.input.firing, false);
   assert.equal(controls.input.x, 1);
-  pointer(fireButton, 'pointerdown', 5);
+  pressAim(fireButton, 5);
   pointer(zone, 'pointerup', 1);
   assert.equal(controls.input.x, 0);
   assert.equal(controls.input.firing, true);
@@ -123,10 +138,10 @@ test('release, cancellation, and lost capture clear movement and firing', () => 
     pointer(zone, 'pointerdown');
     pointer(zone, 'pointermove', 1, 100, 156);
     assert.equal(controls.input.z, -1);
-    pointer(fireButton, 'pointerdown', 2);
+    pressAim(fireButton, 2);
     pointer(zone, event);
     pointer(fireButton, event, 2);
-    assert.deepEqual(controls.input, { x: 0, z: 0, firing: false, airborne: false });
+    assert.deepEqual(controls.input, idle);
     assert.equal(stick.hidden, true);
     assert.equal(zone.captures.size, 0);
     assert.equal(fireButton.captures.size, 0);
@@ -138,23 +153,23 @@ test('blur, resize, and backgrounding reset both controls', () => {
     const { zone, controls, fireButton } = setup();
     pointer(zone, 'pointerdown');
     pointer(zone, 'pointermove', 1, 144, 200);
-    pointer(fireButton, 'pointerdown', 2);
+    pressAim(fireButton, 2);
     if (event === 'visibilitychange') {
       document.hidden = true;
       document.dispatchEvent(new Event(event));
     } else window.dispatchEvent(new Event(event));
-    assert.deepEqual(controls.input, { x: 0, z: 0, firing: false, airborne: false });
+    assert.deepEqual(controls.input, idle);
   }
 });
 
 test('disabled controls ignore input and a new round starts cleanly', () => {
   const { zone, controls, fireButton, stick, bursts } = setup();
   pointer(zone, 'pointerdown');
-  pointer(fireButton, 'pointerdown', 2);
+  pressAim(fireButton, 2);
   controls.setEnabled(false);
   pointer(zone, 'pointerdown', 3);
   pointer(fireButton, 'pointerdown', 4);
-  assert.deepEqual(controls.input, { x: 0, z: 0, firing: false, airborne: false });
+  assert.deepEqual(controls.input, idle);
   assert.equal(stick.hidden, true);
   assert.equal(bursts(), 1);
   controls.setEnabled(true);
@@ -167,40 +182,66 @@ test('vertical speed and diagonal lane input preserve independent spray and rele
   const { controls, zone, thumb, fireButton } = setup();
   pointer(zone, 'pointerdown');
   pointer(zone, 'pointermove', 1, 100, 400);
-  assert.deepEqual(controls.input, { x: 0, z: 1, firing: false, airborne: false });
+  assert.deepEqual(controls.input, { ...idle, z: 1 });
   pointer(zone, 'pointermove', 1, 144, 200);
   assert.equal(controls.input.x, 1); assert.equal(controls.input.z, 0);
   assert.equal(thumb.style.transform, 'translate(44px, 0px)');
-  pointer(fireButton, 'pointerdown', 2);
+  pressAim(fireButton, 2);
   pointer(zone, 'pointermove', 1, 56, 156);
   assert.ok(controls.input.x < -.7 && controls.input.z < -.7);
   assert.equal(controls.input.firing, true);
-  pointer(zone, 'pointerup'); assert.deepEqual(controls.input, { x: 0, z: 0, firing: true, airborne: false });
+  pointer(zone, 'pointerup'); assert.deepEqual(controls.input, { ...idle, aimX: 30 / 44, firing: true });
   pointer(zone, 'pointerdown', 3);
   pointer(zone, 'pointermove', 3, 100, 156);
   assert.equal(controls.input.z, -1);
 });
 
-test('spray drag raises the stream without restarting a burst or stealing the movement pointer', () => {
+test('the right stick starts at home, auto-fires past its deadzone and follows a long drag', () => {
   const { controls, zone, fireButton, bursts } = setup();
   pointer(zone, 'pointerdown'); pointer(zone, 'pointermove', 1, 144, 200);
-  pointer(fireButton, 'pointerdown', 2, 300, 300);
-  pointer(fireButton, 'pointermove', 3, 300, 200);
-  assert.equal(controls.input.airborne, false);
-  pointer(fireButton, 'pointermove', 2, 300, 270);
-  assert.equal(controls.input.airborne, true); assert.equal(controls.input.firing, true);
+  pointer(fireButton, 'pointerdown', 2, 300, 300, 0);
+  assert.equal(controls.input.firing, false);
+  pointer(fireButton, 'pointermove', 2, 310, 300, 50);
+  assert.ok(controls.input.aimX > .15 && !controls.input.firing);
+  pointer(fireButton, 'pointermove', 2, 369, 300, 100);
+  assert.equal(controls.input.aimX, 1);
+  assert.equal(controls.input.firing, true);
+  assert.equal(fireButton.style['--aim-base-x'], '25px');
+  assert.equal(fireButton.style['--aim-thumb-x'], '44px');
   assert.equal(controls.input.x, 1); assert.equal(bursts(), 1);
-  pointer(fireButton, 'pointermove', 2, 300, 280);
-  assert.equal(controls.input.airborne, true, 'Small jitter does not toggle height');
-  pointer(fireButton, 'pointermove', 2, 300, 290);
-  assert.equal(controls.input.airborne, false); assert.equal(bursts(), 1);
-  pointer(fireButton, 'pointermove', 2, 300, 230);
-  pointer(fireButton, 'pointercancel', 2);
-  assert.equal(controls.input.airborne, false); assert.equal(controls.input.firing, false);
-  assert.equal(fireButton.style['--spray-lift'], '0px'); assert.equal(controls.input.x, 1);
-  pointer(fireButton, 'pointerdown', 4, 300, 300);
-  pointer(fireButton, 'pointermove', 4, 300, 230);
-  controls.setEnabled(false);
+  pointer(fireButton, 'pointerup', 2);
+  assert.equal(fireButton.style['--aim-base-x'], '0px');
+  assert.ok(fireButton.classes.has('returning'));
+  assert.deepEqual(controls.input, { ...idle, x: 1 });
+});
+
+test('a fast upward flick raises the spray from a held aim or a fresh touch', () => {
+  const { controls, fireButton, bursts } = setup();
+  pointer(fireButton, 'pointerdown', 2, 330, 300, 0);
+  pointer(fireButton, 'pointermove', 2, 330, 265, 120);
+  assert.equal(controls.input.airborne, false, 'A slow drag aims along the ground');
+  pointer(fireButton, 'pointermove', 2, 330, 229, 160);
+  assert.equal(controls.input.airborne, true);
+  assert.equal(controls.input.firing, true);
+  assert.equal(bursts(), 1, 'Pitch changes preserve a held charge');
+  pointer(fireButton, 'pointermove', 2, 330, 240, 180);
+  assert.equal(controls.input.airborne, true);
+  pointer(fireButton, 'pointermove', 2, 330, 265, 210);
+  assert.equal(controls.input.airborne, false, 'A downward flick lowers the spray');
+  pointer(fireButton, 'pointerup', 2);
+  pointer(fireButton, 'pointerdown', 3, 300, 300, 300);
+  pointer(fireButton, 'pointermove', 3, 300, 258, 340);
+  assert.equal(controls.input.airborne, true);
+  assert.equal(bursts(), 2);
+  pointer(fireButton, 'pointercancel', 3);
   assert.equal(controls.input.airborne, false);
   assert.equal(fireButton.classes.has('aiming-up'), false);
+});
+
+test('a flick across the centre still produces a short upward shot', () => {
+  const { controls, fireButton, shots } = setup();
+  pointer(fireButton, 'pointerdown', 2, 300, 334, 0);
+  pointer(fireButton, 'pointermove', 2, 300, 300, 30);
+  assert.equal(controls.input.firing, false, 'The centred stick does not keep firing');
+  assert.deepEqual(shots.map(shot => shot.airborne), [false, true]);
 });

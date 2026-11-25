@@ -3,7 +3,7 @@ import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import { createSceneryModel } from '../maps/scenery-model.js';
 import { animateGoose, createGooseModel, gooseRig } from '../goose.js';
 import { createTrafficModel, animateTraffic } from './traffic-models.js';
-import { RUN_LANES, TRAFFIC_COLORS, TRAFFIC_CAPACITY, ROADWORK_TYPES } from './course.js';
+import { RUN_LANES, TRAFFIC_COLORS, TRAFFIC_CAPACITY, ROADWORK_TYPES, RUNNER_IMPACT_PAUSE } from './course.js';
 import { isCameo } from './cameo-roster.js';
 import { animateCameo } from './cameo-models.js';
 import { paintFigure } from '../world/painted-material.js';
@@ -13,20 +13,25 @@ import { prepareFadingMaterials, setModelAppearance } from './model-appearance.j
 export function createRunnerTraffic(root, name, { riderKinds = ['bike', 'scooter'], lanes = RUN_LANES, tramChance = 0, tramRoute = null, roadworkKinds = ROADWORK_TYPES } = {}) {
   const trafficPool = [], trafficMaterials = [];
   const templates = new Map(), activeVariants = Array(TRAFFIC_CAPACITY).fill(null);
-  const slotAppearance = [];
+  const slotAppearance = [], cameoAppearance = new Map();
   const goosePoses = [];
   const actorSlots = new Map(), activeActors = new Set(), slotOwners = Array(TRAFFIC_CAPACITY).fill(null);
   // Keep one copy of each geometry in the map subtree for deterministic
-  // disposal. Slots clone only the variant they currently display.
+  // disposal. The course has only one cameo on screen at a time, so its
+  // prebuilt rig can move between the active slot and the hidden template root.
   const templateRoot = new THREE.Group();
   templateRoot.name = `${name} traffic templates`;
   templateRoot.visible = false;
+  // The templates stay discoverable for shader warmup and disposal. Their
+  // matrices only matter after a model moves into an active traffic slot.
+  templateRoot.updateMatrixWorld = () => {};
   templateRoot.userData.runnerTraffic = true;
   root.add(templateRoot);
   function addTemplate(kind, color) {
     const template = kind === 'goose' ? createGooseModel() : createTrafficModel(kind, color);
     if (kind === 'goose') { template.name = 'goose goose'; template.scale.setScalar(.88); }
-    prepareFadingMaterials(template);
+    const materials = prepareFadingMaterials(template);
+    if (isCameo(kind)) cameoAppearance.set(template, materials);
     templates.set(`${color} ${kind}`, template);
     templateRoot.add(template);
   }
@@ -57,7 +62,13 @@ export function createRunnerTraffic(root, name, { riderKinds = ['bike', 'scooter
     // Compacting the course's array must not replace the models of surviving actors.
     for (const [agent, index] of actorSlots) {
       if (activeActors.has(agent)) continue;
-      trafficPool[index].visible = false;
+      const slot = trafficPool[index];
+      slot.visible = false;
+      const variant = slot.children[0];
+      if (cameoAppearance.has(variant)) {
+        templateRoot.add(variant);
+        activeVariants[index] = null;
+      }
       slotOwners[index] = null;
       actorSlots.delete(agent);
     }
@@ -83,13 +94,13 @@ export function createRunnerTraffic(root, name, { riderKinds = ['bike', 'scooter
           goosePoses[i] = null;
         }
         object.clear();
-        const variant = goose ? clone(template) : template.clone(true);
+        const variant = cameo ? template : goose ? clone(template) : template.clone(true);
         if (goose) goosePoses[i] = { goose: gooseRig(variant), body: variant, gait: 0 };
         if (!cameo) variant.traverse(node => {
           if (node.isMesh && node.material.vertexColors && node.material.side === material.side) node.material = material;
         });
         object.add(variant);
-        slotAppearance[i] = prepareFadingMaterials(variant);
+        slotAppearance[i] = cameo ? cameoAppearance.get(variant) : prepareFadingMaterials(variant);
         activeVariants[i] = key;
       }
       if (agent.kind === 'tram' && tramRoute) {
@@ -116,11 +127,13 @@ export function createRunnerTraffic(root, name, { riderKinds = ['bike', 'scooter
       // oncoming rows. Keep their fade brief so the warning remains useful.
       const fadeTime = cameo ? .5 : agent.crossing ? .24 : .7;
       const age = cameo ? agent.age : state.elapsed - (agent.spawnTime ?? state.elapsed - fadeTime);
-      const opacity = THREE.MathUtils.smoothstep(age ?? fadeTime, 0, fadeTime);
+      const fadeOut = agent.recoiling ? THREE.MathUtils.smoothstep(state.hitStop, 0, RUNNER_IMPACT_PAUSE) : 1;
+      const opacity = fadeOut * THREE.MathUtils.smoothstep(age ?? fadeTime, 0, fadeTime);
       setModelAppearance(variant, slotAppearance[i], opacity, agent.hitUntil > state.elapsed ? .7 : 0);
+      if (agent.recoiling) continue;
       if (cameo) {
         const approaching = agent.panicSide === undefined;
-        animateCameo(variant, (agent.gait ?? state.elapsed) + agent.id, agent.stumbleTime === undefined,
+        animateCameo(variant, (agent.gait ?? state.elapsed) + agent.id, agent.stumbleTime === undefined && !agent.waiting,
           approaching ? viewerYaw : 0, false, approaching ? .18 : 0, agent.stumbleTime);
       } else if (goose) {
         animateGoose(goosePoses[i], dt, agent.z > -4.5 && agent.z < 2.5, agent.speed);

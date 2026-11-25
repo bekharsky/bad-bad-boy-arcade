@@ -30,17 +30,17 @@ test('Baana recycles scenery and traffic with bounded geometry and all rider col
   const pool = map.root.children.filter(node => node.name === 'Baana traffic');
   assert.equal(pool.length, TRAFFIC_CAPACITY);
   assert.equal(pool.filter(node => node.visible).length, run.state.traffic.length);
+  assert.ok(pool.every(object => object.children.length <= 1));
+  for (const object of pool.filter(node => node.visible)) assert.equal(object.children.length, 1);
+  map.reset(); assert.equal(pool.some(node => node.visible), false);
   assert.deepEqual(templates.children.map(node => node.name).filter(Boolean).sort(), [
     'goose goose',
     ...CAMEO_KINDS.map(kind => 'cameo ' + kind),
     ...['blue', 'green', 'red'].flatMap(color => [color + ' bike', color + ' scooter']),
     ...['barrier', 'cone', 'tractor', 'trench'].map(kind => 'roadwork ' + kind),
   ].sort());
-  assert.ok(pool.every(object => object.children.length <= 1));
-  for (const object of pool.filter(node => node.visible)) assert.equal(object.children.length, 1);
   const sections = map.root.children.filter(node => node.name === 'Baana cutting section');
   assert.equal(sections.length, 5); assert.ok(sections.every(node => node.position.z >= -128 && node.position.z < 32));
-  map.reset(); assert.equal(pool.some(node => node.visible), false);
   map.dispose();
 });
 

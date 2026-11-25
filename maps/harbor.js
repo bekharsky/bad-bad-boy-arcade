@@ -17,6 +17,7 @@ export const harborMap = {
   environment: { background: new THREE.Color('#376b7c'), fog: null },
   spawn: { x: -5, z: 7, heading: Math.PI / 2 },
   bounds: { minX: -27.8, maxX: 27.8, minZ: -27.8, maxZ: 27.8 },
+  openingCameoRoute: [[-11.5, 2], [-10.5, 2]],
   // Hidden entrances lead into separate streets around the district.
   pedestrianRoutes: [
     [[-12, 2], [-9, 3], [-8, 4], [-2, 3], [3, 2]],

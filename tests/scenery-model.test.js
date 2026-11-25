@@ -69,7 +69,7 @@ test('nested facade parts fade together with unique materials and reset shadows'
   const root = model.finish({ vertexColors: true }), mesh = root.children[0];
   const nested = new THREE.Group(); nested.add(new THREE.Mesh(mesh.geometry, mesh.material)); root.add(nested);
   const house = registerBuilding(root);
-  assert.equal(house.meshes.length, 2); assert.equal(house.materials.length, 1);
+  assert.equal(house.meshes.length, 1, 'Only original shadow casters are tracked'); assert.equal(house.materials.length, 1);
   const camera = new THREE.PerspectiveCamera(), hero = new THREE.Group();
   camera.position.set(0, 2, 10); hero.position.set(0, 0, -4);
   const visibility = createBuildingVisibility([house]); visibility.update(camera, hero, 3.45, 1);
@@ -80,7 +80,8 @@ test('nested facade parts fade together with unique materials and reset shadows'
   hero.position.set(20, 0, -4);
   visibility.update(camera, hero, 3.45, 1);
   assert.equal(mesh.material.opacity, 1);
-  assert.equal(mesh.material.version, fadedVersion + 1, 'Restoring the opaque shader happens once');
+  assert.equal(mesh.material.version, fadedVersion, 'Fading back in uses the same shader');
+  assert.equal(nested.children[0].castShadow, false);
   visibility.reset(); assert.equal(mesh.material.opacity, 1); assert.equal(mesh.castShadow, true);
   disposeObject(root);
 });

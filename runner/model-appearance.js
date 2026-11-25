@@ -22,7 +22,9 @@ export function setModelAppearance(model, materials, opacity, flash) {
   }
   for (const material of materials) {
     material.opacity = opacity;
-    material.emissive?.set(flash > 0 ? '#ffe58c' : '#000000');
-    material.emissiveIntensity = flash;
+    if (material.emissiveIntensity !== flash) {
+      material.emissive?.setHex(flash > 0 ? 0xffe58c : 0x000000);
+      material.emissiveIntensity = flash;
+    }
   }
 }

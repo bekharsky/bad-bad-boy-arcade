@@ -10,14 +10,14 @@ export async function prepareScene(renderer, scene, camera, draw = () => rendere
   scene.traverse(node => {
     if (!node.isMesh) return;
     for (const material of Array.isArray(node.material) ? node.material : [node.material]) {
-      if (!material.transparent) opaqueMaterials.add(material);
+      if (!material.transparent && !material.alphaHash) opaqueMaterials.add(material);
       for (const value of Object.values(material)) if (value?.isTexture) textures.add(value);
       if (material.transmission > 0 && !node.visible) transmissionMeshes.push(node);
     }
   });
   try {
-    // Buildings fade and the hero flashes after a bite. Retain both programs
-    // on their materials so the first occlusion or hit does not compile them.
+    // Materials with alpha hashing already use one program at every opacity.
+    // Warm both passes for the remaining effects, including the hero's hit flash.
     for (const transparent of [true, false]) {
       for (const material of opaqueMaterials) {
         material.transparent = transparent;

@@ -174,12 +174,20 @@ test('reset restores faded buildings and their shadows for the next run', () => 
   camera.position.set(-14, 3, 15);
   const hero = new THREE.Group();
   hero.position.set(-14, 0, 0);
-  city.updateVisibility(camera, hero, 3.45, 1);
   const meshes = scene.getObjectByName('Verkkopaukka').children;
+  const versions = meshes.map(mesh => mesh.material.version);
+  city.updateVisibility(camera, hero, 3.45, 1);
   assert.ok(meshes.some(mesh => mesh.material.opacity < .2));
+  hero.position.set(-24, 0, 12);
+  city.updateVisibility(camera, hero, 3.45, 1);
+  assert.ok(meshes.every(mesh => mesh.material.opacity === 1));
+  assert.deepEqual(meshes.map(mesh => mesh.material.version), versions, 'Restoring opacity keeps the shader program');
+  hero.position.set(-14, 0, 0);
+  city.updateVisibility(camera, hero, 3.45, 1);
   city.reset();
   for (const mesh of meshes) {
     assert.equal(mesh.material.opacity, 1);
+    assert.equal(mesh.material.alphaHash, true);
     assert.equal(mesh.material.transparent, false);
     assert.equal(mesh.castShadow, true);
   }

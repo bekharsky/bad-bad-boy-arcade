@@ -27,6 +27,8 @@ test('3D queries respect height, radius, grazing faces and world boundaries', ()
   assert.equal(nav.lineClear(0, 2, 1, 2, .01), false);
   assert.equal(nav.lineClear(0, 3, 11, 3, 0), false);
   assert.equal(nav.lineClear3D(point(-11, 2), point(0, 2)), false);
+  assert.equal(nav.lineClear3D(point(-11, 2), point(0, 2), 0, { allowOutsideOrigin: true }), true);
+  assert.equal(nav.lineClear3D(point(-11, .5), point(1, .5), 0, { allowOutsideOrigin: true }), false);
   assert.equal(nav.lineClear(0, 3, 10, 3, 0), true);
   assert.equal(nav.lineClear(0, 3, 10, 3, .01), false);
 });

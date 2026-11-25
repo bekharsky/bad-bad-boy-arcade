@@ -63,28 +63,19 @@ function jacketPanel(model, color, outline, layer) {
   }
 }
 
-function body(model, look, kind) {
+function body(model, look) {
   const suit = look.formal;
   const { bottom, height, waist, shoulders, depth, sides } = JACKET;
   model.geometry(look.jacket, new THREE.CylinderGeometry(shoulders, waist, height, sides)
     .scale(1, 1, depth).translate(0, bottom + height / 2, 0));
   oval(model, look.trousers, 0, 1.19, 0, .255, .16, .18);
-  if (look.standCollar) {
-    model.geometry(look.lapel,new THREE.CylinderGeometry(.133,.168,.115,24).translate(0,2.202,0));
-    jacketPanel(model, '#242123', [[-.008,2.15],[.008,2.15],[.008,1.18],[-.008,1.18]],.002);
-    return;
-  }
-  if (look.shortSleeves) {
-    oval(model, '#454834', 0, 2.17, 0, .157, .031, .133);
-    return;
-  }
   jacketPanel(model, look.shirt, [[-.14, 2.16], [.14, 2.16], [.095, 1.69], [-.095, 1.69]], .001);
   for (const side of [-1, 1]) {
     jacketPanel(model, look.lapel,
       [[side*.14, 2.16], [side*.27, 2.06], [side*.08, 1.68], [side*.19, 1.94], [side*.10, 2.02]], .002);
   }
   if (suit) {
-    const tieTip = kind === 'trump' ? 1.38 : 1.65;
+    const tieTip = 1.65;
     jacketPanel(model, look.tie,
       [[0, 2.10], [-.039, 2.03], [-.045, tieTip + .04], [0, tieTip], [.045, tieTip + .04], [.039, 2.03]], .003);
     jacketPanel(model, look.lapel, [[.16,1.92],[.27,1.95],[.27,1.925],[.16,1.895]], .003);
@@ -100,7 +91,7 @@ function body(model, look, kind) {
 }
 
 function limbs(root, look, shoulderDrop = 0) {
-  const sole = look.formal || look.standCollar ? '#383331' : '#c9c5ad';
+  const sole = look.formal ? '#383331' : '#c9c5ad';
   for (const side of [-1, 1]) {
     const leg = createSceneryModel(`${look.name} leg ${side}`);
     // Broad thigh, tucked knee and trouser hem give a running leg a distinct silhouette.
@@ -127,17 +118,12 @@ function limbs(root, look, shoulderDrop = 0) {
 
     const arm = createSceneryModel(`${look.name} arm ${side}`);
     oval(arm, look.jacket, 0, -.04, 0, .105, .13, .12);
-    if (look.shortSleeves) {
-      rod(arm, look.skin, [0, -.16, 0], [0, -.37, 0], .099, .083);
-      rod(arm, look.jacket, [0, -.06, 0], [0, -.21, 0], .109, .105);
-    } else {
-      rod(arm, look.jacket, [0, -.06, 0], [0, -.37, 0], .105, .083);
-    }
+    rod(arm, look.jacket, [0, -.06, 0], [0, -.37, 0], .105, .083);
     const armRoot = arm.finish({ vertexColors: true });
     armRoot.position.set(side * .34, 2.05 - shoulderDrop, 0);
     armRoot.userData.swing = -side;
     const forearm = createSceneryModel(`${look.name} elbow ${side}`);
-    rod(forearm, look.shortSleeves ? look.skin : look.jacket, [0, 0, 0], [0, -.30, 0], .085, .067);
+    rod(forearm, look.jacket, [0, 0, 0], [0, -.30, 0], .085, .067);
     if (look.formal) rod(forearm, look.shirt, [0,-.285,0], [0,-.325,0], .070, .066);
     oval(forearm, look.skin, 0, -.35, 0, .077, .10, .068);
     const elbow = forearm.finish({ vertexColors: true });
@@ -160,7 +146,6 @@ export function createCameoModel(kind) {
   const costume = createSceneryModel(`${look.name} body`);
   body(costume, look, kind);
   const jacket = costume.finish({ vertexColors: true, roughness: .95 });
-  if (kind === 'trump') jacket.scale.set(1.10, 1, 1.09);
   root.add(jacket);
   const neck=createCameoNeck(kind);
   neck.name=`${look.name} neck`;

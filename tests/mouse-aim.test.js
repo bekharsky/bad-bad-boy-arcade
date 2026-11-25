@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createMouseAim } from '../mouse-aim.js';
 
-function setup() {
+function setup(options) {
   globalThis.window = new EventTarget();
   const canvas = { getBoundingClientRect: () => ({ left: 40, top: 20, width: 800, height: 600 }) };
-  const aim = createMouseAim({ canvas });
+  const aim = createMouseAim({ canvas, ...options });
 
   function move(clientX, clientY, pointerType = 'mouse') {
     const event = new Event('pointermove');
@@ -86,4 +86,21 @@ test('keyboard steering stops following until the mouse actually moves again', (
   move(39, 170);
   assert.equal(aim.aiming, false);
   assert.equal(aim.following, true, 'Keep steering forward on the last heading after exiting');
+});
+
+test('a stationary click keeps the previous aim and mouse motion starts from the projected reticle', () => {
+  const samples = [];
+  let projected = { x: .5, y: .25 };
+  const { aim, move } = setup({ onAim: point => samples.push({ ...point }), projectAim: () => projected });
+  move(440, 170);
+  aim.setEnabled(true);
+  assert.deepEqual(samples, [{ x: .5, y: .25 }]);
+
+  projected = { x: .44, y: .38 };
+  aim.point({ type: 'pointerdown', pointerType: 'mouse', clientX: 440, clientY: 170 });
+  move(440, 170);
+  assert.equal(samples.length, 1);
+
+  move(460, 158);
+  assert.deepEqual(samples.at(-1), { x: .465, y: .36 });
 });

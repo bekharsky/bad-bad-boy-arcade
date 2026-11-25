@@ -22,17 +22,43 @@ test('forward and reverse use the current heading without turning the hero', () 
   }
 });
 
-test('reversing while spraying immediately changes travel and keeps the shot ahead', () => {
+test('reversing WASD brakes before changing travel and keeps the shot ahead', () => {
   const { player, input, step } = setup({ heading: Math.PI, codes: ['KeyW'], firing: true });
   input.steerWithMouse = true;
   input.cursorHeading = Math.PI;
   step(30);
   const before = player.z;
+  const incomingSpeed = player.moveSpeed;
   input.keys = new Set(['KeyS']);
   step();
-  assert.ok(player.z > before);
+  assert.ok(player.z < before);
+  assert.ok(player.moveSpeed < incomingSpeed);
+  step(15);
+  assert.ok(player.z > before && Math.abs(player.x) < 1e-10);
   assert.equal(player.dz, -1);
   assert.equal(player.root.rotation.y, player.heading);
+});
+
+test('changing WASD direction rounds the corner without moving the aim', () => {
+  const { player, input, step } = setup({ codes: ['KeyW'], heading: .4 });
+  input.steerWithMouse = true;
+  input.cursorHeading = .4;
+  step(60);
+  const before = { x: player.x, z: player.z };
+  input.keys = new Set(['KeyD']);
+  step();
+  assert.ok(player.x > before.x && player.z < before.z);
+  assert.ok(player.moveX > 0 && player.moveX < .16 && player.moveZ < -.98);
+  step(45);
+  assert.ok(player.moveX > .999 && Math.abs(player.moveZ) < .001);
+  assert.equal(player.heading, .4);
+});
+
+test('the right touch stick aims independently while the left stick moves', () => {
+  const { player, step } = setup({ touch: { x: 0, z: -1, aimX: 1, aimZ: 0 }, firing: true });
+  step(24);
+  assert.ok(player.z < -.7 && player.x === 0);
+  assert.ok(player.dx > .999 && Math.abs(player.dz) < .001);
 });
 
 test('direct facing takes the short path across the angle boundary', () => {

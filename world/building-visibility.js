@@ -10,7 +10,9 @@ export function registerBuilding(group) {
     meshes.push(node);
     for (const material of Array.isArray(node.material) ? node.material : [node.material]) materials.add(material);
   });
-  return { group, meshes, materials: [...materials], opacity: 1, hiddenUntil: 0, bounds: new THREE.Box3().setFromObject(group).expandByScalar(.06) };
+  // Keep the same shader and render pass through the entire fade.
+  for (const material of materials) material.alphaHash = true;
+  return { group, meshes: meshes.filter(mesh => mesh.castShadow), materials: [...materials], opacity: 1, hiddenUntil: 0, bounds: new THREE.Box3().setFromObject(group).expandByScalar(.06) };
 }
 
 export function createBuildingVisibility(buildings) {
@@ -23,6 +25,7 @@ export function createBuildingVisibility(buildings) {
   const sightTargets = samples.map(() => new THREE.Vector3());
   let visibilityTime = 0;
   function updateVisibility(camera, hero, height, dt) {
+    if (!buildings.length) return;
     visibilityTime += dt;
     camera.updateMatrixWorld();
     hero.getWorldPosition(heroPosition);
@@ -43,14 +46,12 @@ export function createBuildingVisibility(buildings) {
       let opacity = THREE.MathUtils.damp(house.opacity, target, 14, dt);
       if (Math.abs(opacity - target) < 0.003) opacity = target;
       if (Math.abs(opacity - house.opacity) < 0.00001) continue;
-      house.opacity = opacity;
-      for (const material of house.materials) {
-        const transparent = opacity < 1;
-        if (material.transparent !== transparent) { material.transparent = transparent; material.needsUpdate = true; }
-        material.opacity = opacity;
-        material.depthWrite = !transparent;
+      const restoreShadow = opacity > .98;
+      if (restoreShadow !== (house.opacity > .98)) {
+        for (const mesh of house.meshes) mesh.castShadow = restoreShadow;
       }
-      for (const mesh of house.meshes) mesh.castShadow = opacity > 0.98;
+      house.opacity = opacity;
+      for (const material of house.materials) material.opacity = opacity;
     }
   }
 
@@ -59,11 +60,7 @@ export function createBuildingVisibility(buildings) {
     for (const house of buildings) {
       house.opacity = 1;
       house.hiddenUntil = 0;
-      for (const material of house.materials) {
-        if (material.transparent) { material.transparent = false; material.needsUpdate = true; }
-        material.opacity = 1;
-        material.depthWrite = true;
-      }
+      for (const material of house.materials) material.opacity = 1;
       for (const mesh of house.meshes) mesh.castShadow = true;
     }
   }

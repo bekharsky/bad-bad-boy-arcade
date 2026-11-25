@@ -27,7 +27,7 @@ export function aleksiRoadSpans(from, to) {
 }
 export const aleksanterinkatuMap = {
   id: 'aleksanterinkatu', name: 'Aleksanterinkatu', mode: 'runner',
-  runner: { length: ALEKSI_LENGTH, variety: true, busy: true, cameoShoulder: 7.35, riderKinds: ['bike', 'scooter', 'goose', ...CAMEO_KINDS], lanes: TRAM_LANES, tramChance: .54, tramRoute: aleksiTramRoute, roadworkKinds: ['cone', 'barrier'], crossingPoints: ALEKSI_CROSSINGS, startSpeed: 10.5, speedLimit: 18, acceleration: .12 },
+  runner: { length: ALEKSI_LENGTH, variety: true, busy: true, cameoShoulder: 6.12, riderKinds: ['bike', 'scooter', 'goose', ...CAMEO_KINDS], lanes: TRAM_LANES, tramChance: .54, tramRoute: aleksiTramRoute, roadworkKinds: ['cone', 'barrier'], crossingPoints: ALEKSI_CROSSINGS, startSpeed: 10.5, speedLimit: 18, acceleration: .12 },
   spawn: { x: TRAM_LANES[0], z: 0, heading: Math.PI },
   pickups: { medkit: [{ x: TRAM_LANES[0], z: -300 }] },
   bounds: { minX: -5.3, maxX: 5.3, minZ: -150, maxZ: 35 },
@@ -124,6 +124,7 @@ function buildAleksi(root) {
   const squares = ALEKSI_CROSSINGS.map((progress, index) => junction(progress, index, paving));
   for (const square of squares) city.add(square.root);
   const intervals = [[-40, 120], [160, 260], [300, 400], [440, 540], [580, 680]];
+  const facades = createAleksiLandmarks();
   let variant = 0;
   for (const [from, to] of intervals) for (const side of [-1, 1]) {
     for (const [start, end] of remainingFacadeSpans(side, from, to)) {
@@ -131,12 +132,12 @@ function buildAleksi(root) {
       for (let i = 0; i < count; i++) {
         const building = facade(side, start + (i + .5) * depth, depth, variant++);
         Object.assign(building.userData, { side, routeFrom: start + i * depth, routeTo: start + (i + 1) * depth });
-        city.add(building);
+        facades.push(building);
       }
     }
   }
   const waterfront = createAleksiWaterfront(paving);
-  city.add(...createAleksiLandmarks(), waterfront.root, paving.finish());
+  city.add(...facades, waterfront.root, paving.finish());
   const traffic = createRunnerTraffic(root, 'Aleksanterinkatu', aleksanterinkatuMap.runner);
   const finish = createRunnerFinish(root, 'Aleksanterinkatu', ALEKSI_LENGTH);
   let currentState = { distance: 0, elapsed: 0, traffic: [], crossings: [] }, colliderTime = -1;
@@ -145,7 +146,7 @@ function buildAleksi(root) {
   function dynamicColliders() {
     if (colliderTime !== currentState.elapsed) {
       colliderTime = currentState.elapsed; tramColliders.length = 0;
-      for (const agent of currentState.traffic) if (agent.kind === 'tram' && !agent.cleared) {
+      for (const agent of currentState.traffic) if (agent.kind === 'tram' && !agent.cleared && !agent.hit) {
         for (const offset of [-TRAM_CAR_OFFSET, TRAM_CAR_OFFSET]) {
           aleksiTramRoute(agent.progress + offset, TRAM_LANES[agent.lane], tramPose);
           const c = colliderPool[tramColliders.length], s = Math.abs(Math.sin(tramPose.heading)), cos = Math.abs(Math.cos(tramPose.heading));
@@ -162,12 +163,21 @@ function buildAleksi(root) {
     if (state !== currentState) colliderTime = -1;
     currentState = state;
     city.position.z = state.distance;
-    waterfront.update(state.elapsed);
+    // The fog is fully opaque before the front of this window. Skip hidden
+    // facade subtrees during draw and shadow traversal.
+    const far = Math.min(150, (root.parent?.fog?.far ?? 132) + 5);
+    for (const building of facades) {
+      const { routeFrom, routeTo } = building.userData;
+      building.visible = routeTo >= state.distance - 45 && routeFrom <= state.distance + far;
+    }
+    waterfront.root.visible = state.distance + far >= 580;
+    if (waterfront.root.visible) waterfront.update(state.elapsed);
     // Fade nearby hanging lamps before they can conceal a rider or the hero
     // under the following camera. Geometry stays shared across all fixtures.
     for (const lamp of lamps) {
-      lamp.material.opacity = THREE.MathUtils.clamp(-(state.distance + lamp.position.z) / 8, 0, 1);
-      lamp.visible = lamp.material.opacity > .005;
+      const ahead = -lamp.position.z - state.distance;
+      lamp.visible = ahead > .04 && ahead < far;
+      if (lamp.visible) lamp.material.opacity = Math.min(1, ahead / 8);
     }
     for (let i = 0; i < squares.length; i++) {
       const event = state.crossings?.[i];

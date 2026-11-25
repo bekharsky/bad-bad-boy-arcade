@@ -14,6 +14,11 @@
   <body>
     <main class="game-shell">
       <canvas id="game" tabindex="0" aria-label="Piss Deal game"></canvas>
+      <svg id="mouse-reticle" class="mouse-reticle" viewBox="0 0 17 17" aria-hidden="true" focusable="false" hidden>
+        <path d="M8.5 2v4m0 5v4M2 8.5h4m5 0h4" stroke="#111620" stroke-width="3"/>
+        <path d="M8.5 2v4m0 5v4M2 8.5h4m5 0h4" stroke="#fff2d6" stroke-width="1.5"/>
+      </svg>
+      <template id="cameo-speech"><div class="cameo-speech" role="status" hidden><span aria-hidden="true"></span></div></template>
       <div id="hero-hud" class="hero-hud" hidden>
         <div id="hero-power" class="hero-power" hidden></div>
         <div id="encounter-hint" class="encounter-hint" role="status" hidden>
@@ -88,7 +93,8 @@
         </div>
       </header>
 
-      <section id="sleigh-intro" class="sleigh-intro" aria-label="Joulupukki loses his sleigh over Helsinki" hidden>
+      <section id="sleigh-intro" class="sleigh-intro" aria-label="A drone hits Joulupukki and the sleigh breaks apart over Helsinki" hidden>
+        <video id="intro-witness" class="intro-witness" muted playsinline preload="auto" aria-hidden="true" hidden></video>
         <div class="intro-shade" aria-hidden="true"></div>
         <span id="intro-location" class="intro-location" aria-hidden="true">HELSINKI · CHRISTMAS EVE</span>
         <button id="skip-intro" class="intro-skip" type="button">SKIP INTRO</button>
@@ -149,6 +155,7 @@
             <div class="runner-control"><kbd aria-label="Left and right to dodge, up and down for speed">←→↑↓</kbd><span>DODGE / SPEED</span></div>
           </div>
         </div>
+        <p class="orientation-hint">For the best experience, turn your phone sideways.</p>
       </section>
 
       <section id="end-screen" class="overlay hidden">
@@ -183,11 +190,12 @@
       </dialog>
 
       <div class="mobile-controls" aria-label="Touch controls">
-        <div id="joystick-zone" class="joystick-zone" aria-label="Drag to move and aim">
+        <div id="joystick-zone" class="joystick-zone" aria-label="Drag to move">
           <div class="joystick-hint" aria-hidden="true"><span class="joystick-idle-thumb"></span></div>
           <div id="joystick" class="joystick" aria-hidden="true" hidden><div id="joystick-thumb" class="joystick-thumb"></div></div>
         </div>
-        <button id="mobile-fire" class="fire-button touch-control" type="button" aria-label="Fire spray">
+        <div id="spray-home" class="spray-home" aria-hidden="true"></div>
+        <button id="mobile-fire" class="fire-button touch-control" type="button" aria-label="Drag to aim and spray; flick up to spray at birds">
           <span class="spray-up-cue" aria-hidden="true">⌃</span>
           <svg class="spray-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true" focusable="false">
             <circle cx="24" cy="24" r="15" />

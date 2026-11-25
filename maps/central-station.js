@@ -12,6 +12,7 @@ export const centralStationMap = {
   spawn: { x: 10, z: 24.5, heading: Math.PI },
   bounds: { minX: -39, maxX: 35, minZ: -47, maxZ: 30 },
   environment: { background: new THREE.Color('#abc9cb'), fog: new THREE.Fog('#abc9cb', 55, 134) },
+  openingCameoRoute: [[16.5, 16.5], [15.5, 16.5]],
   pedestrianRoutes: [
     [[8, -7], [-1.5, -7], [-1.5, 6], [2, 8], [4, 10]],
     [[14, -8.5], [22, -10]],
