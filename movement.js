@@ -17,30 +17,43 @@ function approachHeading(heading, target, dt, turnRate = 14) {
   return Math.abs(angle) <= turnStep ? target : heading + Math.sign(angle) * turnStep;
 }
 
-export function movePlayer(player, city, { keys, touch, dt, firing, height, cursorHeading = null, shotHeading = null, touchShotHeading = null, steerWithMouse = false }) {
+export function smoothTouchHeading(heading, target, dt) {
+  const maxRate = 10;
+  const response = 20;
+  const angle = Math.atan2(Math.sin(target - heading), Math.cos(target - heading));
+  const distance = Math.abs(angle);
+  // Cap a large turn, then ease into the target at the same rate at any FPS.
+  const timeAtMaxRate = Math.min(dt, Math.max(0, (distance - maxRate / response) / maxRate));
+  const remaining = (distance - maxRate * timeAtMaxRate) * Math.exp(-response * (dt - timeAtMaxRate));
+  const next = heading + Math.sign(angle) * (distance - remaining);
+  return Math.atan2(Math.sin(next), Math.cos(next));
+}
+
+export function movePlayer(player, city, { keys, touch, dt, firing, height, cursorHeading = null, shotHeading = null, touchHeading = null, steerWithMouse = false }) {
   const touchStrength = Math.hypot(touch.x, touch.z);
   const x = touchStrength ? touch.x : Number(keys.has('KeyD')) - Number(keys.has('KeyA'));
   const z = touchStrength ? touch.z : Number(keys.has('KeyS')) - Number(keys.has('KeyW'));
   const turn = touchStrength ? 0 : Number(keys.has('ArrowLeft')) - Number(keys.has('ArrowRight'));
   const throttle = touchStrength ? 0 : Number(keys.has('ArrowUp')) - Number(keys.has('ArrowDown'));
   const directStrength = Math.hypot(x, z);
-  const wasd = !touchStrength && directStrength > 0;
-  const touchAim = touch.aimX || touch.aimZ ? Math.atan2(touch.aimX, touch.aimZ) : touchShotHeading;
+  const touchAim = touch.aimX || touch.aimZ ? Math.atan2(touch.aimX, touch.aimZ) : touchHeading;
   const mouseSteering = steerWithMouse && !touchStrength;
   const mouseHeading = touchStrength ? null : shotHeading ?? (mouseSteering ? cursorHeading : null);
   player.targetHeading ??= player.heading;
   turnPlayer(player, turn * (firing ? 1.7 : 3.2), dt);
-  if (!turn && !throttle && directStrength && !mouseSteering) player.targetHeading = Math.atan2(x, z);
+  if (!touchStrength && !turn && !throttle && directStrength && !mouseSteering) player.targetHeading = Math.atan2(x, z);
 
   if (touchAim !== null) {
-    player.heading = player.targetHeading = touchAim;
+    player.heading = player.targetHeading = smoothTouchHeading(player.heading, touchAim, dt);
+  } else if (touchStrength) {
+    player.targetHeading = player.heading;
   } else if (mouseHeading !== null) {
     player.heading = mouseHeading;
     if (!turn && (mouseSteering || (!throttle && !directStrength))) player.targetHeading = mouseHeading;
-  } else if (firing && !touchStrength && !directStrength) {
+  } else if (firing && !directStrength) {
     player.heading = player.targetHeading;
   } else {
-    const turnRate = touchStrength ? 22 : wasd && !turn && !throttle ? 10 : 14;
+    const turnRate = directStrength && !turn && !throttle ? 10 : 14;
     player.heading = approachHeading(player.heading, player.targetHeading, dt, turnRate);
   }
 
@@ -60,14 +73,14 @@ export function movePlayer(player, city, { keys, touch, dt, firing, height, curs
   const oldSpeed = player.moveSpeed;
   const directionX = moving ? moveX / strength : (player.moveX ?? player.dx);
   const directionZ = moving ? moveZ / strength : (player.moveZ ?? player.dz);
-  const blendWasd = wasd && moving && oldSpeed > 0 && player.moveX !== undefined;
-  const redirecting = blendWasd && player.moveX * directionX + player.moveZ * directionZ < .999;
+  const blendDirect = directStrength > 0 && moving && oldSpeed > 0 && player.moveX !== undefined;
+  const redirecting = blendDirect && player.moveX * directionX + player.moveZ * directionZ < .999;
   const damping = moving ? (redirecting ? 8 : 14) : 48;
   const decay = Math.exp(-damping * dt);
   const easingTime = (1 - decay) / damping;
   let travelX, travelZ;
-  // Blend WASD velocity through corners and brake before reversing.
-  if (blendWasd) {
+  // Blend screen-relative movement through corners and brake before reversing.
+  if (blendDirect) {
     const targetX = directionX * targetSpeed, targetZ = directionZ * targetSpeed;
     const deltaX = player.moveX * oldSpeed - targetX, deltaZ = player.moveZ * oldSpeed - targetZ;
     travelX = targetX * dt + deltaX * easingTime;

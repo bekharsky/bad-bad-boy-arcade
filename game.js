@@ -101,6 +101,7 @@ const toast = document.querySelector('#toast');
 const encounterHint = document.querySelector('#encounter-hint');
 const sprayTutorial = createSprayTutorial(document.querySelector('#spray-tutorial'), encounterHint);
 const sprayButton = document.querySelector('#mobile-fire');
+const sprayZone = document.querySelector('#spray-zone');
 const pauseDialog = document.querySelector('#pause-dialog');
 const startOver = document.querySelector('#start-over');
 const soundButtons = document.querySelectorAll('[data-toggle-sound]');
@@ -127,8 +128,10 @@ const touchControls = createTouchControls({
   stick: document.querySelector('#joystick'),
   thumb: document.querySelector('#joystick-thumb'),
   home: document.querySelector('.joystick-hint'),
-  fireButton: document.querySelector('#mobile-fire'),
+  fireZone: sprayZone,
+  fireButton: sprayButton,
   fireHome: document.querySelector('#spray-home'),
+  getAimHeading: previous => usingTouchControls ? previous ?? player.heading : player.heading,
   onFireStart: (airborne, heading, fresh) => beginSpray(false, airborne, heading, fresh),
   onInput() {
     canvas.focus({ preventScroll: true });
@@ -724,7 +727,8 @@ function updateMovement(dt, firing) {
     keys, touch: touchControls.input, dt, firing, height: HERO_HEIGHT,
     cursorHeading: heading,
     shotHeading: mouseFiring ? heading : null,
-    touchShotHeading: player.tapTimer > 0 ? player.touchTapHeading : null,
+    touchHeading: (usingTouchControls ? touchControls.aimHeading : null)
+      ?? (player.tapTimer > 0 ? player.touchTapHeading : null),
     steerWithMouse: mouseAim.following,
   });
 }
@@ -894,15 +898,18 @@ function updateSpray(dt, firing, groundTargets, powered = false) {
     if (actor.age >= .24) sprayTargets.push(actor);
   }
   const direction = sprayAim(player, seagulls.birds, sprayAimingUp());
-  return stream.update(dt, firing, player.rig.emitter, direction, sprayTargets, powered);
+  const spray = stream.update(dt, firing, player.rig.emitter, direction, sprayTargets, powered);
+  // The tap buffer only covers a press that starts and ends between ticks.
+  if (touchControls.input.firing && player.touchTapHeading !== null) player.tapTimer = 0;
+  return spray;
 }
 
 function updateSprayFeedback(spray) {
   const range = spray.range.toFixed(1);
-  const mode = spray.airborne ? 'Spraying upward; flick down to lower' : `Drag to aim and spray, range ${range} metres; flick up to aim at birds`;
+  const mode = spray.airborne ? 'Spraying upward; flick down to lower' : `Tap to spray, hold for range, drag to aim. Range ${range} metres. Flick up to spray at birds`;
   const label = `${mode}${spray.blocked ? ', blocked' : ''}`;
   sprayButton.dataset.blocked = String(spray.blocked);
-  if (sprayButton.getAttribute('aria-label') !== label) sprayButton.setAttribute('aria-label', label);
+  if (sprayZone.getAttribute('aria-label') !== label) sprayZone.setAttribute('aria-label', label);
 }
 
 function updateHealth() {
@@ -1257,6 +1264,7 @@ const mouseInput = bindGameInput({
   canvas,
   movementZone: document.querySelector('#joystick-zone'),
   movementHandle: document.querySelector('.joystick-hint'),
+  sprayZone,
   canInteract: () => playing && !pauseDialog.open && !gameInterlude(),
   setFiring(firing, airborne) {
     if (firing) keys.add('Fire');

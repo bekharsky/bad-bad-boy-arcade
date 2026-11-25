@@ -1,12 +1,14 @@
 // Each control owns its pointer so moving and spraying work with two thumbs.
-export function createTouchControls({ zone, stick, thumb, home, fireButton, fireHome, onFireStart, onInput = () => {} }) {
+export function createTouchControls({ zone, stick, thumb, home, fireZone, fireButton, fireHome, getAimHeading, onFireStart, onInput = () => {} }) {
   const radius = 44;
   const deadzone = 0.1;
+  const aimDeadzone = 16;
   const input = { x: 0, z: 0, aimX: 0, aimZ: 0, firing: false, airborne: false };
   let enabled = false;
   let movePointer = null, firePointer = null;
   let originX = 0, originY = 0;
-  let aimBaseX = 0, aimBaseY = 0, homeX = 0, homeY = 0, aimBounds;
+  let aimBaseX = 0, aimBaseY = 0, homeX = 0, homeY = 0;
+  let aimHeading = null, flickX = null;
   const flickSamples = [];
 
   function resetMove() {
@@ -32,18 +34,20 @@ export function createTouchControls({ zone, stick, thumb, home, fireButton, fire
     input.firing = false;
     input.airborne = false;
     input.aimX = input.aimZ = 0;
+    flickX = null;
     flickSamples.length = 0;
     aimBaseX = homeX; aimBaseY = homeY;
     fireButton.classList.toggle('returning', !immediate);
     drawAim(0, 0);
     fireButton.classList.remove('pressed');
     fireButton.classList.remove('aiming-up');
-    if (pointer !== null && fireButton.hasPointerCapture(pointer)) fireButton.releasePointerCapture(pointer);
+    if (pointer !== null && fireZone.hasPointerCapture(pointer)) fireZone.releasePointerCapture(pointer);
   }
 
   function reset() {
     resetMove();
     resetFire(true);
+    aimHeading = null;
   }
 
   function move(event) {
@@ -90,20 +94,29 @@ export function createTouchControls({ zone, stick, thumb, home, fireButton, fire
     zone.addEventListener(name, event => {
       if (event.pointerId === movePointer) resetMove();
     });
-    fireButton.addEventListener(name, event => {
+    fireZone.addEventListener(name, event => {
       if (event.pointerId === firePointer) resetFire();
     });
   }
 
-  function aimAndFire(event) {
+  function setAim(heading) {
+    aimHeading = heading;
+    input.aimX = Math.sin(heading);
+    input.aimZ = Math.cos(heading);
+  }
+
+  function aim(event) {
     const { clientX: x, clientY: y, timeStamp: time } = event;
     while (flickSamples.length && flickSamples[0].time < time - 120) flickSamples.shift();
     let flick = 0;
+    let fastVerticalDrag = false;
     for (let i = flickSamples.length - 1; i >= 0; i--) {
       const sample = flickSamples[i];
       const dy = y - sample.y;
       const duration = Math.max(16, time - sample.time);
-      if (Math.abs(dy) >= 24 && Math.abs(dy) >= Math.abs(x - sample.x) * 1.5 && Math.abs(dy) / duration >= .42) {
+      if (Math.abs(dy) >= 8 && Math.abs(dy) >= Math.abs(x - sample.x) * 1.5 && Math.abs(dy) / duration >= .42) {
+        fastVerticalDrag = true;
+        if (Math.abs(dy) < 24) continue;
         flick = Math.sign(dy);
         break;
       }
@@ -111,55 +124,61 @@ export function createTouchControls({ zone, stick, thumb, home, fireButton, fire
     if (flick) flickSamples.length = 0;
     if (flickSamples.at(-1)?.time !== time) flickSamples.push({ x, y, time });
 
+    if (flick) {
+      flickX = aimBaseX = x;
+      aimBaseY = y;
+      drawAim(0, 0);
+      const airborne = flick < 0;
+      if (airborne !== input.airborne) {
+        input.airborne = airborne;
+        fireButton.classList.toggle('aiming-up', airborne);
+        onFireStart(airborne, aimHeading, false);
+      }
+      return;
+    }
+    if (flickX !== null && Math.abs(x - flickX) < aimDeadzone) {
+      aimBaseY = y;
+      drawAim(x - aimBaseX, 0);
+      return;
+    }
+    flickX = null;
     let dx = x - aimBaseX, dy = y - aimBaseY;
     const distance = Math.hypot(dx, dy);
     if (distance > radius) {
-      aimBaseX = Math.max(aimBounds.left + radius, Math.min(aimBounds.right - radius, x - dx / distance * radius));
-      aimBaseY = Math.max(aimBounds.top + radius, Math.min(aimBounds.bottom - radius, y - dy / distance * radius));
-      dx = x - aimBaseX; dy = y - aimBaseY;
-      const length = Math.hypot(dx, dy);
-      if (length > radius) { dx *= radius / length; dy *= radius / length; }
+      dx *= radius / distance;
+      dy *= radius / distance;
+      aimBaseX = x - dx;
+      aimBaseY = y - dy;
     }
-    const strength = Math.hypot(dx, dy) / radius;
-    const wasFiring = input.firing, wasAirborne = input.airborne;
-    const previousHeading = input.aimX || input.aimZ ? Math.atan2(input.aimX, input.aimZ) : Math.PI;
-    input.firing = strength >= (wasFiring ? .22 : .3);
-    input.airborne = input.firing && (flick ? flick < 0 : wasAirborne);
-    input.aimX = strength > .15 ? dx / radius : 0;
-    input.aimZ = strength > .15 ? dy / radius : 0;
+    if (distance >= aimDeadzone && !fastVerticalDrag) setAim(Math.atan2(dx, dy));
     drawAim(dx, dy);
-    fireButton.classList.toggle('pressed', input.firing);
-    fireButton.classList.toggle('aiming-up', input.airborne);
-    const flickShot = flick < 0 && !wasAirborne;
-    if (flickShot || (input.firing && !wasFiring)) {
-      const heading = input.aimX || input.aimZ ? Math.atan2(input.aimX, input.aimZ) : previousHeading;
-      onFireStart(flickShot || input.airborne, heading, !wasFiring);
-    }
   }
 
-  fireButton.addEventListener('pointerdown', event => {
-    if (!enabled || firePointer !== null || event.button !== 0) return;
+  fireZone.addEventListener('pointerdown', event => {
+    if (!enabled || firePointer !== null || event.button !== 0 || event.pointerType === 'mouse') return;
     event.preventDefault();
     firePointer = event.pointerId;
     const homeBounds = fireHome.getBoundingClientRect();
-    const baseBounds = fireButton.getBoundingClientRect();
-    aimBounds = fireButton.parentElement.getBoundingClientRect();
     homeX = homeBounds.left + homeBounds.width / 2;
     homeY = homeBounds.top + homeBounds.height / 2;
-    aimBaseX = baseBounds.left + baseBounds.width / 2;
-    aimBaseY = baseBounds.top + baseBounds.height / 2;
+    aimBaseX = event.clientX;
+    aimBaseY = event.clientY;
     flickSamples.push({ x: event.clientX, y: event.clientY, time: event.timeStamp });
     fireButton.classList.remove('returning');
-    fireButton.setPointerCapture(firePointer);
+    fireButton.classList.add('pressed');
+    fireZone.setPointerCapture(firePointer);
+    setAim(getAimHeading(aimHeading));
+    input.firing = true;
+    drawAim(0, 0);
     onInput();
-    aimAndFire(event);
+    onFireStart(false, aimHeading, true);
   });
-  fireButton.addEventListener('pointermove', event => {
+  fireZone.addEventListener('pointermove', event => {
     if (event.pointerId !== firePointer) return;
     event.preventDefault();
-    aimAndFire(event);
+    aim(event);
   });
-  for (const element of [zone, fireButton]) {
+  for (const element of [zone, fireZone]) {
     element.addEventListener('contextmenu', event => event.preventDefault());
   }
   window.addEventListener('blur', reset);
@@ -170,6 +189,7 @@ export function createTouchControls({ zone, stick, thumb, home, fireButton, fire
 
   return {
     input,
+    get aimHeading() { return aimHeading; },
     reset,
     setEnabled(value) {
       enabled = value;

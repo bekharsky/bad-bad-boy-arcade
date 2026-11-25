@@ -55,15 +55,29 @@ test('changing WASD direction rounds the corner without moving the aim', () => {
 });
 
 test('the right touch stick aims independently while the left stick moves', () => {
-  const { player, step } = setup({ touch: { x: 0, z: -1, aimX: 1, aimZ: 0 }, firing: true });
-  step(24);
+  const { player, input, step } = setup({ touch: { x: 0, z: -1, aimX: 1, aimZ: 0 }, firing: true });
+  step(32);
   assert.ok(player.z < -.7 && player.x === 0);
   assert.ok(player.dx > .999 && Math.abs(player.dz) < .001);
+  input.touch = { x: 0, z: -1 };
+  input.touchHeading = Math.PI / 2;
+  input.firing = false;
+  const before = player.z;
+  step(24);
+  assert.ok(player.z < before - .9 && player.x === 0);
+  assert.ok(Math.abs(player.heading - Math.PI / 2) < .001);
+  input.touchHeading = -Math.PI / 2;
+  step();
+  assert.ok(player.heading > 1.3 && player.heading < 1.5, 'The hero starts to turn without snapping after the finger lifts');
+  step(36);
+  assert.ok(Math.abs(player.heading + Math.PI / 2) < .002, 'A final aim change is retained after the finger lifts');
+  assert.equal(player.x, 0);
 });
 
 test('direct facing takes the short path across the angle boundary', () => {
   const heading = Math.PI - .02;
-  const { player, step } = setup({ heading, touch: { x: Math.sin(-Math.PI + .02), z: Math.cos(-Math.PI + .02) } });
+  const { player, step } = setup({ heading });
+  player.targetHeading = -Math.PI + .02;
   step();
   const change = Math.atan2(Math.sin(player.heading - heading), Math.cos(player.heading - heading));
   assert.ok(change > 0 && change <= .04 + 1e-10);
@@ -85,15 +99,35 @@ test('keyboard turn acceleration is frame-rate independent and stops when releas
   assert.ok(Math.max(...headings) - Math.min(...headings) < 1e-10);
 });
 
-test('small joystick aim corrections reach the exact angle in one frame while firing', () => {
+test('touch aim eases into small corrections at the same rate while firing at any FPS', () => {
   for (const fps of [30, 60, 120]) {
     const angle = .05;
-    const { player, input, step } = setup({ touch: { x: Math.sin(angle) * .25, z: Math.cos(angle) * .25 }, firing: true });
+    const { player, input, step } = setup({
+      touch: { x: 0, z: -1, aimX: Math.sin(angle) * .25, aimZ: Math.cos(angle) * .25 }, firing: true,
+    });
     input.dt = 1 / fps;
     step();
-    assert.ok(Math.abs(player.heading - angle) < 1e-10);
+    assert.ok(player.heading > 0 && player.heading < angle);
+    step(fps / 5 - 1);
+    assert.ok(Math.abs(player.heading - angle * (1 - Math.exp(-4))) < 1e-10);
     assert.equal(player.dx, Math.sin(player.heading));
     assert.equal(player.dz, Math.cos(player.heading));
+  }
+});
+
+test('a sudden half turn from the right stick stays smooth and takes the short path across the angle boundary', () => {
+  for (const fps of [30, 60, 120]) {
+    const heading = 2.8, target = -.35;
+    const { player, input, step } = setup({ heading, touch: { x: 0, z: 0 }, firing: true });
+    input.touchHeading = target;
+    input.dt = 1 / fps;
+    for (let frame = 0; frame < fps / 2; frame++) {
+      const before = player.heading;
+      step();
+      const turn = Math.atan2(Math.sin(player.heading - before), Math.cos(player.heading - before));
+      assert.ok(turn > 0 && turn <= 10 / fps + 1e-10);
+    }
+    assert.ok(Math.abs(player.heading - target) < .005);
   }
 });
 
@@ -169,23 +203,30 @@ test('tank controls turn in place and back up without changing the facing direct
 test('the virtual joystick stays directional while the arrows are held', () => {
   const { player, step } = setup({ codes: ['ArrowLeft', 'ArrowDown'], touch: { x: .5, z: -.5 } });
   step(30);
-  assert.ok(Math.abs(player.heading - Math.PI * .75) < 1e-10);
+  assert.equal(player.heading, 0);
   assert.ok(player.moveSpeed > 0);
   assert.ok(player.x > 0 && player.z < 0);
 });
 
-test('joystick reversal changes travel immediately and completes facing quickly while firing', () => {
+test('full stick deflections trace the same path as WASD through corners and reversals', () => {
   for (const fps of [30, 60, 120]) {
-    const { player, input, step } = setup({ touch: { x: 0, z: -1 }, firing: true });
-    input.dt = 1 / fps;
-    step(fps);
-    const before = player.z;
-    input.touch = { x: 0, z: 1 };
-    step();
-    assert.ok(player.z > before, 'Movement reverses on the first frame');
-    step(Math.ceil(fps * .18));
-    assert.ok(Math.abs(player.heading) < 1e-10, 'Turning is not slowed by the fire button');
-    assert.equal(player.dz, 1);
+    const heading = .7;
+    const touch = setup({ heading, firing: true });
+    const desktop = setup({ heading, firing: true });
+    touch.input.dt = desktop.input.dt = 1 / fps;
+    desktop.input.steerWithMouse = true;
+    desktop.input.cursorHeading = heading;
+    for (const [code, x, z] of [['KeyW', 0, -1], ['KeyD', 1, 0], ['KeyA', -1, 0], ['KeyS', 0, 1]]) {
+      touch.input.touch = { x, z };
+      desktop.input.keys = new Set([code]);
+      for (let frame = 0; frame < fps / 2; frame++) {
+        touch.step();
+        desktop.step();
+        assert.equal(touch.player.x, desktop.player.x);
+        assert.equal(touch.player.z, desktop.player.z);
+        assert.equal(touch.player.heading, heading);
+      }
+    }
   }
 });
 
@@ -263,12 +304,12 @@ test('S always moves down-screen while the crosshair and shot direction change',
   }
 });
 
-test('the joystick takes priority over a mouse target', () => {
+test('the movement stick keeps the last facing when switching away from mouse aim', () => {
   const { player, input, step } = setup({ touch: { x: 0, z: -1 } });
   input.cursorHeading = input.shotHeading = .37;
   input.steerWithMouse = true;
   step(30);
-  assert.equal(player.heading, Math.PI);
+  assert.equal(player.heading, 0);
 });
 
 test('WASD takes the same screen directions for every facing', () => {

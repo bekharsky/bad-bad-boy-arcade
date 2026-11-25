@@ -2,7 +2,7 @@ const LEFT_BUTTON = 1;
 const RIGHT_BUTTON = 2;
 const FIRE_BUTTONS = LEFT_BUTTON | RIGHT_BUTTON;
 
-export function bindGameInput({ canvas, movementZone, movementHandle, canInteract, setFiring, beginSpray, pointMouseAim }) {
+export function bindGameInput({ canvas, movementZone, movementHandle, sprayZone, canInteract, setFiring, beginSpray, pointMouseAim }) {
   let buttons = 0;
 
   function focusGame() {
@@ -10,7 +10,7 @@ export function bindGameInput({ canvas, movementZone, movementHandle, canInterac
   }
 
   function onPlayfield(event) {
-    if (event.target === canvas) return true;
+    if (event.target === canvas || event.target === sprayZone) return true;
     if (event.target !== movementZone) return false;
     const handle = movementHandle?.getBoundingClientRect();
     return !handle || event.clientX < handle.left || event.clientX > handle.right || event.clientY < handle.top || event.clientY > handle.bottom;

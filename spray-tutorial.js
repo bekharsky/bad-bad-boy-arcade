@@ -3,7 +3,7 @@ const ENCOUNTER_HINT_TIME = 4;
 const GROUND_HINTS = {
   mouse: 'Hold fire for more range.',
   desktop: 'Press Space to spray forward. Hold for more range.',
-  touch: 'Drag the right stick to aim and spray.',
+  touch: 'Tap right to spray. Hold for range. Drag to aim.',
 };
 
 export function createSprayTutorial(ground, encounter) {
@@ -52,7 +52,7 @@ export function createSprayTutorial(ground, encounter) {
           stage = null;
           show();
         } else if (mouseControls) show('Right click to spray up', 'right');
-        else show(touch ? 'Flick the right stick up' : 'E + Fire');
+        else show(touch ? 'Flick up on the right' : 'E + Fire');
       } else if (stage === 'goose') {
         show('Left click to spray', 'left');
       } else show();

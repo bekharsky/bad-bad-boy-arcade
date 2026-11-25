@@ -18,12 +18,13 @@ function setup({ aiming = false } = {}) {
   canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: 600, height: 800 });
   canvas.focus = () => { document.activeElement = canvas; };
   const movementZone = {};
+  const sprayZone = {};
   const movementHandle = { getBoundingClientRect: () => ({ left: 24, right: 112, top: 680, bottom: 768 }) };
   let interactive = true, firing = false, airborne = false, bursts = 0, shotAim, mouseShot, upwardTap;
   const mouseAim = createMouseAim({ canvas });
   mouseAim.setEnabled(aiming);
   const input = bindGameInput({
-    canvas, movementZone, movementHandle,
+    canvas, movementZone, movementHandle, sprayZone,
     canInteract: () => interactive,
     setFiring: (value, up) => { firing = value; airborne = up; },
     beginSpray: (mouse, up) => {
@@ -35,7 +36,7 @@ function setup({ aiming = false } = {}) {
     pointMouseAim: mouseAim.point,
   });
   return {
-    canvas, movementZone,
+    canvas, movementZone, sprayZone,
     reset: input.reset,
     setInteractive(value) { interactive = value; },
     firing: () => firing, airborne: () => airborne, upwardTap: () => upwardTap,
@@ -66,6 +67,10 @@ test('the invisible touch movement zone does not swallow mouse shots over the wo
   assert.equal(event.cancelBubble, true, 'The virtual joystick must not also claim this mouse press');
   assert.equal(event.defaultPrevented, true);
   assert.equal(document.activeElement, game.canvas);
+  pointer(window, 'pointerup');
+  pointer(window, 'pointerdown', game.sprayZone);
+  assert.equal(game.firing(), true, 'A mouse can still shoot on the right half of a touch-enabled screen');
+  assert.equal(game.bursts(), 2);
 });
 
 test('dragging the visible stick with a mouse and touching the playfield still belong to the joystick', () => {

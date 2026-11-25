@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { animateHero } from '../hero.js';
+import { smoothTouchHeading } from '../movement.js';
 import { createRunnerRun } from './course.js';
 import { createLaneSteering, runnerThrottle } from './runner-input.js';
 
@@ -37,7 +38,8 @@ export function createRunnerSession({
     player.x = state.x; player.z = 0;
     const { aimX, aimZ } = touchControls.input;
     const tapHeading = player.tapTimer > 0 ? player.touchTapHeading : null;
-    player.heading = aimX || aimZ ? Math.atan2(aimX, aimZ) : tapHeading ?? Math.PI;
+    const targetHeading = aimX || aimZ ? Math.atan2(aimX, aimZ) : touchControls.aimHeading ?? tapHeading ?? Math.PI;
+    player.heading = smoothTouchHeading(player.heading, targetHeading, dt);
     player.dx = Math.sin(player.heading); player.dz = Math.cos(player.heading);
     player.root.position.set(player.x, 0, 0); player.root.rotation.y = player.heading;
     const stopped = result.crash || state.hitStop > 0;

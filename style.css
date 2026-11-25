@@ -46,7 +46,7 @@ button { font: inherit; }
 
 .game-shell { position: relative; width: 100%; height: 100%; height: 100dvh; --control-bottom: max(32px, calc(env(safe-area-inset-bottom) + 20px)); overflow: hidden; touch-action: none; overscroll-behavior: none; background: radial-gradient(ellipse at 50% 35%, #29263a, #11131b 70%); }
 #game { display: block; width: 100%; height: 100%; outline: 0; touch-action: none; }
-.mouse-reticle-active #game, .mouse-reticle-active .joystick-zone { cursor: none; }
+.mouse-reticle-active #game, .mouse-reticle-active :is(.joystick-zone, .spray-zone) { cursor: none; }
 .mouse-reticle { position: absolute; z-index: 3; width: 17px; height: 17px; transform: translate(-50%, -50%); fill: none; stroke-linecap: round; pointer-events: none; }
 .cameo-speech { position: absolute; top: 0; left: 0; z-index: 3; width: max-content; max-width: min(210px, calc(100% - 24px)); --speech-padding: 7px 11px; padding: var(--speech-padding); border-radius: 8px; background: #fff3d8; color: #231c25; box-shadow: 0 2px 8px #12162270; font: 650 13px/1.26 Inter, sans-serif; text-align: left; overflow-wrap: anywhere; pointer-events: none; }
 .cameo-speech[hidden] { display: none; }
@@ -213,8 +213,10 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 900 clamp(52px, 8vw, 78px
 }
 
 .mobile-controls { --stick-size: clamp(104px, 28vw, 112px); --fire-size: clamp(88px, 24vw, 96px); --control-side: clamp(16px, 5vw, 24px); }
-.mobile-controls.enabled { position: absolute; z-index: 3; inset: 0; pointer-events: none; }
-.joystick-zone { display: none; position: absolute; top: max(120px, env(safe-area-inset-top)); bottom: 0; left: 0; width: 55%; pointer-events: auto; touch-action: none; }
+.mobile-controls.enabled { position: absolute; z-index: 1; inset: 0; pointer-events: none; }
+.joystick-zone, .spray-zone { position: absolute; inset-block: 0; width: 50%; pointer-events: auto; touch-action: none; }
+.joystick-zone { left: 0; }
+.spray-zone { right: 0; }
 .joystick-hint, .joystick { position: absolute; width: var(--stick-size); height: var(--stick-size); border: 1px solid #f3e8bc55; border-radius: 50%; background: radial-gradient(circle, #1b2028aa 40%, #141821cf); box-shadow: inset 0 0 0 6px #ffffff05, 0 6px 22px #0004; pointer-events: none; }
 .joystick-hint::before, .joystick::before { content: ''; position: absolute; inset: 14px; border: 1px dashed #ffffff24; border-radius: 50%; }
 .joystick-hint { left: max(var(--control-side), calc(env(safe-area-inset-left) + 12px)); bottom: var(--control-bottom); }
@@ -224,7 +226,7 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 900 clamp(52px, 8vw, 78px
 .spray-home, .fire-button { position: absolute; right: max(var(--control-side), calc(env(safe-area-inset-right) + 12px)); bottom: calc(var(--control-bottom) + (var(--stick-size) - var(--fire-size)) / 2); width: var(--fire-size); height: var(--fire-size); border-radius: 50%; }
 .spray-home { border: 1px dashed #f3e8bc60; pointer-events: none; }
 .touch-control { display: grid; place-items: center; padding: 0; border: 1px solid #f3e8bc65; color: #fff1b5; background: radial-gradient(circle, #40342199 35%, #19191cbe); box-shadow: 0 6px 22px #0005; }
-.fire-button { transform: translate(var(--aim-base-x, 0px), var(--aim-base-y, 0px)); pointer-events: auto; touch-action: none; }
+.fire-button { transform: translate(var(--aim-base-x, 0px), var(--aim-base-y, 0px)); pointer-events: none; }
 .fire-button .spray-icon { width: 46px; height: 46px; padding: 6px; border: 1px solid #fff0aa90; border-radius: 50%; background: #83652ddd; transform: translate(var(--aim-thumb-x, 0px), var(--aim-thumb-y, 0px)); pointer-events: none; }
 @media (prefers-reduced-motion: no-preference) {
   .fire-button.returning, .fire-button.returning .spray-icon { transition: transform .22s cubic-bezier(.18,.72,.23,1); }
@@ -239,10 +241,6 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 900 clamp(52px, 8vw, 78px
 .orientation-hint { display: none; }
 @media (pointer: coarse) and (orientation: portrait) {
   #start-screen .orientation-hint { display: block; position: absolute; right: 20px; bottom: max(16px, calc(env(safe-area-inset-bottom) + 10px)); left: 20px; margin: 0; color: #fff4dcc7; text-align: center; font: 500 12px/1.4 Inter, sans-serif; text-shadow: 0 1px 6px #11131b; }
-}
-
-@media (any-pointer: coarse), (max-width: 680px) {
-  .joystick-zone { display: block; }
 }
 
 @media (any-pointer: coarse) {
