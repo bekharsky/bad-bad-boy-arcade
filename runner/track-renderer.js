@@ -123,7 +123,7 @@ export function createRunnerTraffic(root, name, { riderKinds = ['bike', 'scooter
         animateCameo(variant, (agent.gait ?? state.elapsed) + agent.id, agent.stumbleTime === undefined,
           approaching ? viewerYaw : 0, false, approaching ? .18 : 0, agent.stumbleTime);
       } else if (goose) {
-        animateGoose(goosePoses[i], dt, Math.abs(agent.z) < 2.5, agent.speed);
+        animateGoose(goosePoses[i], dt, agent.z > -4.5 && agent.z < 2.5, agent.speed);
       } else {
         animateTraffic(variant, state.elapsed + agent.id, agent.crossing ? Math.abs(agent.vx) : agent.speed + state.speed, viewerYaw);
       }

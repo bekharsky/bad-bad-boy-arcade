@@ -16,7 +16,15 @@
       <canvas id="game" tabindex="0" aria-label="Piss Deal game"></canvas>
       <div id="hero-hud" class="hero-hud" hidden>
         <div id="hero-power" class="hero-power" hidden></div>
-        <div id="gull-hint" class="gull-hint" role="status"></div>
+        <div id="encounter-hint" class="encounter-hint" role="status" hidden>
+          <svg class="mouse-hint-icon" viewBox="0 0 24 34" aria-hidden="true" focusable="false">
+            <path class="mouse-hint-left" d="M12 2a10 10 0 0 0-10 10v3h10Z"/>
+            <path class="mouse-hint-right" d="M12 2a10 10 0 0 1 10 10v3H12Z"/>
+            <rect x="2" y="2" width="20" height="30" rx="10"/>
+            <path d="M2 15h20M12 2v13"/>
+          </svg>
+          <span class="encounter-hint-label"></span>
+        </div>
       </div>
       <svg class="menu-symbols" aria-hidden="true" focusable="false">
         <symbol id="holiday-sleigh" viewBox="0 0 96 49">
@@ -134,21 +142,11 @@
             </div>
             <div class="start-control">
               <kbd>Mouse</kbd>
-              <span class="start-control-label">AIM</span>
-            </div>
-            <div class="start-control">
-              <kbd class="start-space-key">SPACE</kbd>
-              <span class="start-control-label">FIRE</span>
-            </div>
-            <div class="start-control">
-              <kbd>E</kbd>
-              <span class="start-control-label">UP</span>
+              <span class="start-control-label">AIM, FIRE</span>
             </div>
           </div>
           <div class="runner-start-hint" role="group" aria-label="Runner controls">
             <div class="runner-control"><kbd aria-label="Left and right to dodge, up and down for speed">←→↑↓</kbd><span>DODGE / SPEED</span></div>
-            <div class="runner-control runner-keyboard"><kbd>SPACE</kbd><span>SPRAY</span></div>
-            <div class="runner-control runner-keyboard"><kbd>E</kbd><span>UP</span></div>
           </div>
         </div>
       </section>

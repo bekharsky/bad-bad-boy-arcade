@@ -15,13 +15,13 @@ export const kamppiSquareMap = {
   name: 'Kamppi · Narinkkatori',
   spawn: { x: -5.5, z: 7.5, heading: Math.PI },
   bounds: { minX: -43, maxX: 43, minZ: -43, maxZ: 68.5 },
-  // Each walk starts behind a building and leads into the starting square.
+  // Hidden entrances lead into and around Narinkkatori.
   pedestrianRoutes: [
     [[-16, 12], [-13, 8], [-10, 7], [-6, 4], [2, 3.5]],
     [[5, 12], [2, 8], [-1, 6], [-4, 3], [-9, 2]],
-    [[-22, 12], [-16, 11], [-10, 7], [-7, 4], [-2, 0.5]],
-    [[11, 12], [6, 9], [-1, 6], [-3, 4], [-7, 2]],
-    [[-21, 15], [-21, 14], [-10, 7], [-5, 4], [0, 3]],
+    [[-22, 12], [-24, 16], [-26, 21], [-31, 24]],
+    [[11, 12], [10, 9], [15, 8], [23, 8], [30, 6]],
+    [[-21, 15], [-21, 24], [-14, 24], [-9, 24]],
   ],
   pickups: {
     sleigh: [{ x: -38, z: 4.5 }],
@@ -250,10 +250,9 @@ function buildKamppi(root) {
     dynamicColliders: () => tram.root.visible ? [tram.collider] : [],
     reset() { tram.reset(); tramCell = null; },
     update(dt, actors, navigation) {
-      const departed = tram.update(dt, actors, navigation);
+      tram.update(dt, actors, navigation);
       const occupied = tram.root.visible ? Math.floor(tram.root.position.x) : null;
       if (occupied !== tramCell) { tramCell = occupied; navigation.refresh(); }
-      return departed ? 'TRAM APPROACHING' : null;
     },
   };
 }

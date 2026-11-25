@@ -84,8 +84,8 @@ const beginSearch = document.querySelector('#begin-search');
 const passerbyCard = document.querySelector('.passerby');
 let shownCameo = null;
 const toast = document.querySelector('#toast');
-const gullHint = document.querySelector('#gull-hint');
-const sprayTutorial = createSprayTutorial(document.querySelector('#spray-tutorial'), gullHint);
+const encounterHint = document.querySelector('#encounter-hint');
+const sprayTutorial = createSprayTutorial(document.querySelector('#spray-tutorial'), encounterHint);
 const sprayButton = document.querySelector('#mobile-fire');
 const pauseDialog = document.querySelector('#pause-dialog');
 const startOver = document.querySelector('#start-over');
@@ -100,8 +100,8 @@ const aimPoint = new THREE.Vector3();
 const aimGround = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 const aimTargetBounds = new THREE.Sphere();
 const aimTargetHit = new THREE.Vector3();
-const gullPoint = new THREE.Vector3();
-const gullScreen = new THREE.Vector3();
+const enemyPoint = new THREE.Vector3();
+const enemyScreen = new THREE.Vector3();
 const mouseAim = createMouseAim({ canvas });
 const touchControls = createTouchControls({
   zone: document.querySelector('#joystick-zone'),
@@ -199,6 +199,7 @@ const player = {
   fireTimer: 0,
   tapTimer: 0,
   mouseTap: false,
+  upwardTap: false,
   runTime: 0,
   runBlend: 0,
   runAngle: 0,
@@ -308,7 +309,6 @@ const runnerInput = bindRunnerInput({
   canvas,
   canInteract: () => playing && isRunner() && !pauseDialog.open && !gameInterlude(),
   dodge: direction => runnerSession.dodge(direction),
-  setFiring: firing => firing ? keys.add('Fire') : keys.delete('Fire'), beginSpray,
 });
 
 const transitionRenderer = createTransitionRenderer(renderer);
@@ -492,7 +492,7 @@ function enterDistrict({ index }) {
   world.reset();
   placePlayerAtSpawn();
   sprayTutorial.reset(openingHarbor);
-  arenaCameos.reset(camera.position);
+  arenaCameos.reset();
   seagulls.reset(player, isRunner(), { attackDelay: openingHarbor ? 6 : 0 });
   medkits.reset(player);
   syncLevelUI();
@@ -506,20 +506,29 @@ function enterDistrict({ index }) {
     sleighCache.place(cache, index);
     const strength = itinerary.slice(0, index + 1).filter(map => map.mode !== 'runner').length;
     const posts = sleighGuardPosts(world, cache);
-    for (const post of openingHarbor ? posts.slice(0, 4) : posts) makeEnemy(post.x, post.z, strength, post);
+    for (const post of openingHarbor ? posts.slice(0, 6) : posts) makeEnemy(post.x, post.z, strength, post);
     if (openingHarbor) {
-      // Give the player one easy target in the plaza. It stays at its post until approached.
-      const post = world.pickupPoint({ x: 0, z: 4.5 }, .65);
-      if (post) {
+      const harborPosts = [
+        [0, 4.5, 6], [6, 8, 6.5], [16, 11, 7], // Plaza and eastbound route
+        [-20, 10.3, 6.5], // Behind Verkkopaukka
+        [-5.5, 26.5, 6.5], // Behind the southern apartment building
+        [-22, -24, 6.5], // Behind the west warehouse
+        [18.5, 22.5, 6.5], // Behind Cafe Helmi
+      ];
+      for (const [x, z, range] of harborPosts) {
+        const post = world.pickupPoint({ x, z }, .65);
+        if (!post) continue;
         const goose = makeEnemy(post.x, post.z, strength, post);
-        goose.guardRange = 4.5;
-        goose.hp = 1;
-        goose.speed *= .8;
+        goose.guardRange = range;
+        if (x === 0) {
+          goose.hp = 1;
+          goose.speed *= .8;
+        }
       }
     } else {
       const openingArena = strength === 1;
-      spawnEnemies(player, openingArena ? 4 : 5 + strength, strength, openingArena
-        ? { minPlayerDistance: 10.5, ringStart: 10.5 } : undefined);
+      const openingRing = openingArena ? 7.5 : 5.5;
+      spawnEnemies(player, openingArena ? 4 : 5 + strength, strength, { minPlayerDistance: openingRing, ringStart: openingRing });
       spawnEnemies(cache, openingArena ? 3 : 6, strength, { minPlayerDistance: openingArena ? 11 : 8 });
     }
   }
@@ -661,8 +670,7 @@ function update(dt) {
   if (!playing) return;
   if (isRunner()) { runnerSession.update(dt); return; }
   searchTime += dt;
-  const announcement = world.update(dt, [player, ...enemies, ...arenaCameos.actors]);
-  if (announcement) showToast(announcement);
+  world.update(dt, [player, ...enemies, ...arenaCameos.actors]);
 
   const firing = keys.has('Space') || keys.has('Fire') || touchControls.input.firing || player.tapTimer > 0;
   const oldX = player.x, oldZ = player.z;
@@ -684,14 +692,15 @@ function update(dt) {
   medkits.update(dt, player, collectMedkit);
   batteries.update(dt, player, collectBattery);
 
-  player.tapTimer = Math.max(0, player.tapTimer - dt);
   // Each parcel starts at the hands, then follows its own ballistic trajectory.
   seagulls.update(dt, player);
   if (!playing) return;
   sprayTutorial.update(dt, {
-    touch: usingTouchControls, mouse: mouseAim.enabled, firing, airborne: aimingUp(keys, touchControls.input), gullVisible: nearbyGullVisible,
+    touch: usingTouchControls, mouse: mouseAim.enabled, firing, airborne: sprayAimingUp(),
+    gooseVisible: nearbyGooseVisible, gullVisible: nearbyGullVisible,
   });
   const spray = updateSpray(dt, firing, enemies, player.powerTimer > 0);
+  player.tapTimer = Math.max(0, player.tapTimer - dt);
   player.powerTimer = Math.max(0, player.powerTimer - dt);
   updateSprayFeedback(spray);
   player.fireTimer -= dt;
@@ -712,14 +721,19 @@ function update(dt) {
   cameraRig.frameArena(player.x, player.z, dt, { dx: player.x - oldX, dz: player.z - oldZ });
 }
 
-function nearbyGullVisible() {
-  return seagulls.birds.some(bird => {
-    if (!bird.alive || Math.hypot(bird.x - player.x, bird.z - player.z) > 18) return false;
-    gullPoint.set(bird.x, bird.hitHeight, bird.z);
-    gullScreen.copy(gullPoint).project(camera);
-    return Math.abs(gullScreen.x) < 1 && Math.abs(gullScreen.y) < 1 && Math.abs(gullScreen.z) < 1
-      && world.lineClear3D(camera.position, gullPoint, .1);
-  });
+function enemyVisible(enemy) {
+  if (!enemy.alive || Math.hypot(enemy.x - player.x, enemy.z - player.z) > 18) return false;
+  enemyPoint.set(enemy.x, enemy.hitHeight, enemy.z);
+  enemyScreen.copy(enemyPoint).project(camera);
+  return Math.abs(enemyScreen.x) < 1 && Math.abs(enemyScreen.y) < 1 && Math.abs(enemyScreen.z) < 1
+    && world.lineClear3D(camera.position, enemyPoint, .1);
+}
+
+function nearbyGooseVisible() { return enemies.some(enemyVisible); }
+function nearbyGullVisible() { return seagulls.birds.some(enemyVisible); }
+
+function sprayAimingUp() {
+  return aimingUp(keys, touchControls.input, player.tapTimer > 0 && player.upwardTap);
 }
 
 function updateSpray(dt, firing, groundTargets, powered = false) {
@@ -729,7 +743,7 @@ function updateSpray(dt, firing, groundTargets, powered = false) {
   if (!isRunner()) for (const actor of arenaCameos.actors) {
     if (actor.age >= .24) sprayTargets.push(actor);
   }
-  const direction = sprayAim(player, seagulls.birds, aimingUp(keys, touchControls.input));
+  const direction = sprayAim(player, seagulls.birds, sprayAimingUp());
   return stream.update(dt, firing, player.rig.emitter, direction, sprayTargets, powered);
 }
 
@@ -798,13 +812,13 @@ function updateDialLabel() {
   if (levelDial.getAttribute('aria-label') !== label) levelDial.setAttribute('aria-label', label);
 }
 
-// Keeps the temporary power label above the hero while a battery boost is active.
+// Anchors temporary power and encounter hints above the hero.
 function updateHeroOverlay() {
   const powered = player.powerTimer > 0;
   const label = powered ? `BATTERY ${Math.ceil(player.powerTimer)}s` : '';
   if (heroPower.textContent !== label) heroPower.textContent = label;
   heroPower.hidden = !powered;
-  if (!playing || (!powered && !gullHint.textContent)) { heroHud.hidden = true; return; }
+  if (!playing || (!powered && encounterHint.hidden)) { heroHud.hidden = true; return; }
   heroHeadPosition.set(player.x, HERO_HEIGHT + 0.5, player.z).project(camera);
   const onScreen = heroHeadPosition.z < 1;
   heroHud.hidden = !onScreen;
@@ -987,15 +1001,16 @@ function animate(now) {
   updateHeroOverlay();
 }
 
-function beginSpray(mouse = false) {
+function beginSpray(mouse = false, upward = false) {
   if (gameInterlude()) return;
   player.tapTimer = 0.075;
   player.mouseTap = mouse;
+  player.upwardTap = upward;
   stream.resetPressure();
 }
 
 function resetInput() {
-  arenaInput.reset();
+  mouseInput.reset();
   runnerInput.reset();
   runnerSession.resetInput();
   mouseAim.resetSteering();
@@ -1003,6 +1018,7 @@ function resetInput() {
   touchControls.reset();
   player.tapTimer = 0;
   player.mouseTap = false;
+  player.upwardTap = false;
   player.moveSpeed = 0;
   player.turnSpeed = 0;
   player.targetHeading = player.heading;
@@ -1080,12 +1096,18 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) { resetInput(); if (playing) pauseGame(); }
 });
 window.addEventListener('resize', resize);
-const arenaInput = bindGameInput({
+const mouseInput = bindGameInput({
   canvas,
   movementZone: document.querySelector('#joystick-zone'),
   movementHandle: document.querySelector('.joystick-hint'),
-  canInteract: () => playing && !pauseDialog.open && !isRunner() && !gameInterlude(),
-  setFiring: firing => firing ? keys.add('Fire') : keys.delete('Fire'),
+  canInteract: () => playing && !pauseDialog.open && !gameInterlude(),
+  setFiring(firing, airborne) {
+    if (firing) keys.add('Fire');
+    else keys.delete('Fire');
+    if (airborne) keys.add('FireUp');
+    else keys.delete('FireUp');
+    if (firing && !airborne) player.upwardTap = false;
+  },
   beginSpray,
   pointMouseAim: mouseAim.point,
 });

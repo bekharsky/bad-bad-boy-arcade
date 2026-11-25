@@ -4,14 +4,14 @@ import { bindRunnerInput, createLaneSteering, runnerThrottle } from '../runner/r
 
 function setup() {
   globalThis.window = new EventTarget(); globalThis.document = new EventTarget();
-  const canvas = new EventTarget(), steps = [], firing = [];
-  let enabled = true, focused = 0;
-  canvas.focus = () => focused++; canvas.setPointerCapture = () => { throw new Error('No capture'); };
-  const input = bindRunnerInput({ canvas, setFiring: value => firing.push(value), canInteract: () => enabled, dodge: value => steps.push(value) });
+  const canvas = new EventTarget(), steps = [];
+  let enabled = true;
+  canvas.focus = () => {}; canvas.setPointerCapture = () => { throw new Error('No capture'); };
+  const input = bindRunnerInput({ canvas, canInteract: () => enabled, dodge: value => steps.push(value) });
   function pointer(type, x = 100, y = 100, id = 1) {
     const event = new Event(type); Object.assign(event, { pointerId: id, button: 0, clientX: x, clientY: y }); canvas.dispatchEvent(event);
   }
-  return { canvas, firing, input, steps, pointer, focused: () => focused, enable: value => { enabled = value; } };
+  return { input, steps, pointer, enable: value => { enabled = value; } };
 }
 
 test('horizontal swipes work without pointer capture and cannot repeat within a gesture', () => {
@@ -46,21 +46,13 @@ test('cancel, pause/reset and backgrounding discard an unfinished swipe', () => 
 });
 
 
-test('mouse spray stops on release/capture loss and paused canvas cannot fire', () => {
-  for (const stop of ['pointerup', 'pointercancel', 'lostpointercapture', 'reset', 'blur']) {
-    const game = setup();
-    const down = new Event('pointerdown'); Object.assign(down, { button: 0, pointerId: 8, pointerType: 'mouse', clientX: 100, clientY: 100 });
-    game.canvas.dispatchEvent(down); assert.equal(game.firing.at(-1), true);
-    if (stop === 'reset') game.input.reset();
-    else if (stop === 'blur') window.dispatchEvent(new Event('blur'));
-    else {
-      const event = new Event(stop); Object.assign(event, { pointerId: 8 });
-      (stop === 'lostpointercapture' ? game.canvas : window).dispatchEvent(event);
-    }
-    assert.equal(game.firing.at(-1), false, stop);
-  }
-  const game = setup(); game.enable(false); game.pointer('pointerdown');
-  assert.deepEqual(game.firing, []);
+test('paused runners do not begin swipes', () => {
+  const game = setup();
+  game.enable(false);
+  game.pointer('pointerdown');
+  game.enable(true);
+  game.pointer('pointermove', 140);
+  assert.deepEqual(game.steps, []);
 });
 
 test('horizontal joystick steps promptly, repeats while held and resets on neutral, reversal and pause', () => {

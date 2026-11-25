@@ -15,14 +15,14 @@ export const senateSquareMap = {
   name: 'Senate Square',
   spawn: { x: -5.5, z: 6.8, heading: Math.PI },
   bounds: { minX: -34, maxX: 34, minZ: -19.5, maxZ: 34 },
-  // Each walk starts behind a building and leads into the starting square.
+  // Hidden entrances lead around the cathedral and the neighbouring blocks.
   pedestrianRoutes: [
     [[-11, 23], [-9, 12], [-8, 11], [-9, 5], [-11, 1]],
-    [[-1, 23], [-1, 21], [-8, 11], [-9, 6], [-11, 2]],
-    [[-1, -9], [-5, -9], [-6, 2], [-8.5, 5], [-9, 10]],
-    [[-11, 26], [-11, 14], [-8, 11], [-9, 5], [-11, 1]],
-    [[-1, 26], [-1, 21], [-8, 11], [-9, 6], [-12, 1]],
-    [[2, -9], [-5, -9], [-6, 2], [-8.5, 5], [-9, 11]],
+    [[-1, 23], [-1, 21], [1, 19], [1, 17], [9, 16], [17, 13], [25, 13]],
+    [[-1, -9], [-5, -9], [-12, -10], [-15, -13], [-19, -13], [-22, -10]],
+    [[-11, 26], [-11, 14], [-21, 16], [-26, 13]],
+    [[-1, 26], [-1, 21], [-1, 19], [0, 20], [4, 19], [9, 20]],
+    [[2, -9], [5, -9], [10, -9], [16, -7], [18, -7], [20, -8]],
   ],
   pickups: {
     sleigh: [{ x: 5, z: 30.8 }],
@@ -251,10 +251,9 @@ function buildSenateSquare(root) {
     dynamicColliders: () => tram.root.visible ? [tram.collider] : [],
     reset() { tram.reset(); tramCell = null; },
     update(dt, actors, navigation) {
-      const departed = tram.update(dt, actors, navigation);
+      tram.update(dt, actors, navigation);
       const occupied = tram.root.visible ? Math.floor(tram.root.position.x) : null;
       if (occupied !== tramCell) { tramCell = occupied; navigation.refresh(); }
-      return departed ? 'TRAM APPROACHING' : null;
     },
   };
 }

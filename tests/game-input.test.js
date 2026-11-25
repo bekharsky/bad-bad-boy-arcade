@@ -19,21 +19,27 @@ function setup({ aiming = false } = {}) {
   canvas.focus = () => { document.activeElement = canvas; };
   const movementZone = {};
   const movementHandle = { getBoundingClientRect: () => ({ left: 24, right: 112, top: 680, bottom: 768 }) };
-  let interactive = true, firing = false, bursts = 0, shotAim, mouseShot;
+  let interactive = true, firing = false, airborne = false, bursts = 0, shotAim, mouseShot, upwardTap;
   const mouseAim = createMouseAim({ canvas });
   mouseAim.setEnabled(aiming);
   const input = bindGameInput({
     canvas, movementZone, movementHandle,
     canInteract: () => interactive,
-    setFiring: value => { firing = value; },
-    beginSpray: mouse => { bursts++; mouseShot = mouse; shotAim = mouseAim.aiming ? { ...mouseAim.position } : null; },
+    setFiring: (value, up) => { firing = value; airborne = up; },
+    beginSpray: (mouse, up) => {
+      bursts++;
+      mouseShot = mouse;
+      upwardTap = up;
+      shotAim = mouseAim.aiming ? { ...mouseAim.position } : null;
+    },
     pointMouseAim: mouseAim.point,
   });
   return {
     canvas, movementZone,
     reset: input.reset,
     setInteractive(value) { interactive = value; },
-    firing: () => firing, bursts: () => bursts, shotAim: () => shotAim, mouseShot: () => mouseShot,
+    firing: () => firing, airborne: () => airborne, upwardTap: () => upwardTap,
+    bursts: () => bursts, shotAim: () => shotAim, mouseShot: () => mouseShot,
   };
 }
 
@@ -46,6 +52,7 @@ test('the first mouse press updates the heading before emitting a spray', () => 
   assert.equal(game.bursts(), 1);
   assert.deepEqual(game.shotAim(), { x: 1 / 3, y: .375 });
   assert.equal(game.mouseShot(), true);
+  assert.equal(game.upwardTap(), false);
   assert.equal(document.activeElement, game.canvas);
   pointer(window, 'pointerup');
   assert.equal(game.firing(), false);
@@ -92,38 +99,47 @@ test('returning focus or pressing a screen control restores keyboard focus only 
   assert.equal(document.activeElement, game.canvas);
 });
 
-test('right clicks do not fire, and release, cancellation and exit never leave a stuck spray', () => {
+test('right clicks spray upward and all release paths clear held mouse input', () => {
   const game = setup();
-  pointer(window, 'pointerdown', game.canvas, { button: 2, buttons: 2 });
-  assert.equal(game.bursts(), 0);
-  for (const name of ['pointerup', 'pointercancel', 'pointerout', 'blur']) {
-    pointer(window, 'pointerdown', game.canvas);
+  for (const name of ['pointerup', 'pointercancel', 'pointerout', 'blur', 'lostpointercapture']) {
+    pointer(window, 'pointerdown', game.canvas, { button: 2, buttons: 2 });
     assert.equal(game.firing(), true);
+    assert.equal(game.airborne(), true);
+    assert.equal(game.upwardTap(), true);
     if (name === 'blur') window.dispatchEvent(new Event('blur'));
+    else if (name === 'lostpointercapture') pointer(game.canvas, name);
     else pointer(window, name);
     assert.equal(game.firing(), false);
+    assert.equal(game.airborne(), false);
   }
 });
 
-test('secondary buttons on the map do not trigger gameplay or open the browser menu', () => {
+test('right click fires over the movement zone and suppresses context menus only during gameplay', () => {
   const game = setup({ aiming: true });
-  for (const [button, buttons] of [[2, 2], [1, 4]]) {
-    pointer(window, 'pointerdown', game.movementZone, { button, buttons });
-    assert.equal(game.firing(), false);
-    assert.equal(game.bursts(), 0);
-  }
+  pointer(window, 'pointerdown', game.movementZone, { button: 1, buttons: 4 });
+  assert.equal(game.bursts(), 0);
+  pointer(window, 'pointerdown', game.movementZone, { button: 2, buttons: 2 });
+  assert.equal(game.airborne(), true);
+  assert.equal(game.bursts(), 1);
   assert.equal(pointer(window, 'contextmenu', game.movementZone).defaultPrevented, true);
+  game.setInteractive(false);
+  assert.equal(pointer(window, 'contextmenu', game.canvas).defaultPrevented, false);
 });
 
-test('a held spray ends on left-button release or gameplay reset', () => {
+test('right takes precedence while both buttons are held and releasing either keeps the other active', () => {
   const game = setup({ aiming: true });
   pointer(window, 'pointerdown', game.canvas);
   pointer(window, 'pointermove', game.canvas, { buttons: 3 });
   assert.equal(game.firing(), true);
-  assert.equal(game.bursts(), 1);
+  assert.equal(game.airborne(), true);
+  assert.equal(game.bursts(), 2);
   pointer(window, 'pointermove', game.canvas, { buttons: 2 });
-  assert.equal(game.firing(), false);
-  pointer(window, 'pointerdown', game.canvas);
+  assert.equal(game.firing(), true);
+  assert.equal(game.airborne(), true);
+  pointer(window, 'pointermove', game.canvas, { buttons: 3 });
+  pointer(window, 'pointermove', game.canvas, { buttons: 1 });
+  assert.equal(game.firing(), true);
+  assert.equal(game.airborne(), false);
   game.reset();
   pointer(window, 'pointermove', game.canvas, { buttons: 1 });
   assert.equal(game.firing(), false);

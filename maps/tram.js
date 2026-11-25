@@ -66,13 +66,11 @@ export function createTram(scene, { z: routeZ = 0, display: destinationText = '9
     collider.maxX = root.position.x + 4.75;
   }
   function update(dt, actors, navigation) {
-    let departed = false;
     if (!root.visible) {
       wait -= dt;
-      if (wait > 0) return false;
+      if (wait > 0) return;
       root.visible = true;
       root.position.x = -direction * extent;
-      departed = true;
       dt = -wait;
     }
     const oldX = root.position.x;
@@ -103,7 +101,6 @@ export function createTram(scene, { z: routeZ = 0, display: destinationText = '9
       direction *= -1;
       wait = 8 + Math.random() * 4;
     }
-    return departed;
   }
   reset();
   return { root, collider, update, reset };

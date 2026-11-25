@@ -1,48 +1,61 @@
-const MIN_VISIBLE_TIME = 3;
-const HINTS = {
-  ground: {
-    mouse: 'Move the mouse to aim. Left-click or press Space to spray. Hold for more range.',
-    desktop: 'Press Space to spray forward. Hold for more range.',
-    touch: 'Tap the spray button. Hold for more range.',
-  },
-  gull: {
-    desktop: 'Hold E + fire',
-    touch: 'Drag spray up',
-  },
+const GROUND_HINT_MIN_TIME = 3;
+const ENCOUNTER_HINT_TIME = 4;
+const GROUND_HINTS = {
+  mouse: 'Hold fire for more range.',
+  desktop: 'Press Space to spray forward. Hold for more range.',
+  touch: 'Tap the spray button. Hold for more range.',
 };
 
-export function createSprayTutorial(ground, gull) {
-  let stage = null, elapsed = 0, used = false;
+export function createSprayTutorial(ground, encounter) {
+  const label = encounter.querySelector('.encounter-hint-label');
+  let stage = null, elapsed = 0;
+  let groundElapsed = 0, groundUsed = false;
 
-  function show(message) {
-    const groundMessage = stage === 'ground' ? message : '';
-    const gullMessage = stage === 'gull' ? message : '';
-    if (ground.textContent !== groundMessage) ground.textContent = groundMessage;
-    if (gull.textContent !== gullMessage) gull.textContent = gullMessage;
+  function show(message = '', button) {
+    encounter.hidden = !message;
+    if (button) encounter.dataset.button = button;
+    else delete encounter.dataset.button;
+    if (label.textContent !== message) label.textContent = message;
   }
 
   return {
     reset(active = false) {
-      stage = active ? 'ground' : null;
-      elapsed = 0;
-      used = false;
-      show('');
+      stage = active ? 'waiting' : null;
+      elapsed = groundElapsed = 0;
+      groundUsed = false;
+      ground.textContent = '';
+      show();
     },
-    update(dt, { touch, mouse, firing, airborne, gullVisible }) {
+    update(dt, { touch, mouse, firing, airborne, gooseVisible, gullVisible }) {
       if (!stage) return;
+      const mouseControls = mouse && !touch;
+      groundElapsed += dt;
+      groundUsed ||= firing;
       elapsed += dt;
-      // A gull can replace the ground hint even if the player hasn't sprayed yet.
-      if (stage === 'ground' && elapsed >= MIN_VISIBLE_TIME && gullVisible()) {
+      if (stage === 'waiting' && mouseControls && gooseVisible()) {
+        stage = 'goose';
+        elapsed = 0;
+      }
+      if (stage === 'goose' && (!mouseControls || elapsed >= ENCOUNTER_HINT_TIME || (firing && !airborne))) {
+        stage = 'waiting-for-gull';
+      }
+      if (stage !== 'goose' && stage !== 'gull' && groundElapsed >= GROUND_HINT_MIN_TIME && gullVisible()) {
         stage = 'gull';
         elapsed = 0;
-        used = false;
       }
-      used ||= firing && (stage === 'ground' || airborne);
-      const visible = elapsed < (stage === 'ground' ? 9 : 7) && (!used || elapsed < MIN_VISIBLE_TIME);
-      const hints = HINTS[stage];
-      const desktopHint = mouse ? hints.mouse ?? hints.desktop : hints.desktop;
-      show(visible ? (touch ? hints.touch : desktopHint) : '');
-      if (!visible && stage === 'gull') stage = null;
+
+      const groundVisible = stage !== 'gull' && groundElapsed < 9 && (!groundUsed || groundElapsed < GROUND_HINT_MIN_TIME);
+      const groundMessage = groundVisible ? GROUND_HINTS[touch ? 'touch' : mouseControls ? 'mouse' : 'desktop'] : '';
+      if (ground.textContent !== groundMessage) ground.textContent = groundMessage;
+      if (stage === 'gull') {
+        if (elapsed >= ENCOUNTER_HINT_TIME || (firing && airborne)) {
+          stage = null;
+          show();
+        } else if (mouseControls) show('Right click to spray up', 'right');
+        else show(touch ? 'Drag spray up' : 'E + Fire');
+      } else if (stage === 'goose') {
+        show('Left click to spray', 'left');
+      } else show();
     },
   };
 }

@@ -6,7 +6,7 @@ import { disposeObject } from './dispose.js';
 /**
  * A map owns its scenery subtree, collision data, spawn, and pickup anchors.
  * The builder supplies static colliders and optional buildings, dynamicColliders,
- * reset(), and update(dt, actors, navigation), which may return an announcement.
+ * reset(), and update(dt, actors, navigation).
  * Coordinates use world metres; the map root stays at the origin.
  */
 export function createMap(definition, build) {

@@ -5,8 +5,10 @@ import { createTrafficModel } from './runner/traffic-models.js';
 import { animateCameo } from './runner/cameo-models.js';
 import { disposeObject } from './world/dispose.js';
 
-const ARRIVAL_INTERVAL = 5;
-const MAX_GUESTS = 8;
+const FIRST_ARRIVAL_DELAY = 8;
+const ARRIVAL_INTERVAL = 11;
+const MAX_GUESTS = 3;
+const GUEST_SPACING = 7;
 const NOTICE_RANGE = 18;
 
 // The session owns this small pool of civilians across district changes and restarts.
@@ -20,11 +22,11 @@ export function createArenaCameos(scene, world, random = Math.random) {
     return { kind, civilian: true, root, model, materials, size: .55, hitHeight: kind === 'stubb' ? 1.6 : 1.45,
       speed: 3.9 + index * .12, standoff: 2.12 + (index % 4) * .24, glance: .85 + (index % 5) * .19, alive: false };
   });
-  let disposed = false, running = false, untilArrival = ARRIVAL_INTERVAL;
+  let disposed = false, running = false, untilArrival = FIRST_ARRIVAL_DELAY;
 
   function clear() {
     running = false;
-    untilArrival = ARRIVAL_INTERVAL;
+    untilArrival = FIRST_ARRIVAL_DELAY;
     actors.length = 0;
     for (const actor of pool) { actor.alive = false; actor.root.visible = false; }
   }
@@ -37,26 +39,28 @@ export function createArenaCameos(scene, world, random = Math.random) {
     animateCameo(actor.model, actor.gait, moving, viewerYaw, moving && !running, 0, stumbleTime);
   }
 
-  function welcomeGuests(limit, viewPosition, player) {
-    if (disposed || world.mode === 'runner') return;
+  function welcomeGuest(viewPosition, player) {
     const available = pool.filter(actor => !actor.alive);
-    const routes = world.pedestrianRoutes.filter(([[x, z]]) =>
-      (!player || Math.hypot(player.x - x, player.z - z) > player.radius + .8) &&
-      actors.every(actor => Math.hypot(actor.x - x, actor.z - z) > 2 * actor.size));
-    const count = Math.min(limit, available.length, routes.length);
-    for (let index = 0; index < count; index++) {
-      const [route] = routes.splice(Math.floor(random() * routes.length), 1);
-      const [actor] = available.splice(Math.floor(random() * available.length), 1);
-      const [[x, z], [nextX, nextZ]] = route;
-      const heading = Math.atan2(nextX - x, nextZ - z);
-      Object.assign(actor, { x, z, alive: true, fleeing: false, panic: 0, flash: 0, decision: 0, gait: index * .7, nextJetHit: 0,
-        age: -index * .6, heading, route, waypoint: 1, phase: 'arrival', phaseTime: 0, leaveAt: Infinity, escapeFrom: null,
-        runUntilTrip: 3 + (1 - random()) * 26 });
-      actor.root.position.set(actor.x, 0, actor.z); actor.root.rotation.y = actor.heading;
-      setModelAppearance(actor.model, actor.materials, 0, 0);
-      pose(actor, false, false, viewPosition);
-      actors.push(actor);
-    }
+    const routes = world.pedestrianRoutes.filter(route => {
+      const [x, z] = route[0], [endX, endZ] = route.at(-1);
+      return Math.hypot(player.x - x, player.z - z) >= GUEST_SPACING && actors.every(actor => {
+        const [otherX, otherZ] = actor.route.at(-1);
+        return Math.hypot(actor.x - x, actor.z - z) >= GUEST_SPACING
+          && Math.hypot(otherX - endX, otherZ - endZ) >= GUEST_SPACING;
+      });
+    });
+    if (!available.length || !routes.length) return;
+    const route = routes[Math.floor(random() * routes.length)];
+    const actor = available[Math.floor(random() * available.length)];
+    const [[x, z], [nextX, nextZ]] = route;
+    const heading = Math.atan2(nextX - x, nextZ - z);
+    Object.assign(actor, { x, z, alive: true, fleeing: false, panic: 0, flash: 0, decision: 0, gait: 0, nextJetHit: 0,
+      age: 0, heading, route, waypoint: 1, phase: 'arrival', phaseTime: 0, leaveAt: Infinity, escapeFrom: null,
+      runUntilTrip: 3 + (1 - random()) * 26 });
+    actor.root.position.set(actor.x, 0, actor.z); actor.root.rotation.y = actor.heading;
+    setModelAppearance(actor.model, actor.materials, 0, 0);
+    pose(actor, false, false, viewPosition);
+    actors.push(actor);
   }
 
   function moveWithRoom(actor, player, dx, dz) {
@@ -132,11 +136,7 @@ export function createArenaCameos(scene, world, random = Math.random) {
         if (actor.decision > 0) break;
         actor.decision = .2;
         if (actor.phaseTime >= actor.glance && distance < NOTICE_RANGE && world.lineClear(actor.x, actor.z, player.x, player.z, actor.size)) {
-          let nearbyGuests = 0;
-          for (const guest of actors) {
-            if (guest.phase === 'approach' || guest.phase === 'watch') nearbyGuests++;
-          }
-          if (nearbyGuests < 2) changePhase(actor, 'approach');
+          if (!actors.some(guest => guest.phase === 'approach' || guest.phase === 'watch')) changePhase(actor, 'approach');
         } else if (actor.phaseTime > 5) beginDeparture(actor);
         break;
       case 'approach': {
@@ -178,7 +178,6 @@ export function createArenaCameos(scene, world, random = Math.random) {
     for (let i = actors.length - 1; i >= 0; i--) {
       const actor = actors[i];
       actor.age += dt;
-      if (actor.age <= 0) continue;
       actor.root.visible = true;
       actor.panic = Math.max(0, actor.panic - dt); actor.flash = Math.max(0, actor.flash - dt);
       const oldX = actor.x, oldZ = actor.z;
@@ -223,15 +222,14 @@ export function createArenaCameos(scene, world, random = Math.random) {
     }
     untilArrival -= dt;
     if (untilArrival <= 0) {
-      if (actors.length < MAX_GUESTS) welcomeGuests(1, viewPosition, player);
+      if (actors.length < MAX_GUESTS) welcomeGuest(viewPosition, player);
       untilArrival = ARRIVAL_INTERVAL;
     }
   }
 
   return {
     actors, clear, update,
-    reset(viewPosition) { clear(); running = !disposed && world.mode !== 'runner'; welcomeGuests(4, viewPosition); },
-    nextWave(viewPosition) { welcomeGuests(Math.min(2, 6 - actors.length), viewPosition); },
+    reset() { clear(); running = !disposed && world.mode !== 'runner'; },
     splash(actor, direction) {
       if (!actor.alive || !actors.includes(actor)) return false;
       if (actor.phase === 'stumble') { actor.flash = .18; return true; }

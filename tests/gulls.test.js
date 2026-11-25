@@ -112,6 +112,8 @@ test('fixed-step flight and attacks agree across frame rates; idle updates consu
 test('E and the spray stick change height independently of Shift, movement, and firing', () => {
   assert.equal(aimingUp(new Set(['ShiftLeft', 'Space']), {}), false);
   assert.equal(aimingUp(new Set(['KeyE', 'Space']), {}), true);
+  assert.equal(aimingUp(new Set(['Fire', 'FireUp']), {}), true);
+  assert.equal(aimingUp(new Set(), {}, true), true);
   assert.equal(aimingUp(new Set(), { airborne: true }), true);
   const aim = createSprayAim(), player = { x: 0, z: 0, dx: 0, dz: -1 };
   const front = { alive: true, x: 2, z: -5 }, back = { alive: true, x: 0, z: 3 };

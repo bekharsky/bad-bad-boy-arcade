@@ -49,11 +49,22 @@ button { font: inherit; }
 .mouse-aim-enabled #game, .mouse-aim-enabled .joystick-zone { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='17' height='17' viewBox='0 0 17 17'%3E%3Cpath d='M8.5 2v4m0 5v4M2 8.5h4m5 0h4' stroke='%23111620' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='M8.5 2v4m0 5v4M2 8.5h4m5 0h4' stroke='%23fff2d6' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E") 8 8, crosshair; }
 .hero-hud { position: absolute; left: 0; top: 0; width: 64px; height: 7px; pointer-events: none; }
 .hero-power { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 4px; font-size: 13px; font-weight: 800; white-space: nowrap; color: #39ff14; text-shadow: 0 0 6px #39ff14aa; }
-.gull-hint { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 4px; padding: 5px 9px; border-radius: 6px; background: #121622ed; color: var(--gold); font: 700 13px/1.3 Inter, sans-serif; white-space: nowrap; animation: gull-hint-pulse 1.1s ease-in-out infinite; }
-.gull-hint:empty { display: none; }
-.hero-power:not([hidden]) + .gull-hint { margin-bottom: 22px; }
-@keyframes gull-hint-pulse { 50% { opacity: .48; } }
-@media (prefers-reduced-motion: reduce) { .gull-hint { animation: none; } }
+.encounter-hint { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 4px; padding: 5px 9px; border-radius: 6px; background: #121622ed; color: var(--gold); font: 700 13px/1.3 Inter, sans-serif; white-space: nowrap; }
+.hero-power:not([hidden]) + .encounter-hint { margin-bottom: 22px; }
+.mouse-hint-icon { display: block; width: 24px; height: 34px; fill: none; stroke: #fff2d6; stroke-width: 1.6; stroke-linejoin: round; }
+.encounter-hint:not([data-button]) .mouse-hint-icon { display: none; }
+.encounter-hint[data-button] { padding: 5px 7px; border-radius: 9px; }
+.encounter-hint[data-button] .encounter-hint-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.encounter-hint[data-button="left"] .mouse-hint-left, .encounter-hint[data-button="right"] .mouse-hint-right { fill: var(--gold); }
+@keyframes encounter-hint-blink {
+  from { opacity: 1; }
+  50%, to { opacity: 0; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .encounter-hint:not([data-button]),
+  .encounter-hint[data-button="left"] .mouse-hint-left,
+  .encounter-hint[data-button="right"] .mouse-hint-right { animation: encounter-hint-blink 500ms step-end 8 forwards; }
+}
 
 .hud { position: absolute; z-index: 2; top: 0; left: 0; right: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 10px; padding: 10px clamp(16px, 4vw, 54px) 0; pointer-events: none; }
 .passerby { grid-column: 2; grid-row: 1; align-self: center; width: 56px; height: 56px; border: 2px solid #173d35; border-radius: 4px; background: #e7d8aa url('./assets/cameo-portraits.webp') var(--portrait-x) center / auto 100% no-repeat; box-shadow: 0 0 0 1px #ecdeb57a; }
@@ -122,7 +133,7 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 900 clamp(52px, 8vw, 78px
 .toast.visible { transform: translate(-50%, 0); opacity: 1; }
 .spray-tutorial { position: absolute; z-index: 3; left: 50%; bottom: max(32px, calc(env(safe-area-inset-bottom) + 18px)); width: max-content; max-width: calc(100% - 32px); transform: translateX(-50%); padding: 10px 15px; border-radius: 8px; background: #121622ed; color: var(--ink); font: 700 14px/1.4 Inter, sans-serif; text-align: center; pointer-events: none; }
 .spray-tutorial:empty { opacity: 0; }
-.map-changing .spray-tutorial, .game-shell:has(#pause-dialog[open]) :is(.spray-tutorial, .gull-hint) { visibility: hidden; }
+.map-changing .spray-tutorial, .game-shell:has(#pause-dialog[open]) :is(.spray-tutorial, .encounter-hint) { visibility: hidden; }
 .mobile-controls { display: none; }
 .runner-start-hint { display: none; }
 .runner-mode .runner-start-hint { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; margin-top: 20px; color: var(--muted); font-size: 11px; letter-spacing: .08em; }
@@ -185,7 +196,6 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 900 clamp(52px, 8vw, 78px
 .start-controls { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; margin-top: 22px; }
 .start-control { display: grid; justify-items: center; gap: 9px; }
 .start-controls kbd { display: inline-flex; align-items: center; justify-content: center; min-height: 28px; padding: 0 6px; border: 1px solid #ffffff26; border-bottom-width: 3px; border-radius: 5px; color: #e3e0e9; background: linear-gradient(#ffffff0b, #ffffff04); font: 600 11px/1 Inter, sans-serif; white-space: nowrap; }
-.start-controls .start-space-key { min-width: 76px; letter-spacing: .06em; }
 .start-control-label { color: #aaa6b5; font: 700 10px/1 "Barlow Condensed", sans-serif; letter-spacing: .18em; }
 
 @media (max-width: 680px) {
@@ -231,7 +241,6 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 900 clamp(52px, 8vw, 78px
   .menu-sleigh { margin-left: -43px; }
   .start-controls, .runner-mode .runner-start-hint { gap: 8px; }
   .start-controls kbd { padding: 0 4px; font-size: 10px; }
-  .start-controls .start-space-key { min-width: 60px; }
   .runner-mode .runner-start-hint { font-size: 10px; }
   .runner-start-hint kbd { padding: 4px 6px; font-size: 16px; }
 }
@@ -247,10 +256,6 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 900 clamp(52px, 8vw, 78px
   #start-screen .card { --card-padding: 20px; width: min(440px, 100%); }
   #start-screen h1 { margin: 20px 0 0; }
   .pause-dialog .pause-card { --card-padding: 18px; }
-}
-
-@media (pointer: coarse) {
-  .runner-start-hint .runner-keyboard { display: none; }
 }
 
 /* The GPU transition owns the scene while gameplay controls stay hidden. */

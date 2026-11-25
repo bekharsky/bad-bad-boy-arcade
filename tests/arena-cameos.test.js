@@ -18,18 +18,19 @@ const { createLiquidStream } = await import('../liquid.js');
 const { createCampaign, createWaveDirector } = await import('../waves.js');
 const { createGameCamera } = await import('../world/game-camera.js');
 
-function fixture() {
-  const scene = new THREE.Scene(), player = { x: 0, z: 0, hp: 5, radius: .7 };
+function fixture({ start = true } = {}) {
+  const scene = new THREE.Scene(), player = { x: 0, z: 2, hp: 5, radius: .7 };
   const world = { ...createNavigation({ bounds: { minX: -25, maxX: 25, minZ: -25, maxZ: 25 } }), mode: 'arena',
-    pedestrianRoutes: [-4, 0, 4, 8].map(x => [[x, -6], [x, 1]]) };
+    pedestrianRoutes: [0, -8, 8, 16].map(x => [[x, -6], [x, 1]]) };
   const cameos = createArenaCameos(scene, world, () => 0); cameos.reset();
+  if (start) cameos.update(8, player);
   return { scene, world, player, cameos };
 }
 
 test('passers-by walk towards the square and stay calm close to the player', () => {
   const { player, cameos } = fixture();
-  assert.deepEqual(cameos.actors.map(actor => actor.kind), ['purra', 'orpo', 'marin', 'stubb']);
-  const walker = cameos.actors[1];
+  assert.deepEqual(cameos.actors.map(actor => actor.kind), ['purra']);
+  const walker = cameos.actors[0];
   player.z = -4;
   const plans = [], enemies = [];
   const waves = createWaveDirector({ campaign: createCampaign(['harbor']), onWave: plan => plans.push(plan.number), onReinforcements() {} });
@@ -44,34 +45,37 @@ test('passers-by walk towards the square and stay calm close to the player', () 
     assert.equal(actor.civilian, true); assert.equal(actor.alive, true);
   }
   assert.equal(player.hp, 5); assert.deepEqual(plans, [1, 2]);
-  assert.equal(cameos.actors.length, 4, 'The next wave needs no civilian to be sprayed');
+  assert.equal(cameos.actors.length, 1, 'The next wave needs no civilian to be sprayed');
   cameos.dispose();
 });
 
-test('the second arena wave brings fresh guests through clear entrances', () => {
-  const { cameos, player } = fixture();
-  const first = [...cameos.actors];
-  cameos.nextWave();
-  assert.equal(cameos.actors.length, 4, 'Occupied entrances are skipped');
-  for (let frame = 0; frame < 240; frame++) cameos.update(1 / 60, player);
-  cameos.nextWave();
-  assert.deepEqual(cameos.actors.slice(0, 4), first);
-  assert.equal(new Set(cameos.actors.map(actor => actor.kind)).size, 6);
-  cameos.nextWave();
-  assert.equal(cameos.actors.length, 6);
+test('arena guests arrive individually after a quiet opening and use separate routes', () => {
+  const { cameos, player } = fixture({ start: false });
+  cameos.update(7.5, player);
+  assert.equal(cameos.actors.length, 0);
+  cameos.update(.5, player);
+  assert.equal(cameos.actors.length, 1);
+  const [first] = cameos.actors;
+  cameos.update(10.5, player);
+  assert.equal(cameos.actors.length, 1);
+  cameos.update(.5, player);
+  assert.equal(cameos.actors.length, 2);
+  assert.equal(cameos.actors[0], first);
+  assert.notEqual(cameos.actors[1].route, first.route);
+  assert.ok(Math.hypot(first.x - cameos.actors[1].x, first.z - cameos.actors[1].z) >= 7);
   cameos.dispose();
 });
 
 test('a politician repeatedly runs up, watches the hero, and backs off without contact', () => {
   const { player, cameos } = fixture();
   player.z = 6;
-  const guest = cameos.actors[1], phases = [];
+  const guest = cameos.actors[0], phases = [];
   for (let frame = 0; frame < 1200; frame++) {
     const oldDistance = Math.hypot(guest.x - player.x, guest.z - player.z);
     const phase = guest.phase;
     cameos.update(1 / 60, player, { x: 20, z: -5 });
     const engaging = cameos.actors.filter(actor => actor.phase === 'approach' || actor.phase === 'watch');
-    assert.ok(engaging.length <= 2);
+    assert.ok(engaging.length <= 1);
     if (guest.phase !== phase) phases.push(guest.phase);
     const distance = Math.hypot(guest.x - player.x, guest.z - player.z);
     assert.ok(distance >= guest.standoff - 1e-8);
@@ -87,7 +91,7 @@ test('a politician repeatedly runs up, watches the hero, and backs off without c
 test('a running guest falls flat, gets up, retreats, and comes back to the hero', () => {
   const { player, cameos } = fixture();
   player.z = 6;
-  const guest = cameos.actors[1];
+  const guest = cameos.actors[0];
   const advanceTo = phase => {
     for (let i = 0; i < 1200 && guest.phase !== phase; i++) cameos.update(1 / 60, player);
     assert.equal(guest.phase, phase);
@@ -112,9 +116,10 @@ test('a running guest falls flat, gets up, retreats, and comes back to the hero'
 test('Central Station guests can repeat the approach from their routes while the hero stays at spawn', () => {
   const scene = new THREE.Scene(), world = createMapManager(scene, maps);
   world.activate('central-station');
-  const cameos = createArenaCameos(scene, world, () => .95);
+  const cameos = createArenaCameos(scene, world, () => 0);
   const player = { ...world.spawn, hp: 5, radius: .74, root: new THREE.Group() };
   cameos.reset();
+  cameos.update(8, player);
   const firstGuests = [...cameos.actors], visits = new Map();
   for (let frame = 0; frame < 44 * 60; frame++) {
     const phases = firstGuests.map(actor => actor.phase);
@@ -131,7 +136,7 @@ test('Central Station guests can repeat the approach from their routes while the
 
 test('splashing is optional and only triggers a temporary reaction, never a kill', () => {
   const { scene, world, player, cameos } = fixture();
-  const actor = cameos.actors[1], emitter = new THREE.Object3D();
+  const actor = cameos.actors[0], emitter = new THREE.Object3D();
   cameos.update(1, player);
   emitter.position.set(actor.x, 1.25, 0);
   let hits = 0;
@@ -144,7 +149,7 @@ test('splashing is optional and only triggers a temporary reaction, never a kill
   assert.equal(actor.fleeing, true);
   assert.ok(actor.z < oldZ - 1, 'The spray sends the pedestrian away from its incoming direction');
   for (let i = 0; i < 100; i++) cameos.splash(actor, { x: 0, z: -1 });
-  assert.equal(actor.alive, true); assert.equal(cameos.actors.length, 4); assert.equal(player.hp, 5);
+  assert.equal(actor.alive, true); assert.equal(cameos.actors.length, 1); assert.equal(player.hp, 5);
   cameos.update(2, { ...player, x: 20, z: 20 });
   assert.equal(actor.flash, 0); assert.equal(actor.panic, 0);
   liquid.clear(); cameos.dispose();
@@ -157,8 +162,9 @@ test('pause, restart and switching to a runner reuse the pool without stale acto
   cameos.update(0, player); assert.deepEqual([actor.x, actor.z, actor.gait], before);
   cameos.splash(actor); actor.nextJetHit = 100;
   cameos.clear(); assert.equal(cameos.actors.length, 0); assert.equal(actor.root.visible, false); assert.equal(cameos.splash(actor), false);
-  cameos.reset(); assert.equal(cameos.actors[0], actor); assert.equal(actor.nextJetHit, 0); assert.equal(actor.panic, 0);
-  world.mode = 'runner'; cameos.reset(); assert.equal(cameos.actors.length, 0);
+  cameos.reset(); cameos.update(8, player);
+  assert.equal(cameos.actors[0], actor); assert.equal(actor.nextJetHit, 0); assert.equal(actor.panic, 0);
+  world.mode = 'runner'; cameos.reset(); cameos.update(30, player); assert.equal(cameos.actors.length, 0);
   world.mode = 'arena'; cameos.reset();
   scene.traverse(node => { if (node.geometry) assert.ok(resources.has(node.geometry)); for (const material of [node.material].flat().filter(Boolean)) assert.ok(resources.has(material)); });
   const disposals = new Map();
@@ -189,17 +195,19 @@ test('each arena samples reachable passers-by and moving trams keep them clear',
       }
     }
     const seen = new Set();
-    for (let attempt = 0; attempt < 30; attempt++) {
+    for (let attempt = 0; attempt < 100; attempt++) {
       cameos.reset();
-      assert.equal(cameos.actors.length, 4, definition.id);
-      assert.equal(new Set(cameos.actors.map(actor => actor.kind)).size, 4);
-      for (const actor of cameos.actors) seen.add(actor.kind);
+      assert.equal(cameos.actors.length, 0, definition.id);
+      cameos.update(8, player);
+      assert.equal(cameos.actors.length, 1, definition.id);
+      seen.add(cameos.actors[0].kind);
     }
     for (const kind of CAMEO_KINDS) assert.ok(seen.has(kind), definition.id + ' ' + kind);
+    cameos.reset();
     let moved = 0, arrivals = 0, departures = 0;
     for (let frame = 0; frame < 3900; frame++) {
       world.update(1 / 60, [player, ...cameos.actors]);
-      if (frame % 240 === 0) {
+      if (cameos.actors.length > 0 && frame % 240 === 0) {
         const actor = cameos.actors[Math.floor(frame / 240) % cameos.actors.length];
         player.x = actor.x; player.z = actor.z;
       }
@@ -212,11 +220,11 @@ test('each arena samples reachable passers-by and moving trams keep them clear',
         else arrivals++;
       }
       departures += [...previous.keys()].filter(actor => !actor.alive).length;
-      assert.ok(cameos.actors.length <= 8);
-      if (frame === 899) assert.ok(arrivals >= 2, definition.id + ' brings in guests during the first wave');
+      assert.ok(cameos.actors.length <= 3);
+      if (frame === 899) assert.equal(arrivals, 1, definition.id + ' introduces guests gradually');
     }
     assert.ok(moved > 20, `${definition.id}: civilians can move through the district`);
-    assert.ok(departures > 0 && arrivals > 4, definition.id + ' keeps welcoming guests as others leave');
+    assert.ok(departures > 0 && arrivals >= 3, definition.id + ' keeps welcoming guests as others leave');
     assert.equal(player.hp, 5);
   }
   cameos.dispose(); world.dispose();

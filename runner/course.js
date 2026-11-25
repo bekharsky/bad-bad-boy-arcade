@@ -19,6 +19,7 @@ export const TRAFFIC_COLORS = Object.freeze(['green', 'blue', 'red']);
 export const TRAFFIC_CAPACITY = 24;
 const PASSERBY_LANE_OFFSET = .85;
 const CAMEO_JOG_SPEED = 2.8;
+const FIRST_BUSY_CAMEO_DISTANCE = 60;
 
 export const ROADWORK_TYPES = Object.freeze(['cone', 'tractor', 'barrier', 'trench']);
 const PROFILES = {
@@ -82,8 +83,10 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
   const encounters = createEncounters({ random, variety, tramChance, roadworks: roadworkKinds.length > 0 });
   const crossings = crossingPoints.map((progress, i) => ({ progress, side: i % 2 ? 1 : -1, phase: 'approach', launched: 0, launchAt: Infinity, nextLaunchAt: Infinity }));
   const maxSpeed = speedLimit * RUNNER_BOOST;
+  const firstCameoDistance = busy ? FIRST_BUSY_CAMEO_DISTANCE : 0;
   const state = { distance: 0, elapsed: 0, speed: startSpeed, cruiseSpeed: startSpeed, throttle: 0, x: lanes[startLane], lane: startLane, invulnerable: 0, passed: 0, cleared: 0, bonus: 0, finished: false, traffic: [], crossings };
-  let nextSpawn = 0, nextId = 0, safeLane = startLane, nextCameo = 0, lastCameoSide = 0, nextGeese = 32;
+  let nextSpawn = 0, nextId = 0, safeLane = startLane, nextCameo = firstCameoDistance, lastCameoSide = 0;
+  let nextGeese = 0; // Start with a goose row, subject to the usual traffic spacing.
   const oldPose = {}, pose = {};
   function arrivalTime(distance) {
     if (distance <= 0) return 0;
@@ -142,7 +145,7 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
       paceTime: canTrip ? 0 : .8,
     });
     // On streets with cross traffic, leave a longer stretch for ordinary traffic.
-    nextCameo = state.distance + (busy ? (crossings.length ? 35 : 26) : (crossings.length ? 56 : 40)) + 10 * varietyRoll;
+    nextCameo = state.distance + (busy ? (crossings.length ? 60 : 52) : (crossings.length ? 56 : 40)) + 10 * varietyRoll;
     return !busy;
   }
   function resetCrossings() {
@@ -156,7 +159,7 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
   function reset() {
     Object.assign(state, { distance: 0, elapsed: 0, speed: startSpeed, cruiseSpeed: startSpeed, throttle: 0, x: lanes[startLane], lane: startLane, invulnerable: 0, passed: 0, cleared: 0, bonus: 0, finished: false });
     encounters.reset(); resetCrossings();
-    state.traffic.length = 0; nextSpawn = 0; nextId = 0; safeLane = startLane; nextCameo = 0; lastCameoSide = 0; nextGeese = 32;
+    state.traffic.length = 0; nextSpawn = 0; nextId = 0; safeLane = startLane; nextCameo = firstCameoDistance; lastCameoSide = 0; nextGeese = 0;
     availableCameos.splice(0, availableCameos.length, ...cameoRiders);
   }
   function row() {

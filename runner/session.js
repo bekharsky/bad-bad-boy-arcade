@@ -37,13 +37,13 @@ export function createRunnerSession({
     player.root.updateMatrixWorld(true);
     player.invulnerable = state.invulnerable;
     const firing = keys.has('Space') || keys.has('Fire') || touchControls.input.firing || player.tapTimer > 0;
-    player.tapTimer = Math.max(0, player.tapTimer - dt);
     world.updateRunner(state, cameraRig.camera?.position);
     if (result.hits && !onDamage(result.hits)) return;
     const busyCrossing = state.crossings.some(crossing => crossing.phase === 'warning' || crossing.phase === 'crossing');
     seagulls.update(dt, player, { scroll: state.speed, attacks: !state.finished && !busyCrossing });
     if (!isPlaying()) return;
     onSpray(dt, firing, state.traffic);
+    player.tapTimer = Math.max(0, player.tapTimer - dt);
     // Report progress after spray so the campaign sees every traffic clear.
     onProgress(state.distance / run.length, state.traffic);
     medkits.update(dt, player, onCollect, state);

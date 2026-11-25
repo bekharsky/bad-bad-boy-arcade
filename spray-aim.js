@@ -1,5 +1,5 @@
-// E changes spray elevation without changing horizontal aim.
-export const aimingUp = (keys, touch) => keys.has('KeyE') || !!touch.airborne;
+// E and the right mouse button change elevation without changing horizontal aim.
+export const aimingUp = (keys, touch, upwardTap = false) => keys.has('KeyE') || keys.has('FireUp') || !!touch.airborne || upwardTap;
 
 export function createSprayAim() {
   const facing = { dx: 0, dz: 1, airborne: false, target: null };

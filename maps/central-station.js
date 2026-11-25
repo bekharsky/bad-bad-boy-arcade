@@ -14,10 +14,10 @@ export const centralStationMap = {
   environment: { background: new THREE.Color('#abc9cb'), fog: new THREE.Fog('#abc9cb', 55, 134) },
   pedestrianRoutes: [
     [[8, -7], [-1.5, -7], [-1.5, 6], [2, 8], [4, 10]],
-    [[14, -8.5], [-3, -8.5], [-3, 6], [1, 9.8]],
-    [[8, -10], [-2, -10], [-5, -8], [-6, 1], [-6, 9]],
+    [[14, -8.5], [22, -10]],
+    [[8, -10], [5, -12], [3, -16], [2, -16], [-8, -18]],
     [[-23, -8], [-10, -8], [-8, -3], [-8, 7], [-4, 10], [-5.5, 12.2], [-5, 19]],
-    [[-20, -10], [-10, -10], [-7, -5], [-6, 8], [-5.5, 19.8]],
+    [[-20, -10], [-10, -10], [-8, -3], [-8, 5], [-13, 7], [-15, 7], [-15, 6], [-20, 7]],
     [[-16, -9], [-10, -9], [-6, -12], [-6, -20], [-10, -27]],
   ],
   pickups: {
@@ -173,10 +173,9 @@ function buildDistrict(root) {
     dynamicColliders: () => tram.root.visible ? [tram.collider] : [],
     reset() { tram.reset(); previousCell = null; },
     update(dt, actors, navigation) {
-      const departing = tram.update(dt, actors, navigation);
+      tram.update(dt, actors, navigation);
       const cell = tram.root.visible ? Math.floor(tram.root.position.x) : null;
       if (cell !== previousCell) { navigation.refresh(); previousCell = cell; }
-      return departing ? 'TRAM APPROACHING' : null;
     },
   };
 }

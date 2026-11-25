@@ -1,7 +1,9 @@
-const FIRE_BUTTON = 1;
+const LEFT_BUTTON = 1;
+const RIGHT_BUTTON = 2;
+const FIRE_BUTTONS = LEFT_BUTTON | RIGHT_BUTTON;
 
 export function bindGameInput({ canvas, movementZone, movementHandle, canInteract, setFiring, beginSpray, pointMouseAim }) {
-  let firing = false;
+  let buttons = 0;
 
   function focusGame() {
     if (canInteract()) canvas.focus({ preventScroll: true });
@@ -15,26 +17,38 @@ export function bindGameInput({ canvas, movementZone, movementHandle, canInterac
   }
 
   function reset() {
-    if (!firing) return;
-    firing = false;
-    setFiring(false);
+    if (!buttons) return;
+    buttons = 0;
+    setFiring(false, false);
+  }
+
+  function updateButtons(event) {
+    const next = event.buttons & FIRE_BUTTONS;
+    if (next === buttons) return;
+    const airborne = !!(next & RIGHT_BUTTON);
+    const startsSpray = next && (!buttons || (airborne && !(buttons & RIGHT_BUTTON)));
+    buttons = next;
+    setFiring(!!next, airborne);
+    if (startsSpray) {
+      pointMouseAim(event);
+      beginSpray(true, airborne);
+    }
   }
 
   window.addEventListener('pointerdown', event => {
     focusGame();
-    if (event.pointerType !== 'mouse' || event.button !== 0 || !canInteract() || !onPlayfield(event)) return;
+    if (event.pointerType !== 'mouse' || (event.button !== 0 && event.button !== 2) || !canInteract() || !onPlayfield(event)) return;
     event.preventDefault();
     // The transparent joystick zone covers part of the playfield.
     if (event.target === movementZone) event.stopPropagation();
-    pointMouseAim(event);
-    firing = true;
-    setFiring(true);
-    beginSpray(true);
+    updateButtons(event);
   }, true);
   window.addEventListener('focus', focusGame);
   window.addEventListener('pointermove', event => {
-    // With another mouse button held, releasing left may arrive as pointermove.
-    if (firing && event.pointerType === 'mouse' && !(event.buttons & FIRE_BUTTON)) reset();
+    // Chorded mouse buttons report additional presses and releases as pointermove.
+    if (!buttons || event.pointerType !== 'mouse') return;
+    if (canInteract()) updateButtons(event);
+    else reset();
   });
   window.addEventListener('contextmenu', event => {
     if (canInteract() && onPlayfield(event)) event.preventDefault();
@@ -44,6 +58,9 @@ export function bindGameInput({ canvas, movementZone, movementHandle, canInterac
       if (event.pointerType === 'mouse') reset();
     });
   }
+  canvas.addEventListener('lostpointercapture', event => {
+    if (event.pointerType === 'mouse') reset();
+  });
   window.addEventListener('pointerout', event => {
     if (event.pointerType === 'mouse' && !event.relatedTarget) reset();
   });

@@ -1,8 +1,7 @@
-export function bindRunnerInput({ canvas, canInteract, dodge, setFiring = () => {}, beginSpray = () => {} }) {
-  let swipe = null, firePointer = null;
+export function bindRunnerInput({ canvas, canInteract, dodge }) {
+  let swipe = null;
   canvas.addEventListener('pointerdown', event => {
     if (!canInteract() || event.button !== 0) return;
-    if (event.pointerType === 'mouse') { firePointer = event.pointerId; setFiring(true); beginSpray(); }
     swipe = { id: event.pointerId, x: event.clientX, y: event.clientY, used: false };
     canvas.focus({ preventScroll: true });
     try { canvas.setPointerCapture(event.pointerId); } catch { /* Capture is optional in embedded browsers. */ }
@@ -13,14 +12,8 @@ export function bindRunnerInput({ canvas, canInteract, dodge, setFiring = () => 
     if (Math.abs(dx) < 32 || Math.abs(dx) < Math.abs(dy)) return;
     swipe.used = true; dodge(Math.sign(dx));
   });
-  const stopFiring = event => {
-    if (event && event.pointerId !== firePointer) return;
-    firePointer = null; setFiring(false);
-  };
-  for (const name of ['pointerup', 'pointercancel']) window.addEventListener(name, stopFiring);
-  canvas.addEventListener('lostpointercapture', stopFiring);
-  const reset = () => { swipe = null; stopFiring(); };
-  for (const name of ['pointerup', 'pointercancel', 'lostpointercapture']) canvas.addEventListener(name, () => { swipe = null; });
+  const reset = () => { swipe = null; };
+  for (const name of ['pointerup', 'pointercancel', 'lostpointercapture']) canvas.addEventListener(name, reset);
   window.addEventListener('blur', reset);
   document.addEventListener('visibilitychange', reset);
   return { reset };

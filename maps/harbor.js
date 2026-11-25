@@ -17,13 +17,13 @@ export const harborMap = {
   environment: { background: new THREE.Color('#376b7c'), fog: null },
   spawn: { x: -5, z: 7, heading: Math.PI / 2 },
   bounds: { minX: -27.8, maxX: 27.8, minZ: -27.8, maxZ: 27.8 },
-  // Each walk starts behind a building and leads into the starting square.
+  // Hidden entrances lead into separate streets around the district.
   pedestrianRoutes: [
     [[-12, 2], [-9, 3], [-8, 4], [-2, 3], [3, 2]],
-    [[-16, -1], [-12, 0], [-8, 4], [-3, 3.6], [4, 4]],
-    [[-5, 18], [-5, 16], [-7, 11], [-7.5, 7], [-8.5, 4]],
-    [[4, 18], [-3, 11], [-2, 7], [-1, 3.5], [3, 1]],
-    [[-8, 18], [-5, 18], [-5, 16], [-7, 11], [-7.5, 7.5], [-9, 5]],
+    [[-16, -1], [-22, -2]],
+    [[-5, 18], [-2, 18], [-1, 22], [-1, 26]],
+    [[4, 18], [4, 15], [8, 12], [15, 11], [20, 11]],
+    [[-8, 18], [-9, 18], [-14, 16], [-17, 13], [-22, 12]],
   ],
   pickups: {
     sleigh: [{ x: 24.4, z: 6.3 }],
@@ -358,10 +358,9 @@ function buildHarbor(scene) {
     update(dt, entities, navigation) {
       sceneryTime += dt;
       harbor.update(sceneryTime);
-      const departed = tram.update(dt, entities, navigation);
+      tram.update(dt, entities, navigation);
       const occupiedCell = tram.root.visible ? Math.floor(tram.root.position.x) : null;
       if (occupiedCell !== tramCell) { tramCell = occupiedCell; navigation.refresh(); }
-      return departed ? 'TRAM APPROACHING' : null;
     },
   };
 }

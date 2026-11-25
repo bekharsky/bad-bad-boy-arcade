@@ -26,7 +26,7 @@ test('both runner maps vary the roadside roster across seeds and agree across fr
       for (const fps of [30, 60]) {
         const run = createRunnerRun({ ...map.runner, random: seeded(seed) });
         const seen = new Set(), appearances = [], geese = new Set(), hazards = new Set();
-        let sharedStreet = false;
+        let sharedStreet = false, lastCameoDistance = null;
         while (!run.state.finished) {
           run.update(1 / fps);
           const cameos = run.state.traffic.filter(agent => isCameo(agent.kind));
@@ -38,8 +38,13 @@ test('both runner maps vary the roadside roster across seeds and agree across fr
           }
           for (const agent of cameos) if (!seen.has(agent.id)) {
             seen.add(agent.id); appearances.push([agent.id, agent.x, agent.kind]);
-            if (appearances.length > 1) assert.ok(agent.x * appearances.at(-2)[1] < 0, 'The next jogger uses the other shoulder');
-            else assert.equal(agent.id, 0, 'The first encounter introduces a jogger before traffic');
+            if (lastCameoDistance === null) {
+              assert.ok(run.state.distance >= 60, 'The opening stretch is clear of joggers');
+            } else {
+              assert.ok(agent.x * appearances.at(-2)[1] < 0, 'The next jogger uses the other shoulder');
+              assert.ok(run.state.distance - lastCameoDistance >= 51.5, 'Joggers have a stretch of road between appearances');
+            }
+            lastCameoDistance = run.state.distance;
             assert.equal(agent.alive, true);
             assert.equal(Math.abs(agent.x), Math.abs(run.lanes[0]) + .85);
             assert.ok(agent.age < .08);
@@ -47,7 +52,7 @@ test('both runner maps vary the roadside roster across seeds and agree across fr
           }
         }
         assert.ok(sharedStreet && hazards.size >= (map === baanaMap ? 40 : 20), map.id + ' keeps the course busy during cameos');
-        assert.ok(geese.size >= 4 && appearances.length >= 9, map.id + ' regularly introduces geese and guests');
+        assert.ok(geese.size >= 4 && appearances.length >= 8, map.id + ' regularly introduces geese and guests');
         for (let i = 0; i < appearances.length; i += CAMEO_KINDS.length) {
           const cycle = appearances.slice(i, i + CAMEO_KINDS.length);
           assert.equal(new Set(cycle.map(a => a[2])).size, cycle.length);
