@@ -16,7 +16,7 @@ export async function renderScoreCard({ nickname, score, wave }) {
     <g font-family="Barlow Condensed" font-weight="700">
     <text x="56" y="388" font-size="34" fill="#ffcf69">PISS DEAL  /  ${name}  /  DISTRICT ${wave}</text>
     <text x="52" y="516" font-size="112" fill="#fff5de">${points} POINTS</text>
-    <text x="56" y="577" font-size="42" fill="white">Your turn, Helsinki. Beat that run.</text></g></svg>`;
+    <text x="56" y="577" font-size="42" fill="white">Find all 6 parts. Rebuild Santa’s sleigh.</text></g></svg>`;
   const renderer = new Resvg(svg, {font:{fontBuffers:[new Uint8Array(font)]}});
   try {
     const image = renderer.render();
