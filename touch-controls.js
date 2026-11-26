@@ -1,5 +1,5 @@
 // Each control owns its pointer so moving and spraying work with two thumbs.
-export function createTouchControls({ zone, stick, thumb, fireZone, fireButton, fireHome, getAimHeading, onFireStart, onRunnerDodge, onFireCancel = () => {}, onInput = () => {} }) {
+export function createTouchControls({ zone, stick, thumb, fireZone, fireButton, fireHome, getAimHeading, onFireStart, isRunner = () => false, onInput = () => {} }) {
   const radius = 44;
   const deadzone = 0.1;
   const aimDeadzone = 16;
@@ -7,7 +7,6 @@ export function createTouchControls({ zone, stick, thumb, fireZone, fireButton, 
   let enabled = false;
   let movePointer = null, firePointer = null;
   let originX = 0, originY = 0;
-  let fireDodgeX = 0, fireDodgeY = 0, fireSwipe = false;
   let aimBaseX = 0, aimBaseY = 0, homeX = 0, homeY = 0;
   let aimHeading = null, flickX = null;
   const flickSamples = [];
@@ -37,8 +36,6 @@ export function createTouchControls({ zone, stick, thumb, fireZone, fireButton, 
     input.aimX = input.aimZ = 0;
     flickX = null;
     flickSamples.length = 0;
-    fireDodgeX = fireDodgeY = 0;
-    fireSwipe = false;
     aimBaseX = homeX; aimBaseY = homeY;
     fireButton.classList.toggle('returning', !immediate);
     drawAim(0, 0);
@@ -99,6 +96,7 @@ export function createTouchControls({ zone, stick, thumb, fireZone, fireButton, 
   }
 
   function setAim(heading) {
+    if (isRunner()) return;
     aimHeading = heading;
     input.aimX = Math.sin(heading);
     input.aimZ = Math.cos(heading);
@@ -124,6 +122,16 @@ export function createTouchControls({ zone, stick, thumb, fireZone, fireButton, 
     if (flickSamples.at(-1)?.time !== time) flickSamples.push({ x, y, time });
 
     if (flick) {
+      if (isRunner()) {
+        if (flick < 0 && !input.airborne) {
+          flickX = aimBaseX = x;
+          aimBaseY = y;
+          input.airborne = true;
+          fireButton.classList.add('aiming-up');
+          onFireStart(true, null, false);
+        }
+        return;
+      }
       flickX = aimBaseX = x;
       aimBaseY = y;
       drawAim(0, 0);
@@ -135,6 +143,7 @@ export function createTouchControls({ zone, stick, thumb, fireZone, fireButton, 
       }
       return;
     }
+    if (isRunner()) return;
     if (flickX !== null && Math.abs(x - flickX) < aimDeadzone) {
       aimBaseY = y;
       drawAim(x - aimBaseX, 0);
@@ -157,9 +166,6 @@ export function createTouchControls({ zone, stick, thumb, fireZone, fireButton, 
     if (!enabled || firePointer !== null || event.button !== 0 || event.pointerType === 'mouse') return;
     event.preventDefault();
     firePointer = event.pointerId;
-    fireDodgeX = event.clientX;
-    fireDodgeY = event.clientY;
-    fireSwipe = false;
     const homeBounds = fireHome.getBoundingClientRect();
     homeX = homeBounds.left + homeBounds.width / 2;
     homeY = homeBounds.top + homeBounds.height / 2;
@@ -169,7 +175,10 @@ export function createTouchControls({ zone, stick, thumb, fireZone, fireButton, 
     fireButton.classList.remove('returning');
     fireButton.classList.add('pressed');
     fireZone.setPointerCapture(firePointer);
-    setAim(getAimHeading(aimHeading));
+    if (isRunner()) {
+      aimHeading = null;
+      input.aimX = input.aimZ = 0;
+    } else setAim(getAimHeading(aimHeading));
     input.firing = true;
     drawAim(0, 0);
     onInput();
@@ -178,23 +187,6 @@ export function createTouchControls({ zone, stick, thumb, fireZone, fireButton, 
   fireZone.addEventListener('pointermove', event => {
     if (event.pointerId !== firePointer) return;
     event.preventDefault();
-    const dx = event.clientX - fireDodgeX, dy = event.clientY - fireDodgeY;
-    // A horizontal swipe on the firing side is a dodge, not a spray gesture.
-    if (Math.abs(dx) >= 32 && Math.abs(dx) > Math.abs(dy)
-      && onRunnerDodge?.(Math.sign(dx)) === true) {
-      fireDodgeX = event.clientX;
-      fireDodgeY = event.clientY;
-      if (!fireSwipe) {
-        fireSwipe = true;
-        input.firing = false;
-        input.airborne = false;
-        input.aimX = input.aimZ = 0;
-        fireButton.classList.remove('pressed', 'aiming-up');
-        drawAim(0, 0);
-        onFireCancel();
-      }
-    }
-    if (fireSwipe) return;
     aim(event);
   });
   for (const element of [zone, fireZone]) {

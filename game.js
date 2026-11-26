@@ -136,16 +136,7 @@ const touchControls = createTouchControls({
   fireButton: sprayButton,
   fireHome: document.querySelector('#spray-home'),
   getAimHeading: previous => usingTouchControls ? previous ?? player.heading : player.heading,
-  onRunnerDodge(direction) {
-    if (!playing || !isRunner() || pauseDialog.open || gameInterlude()) return false;
-    runnerSession.dodge(direction);
-    return true;
-  },
-  onFireCancel() {
-    player.tapTimer = 0;
-    player.upwardTap = false;
-    player.touchTapHeading = null;
-  },
+  isRunner: () => world.mode === 'runner',
   onFireStart: (airborne, heading, fresh) => beginSpray(false, airborne, heading, fresh),
   onInput() {
     canvas.focus({ preventScroll: true });
@@ -776,16 +767,17 @@ function blip(frequency, duration) {
 }
 
 function updateMovement(dt, firing) {
+  const runner = isRunner();
   const mouseFiring = isMouseFiring();
-  const heading = mouseAim.aiming && (mouseFiring || mouseAim.following) ? Math.atan2(aimOffset.x, aimOffset.z) : null;
+  const heading = !runner && mouseAim.aiming && (mouseFiring || mouseAim.following) ? Math.atan2(aimOffset.x, aimOffset.z) : null;
   return movePlayer(player, world, {
     keys, touch: touchControls.input, dt, firing, height: HERO_HEIGHT,
     speedMultiplier: player.skateTimer > 0 ? SKATE_SPEED_MULTIPLIER : 1,
     cursorHeading: heading,
-    shotHeading: mouseFiring ? heading : null,
-    touchHeading: (usingTouchControls ? touchControls.aimHeading : null)
+    shotHeading: !runner && mouseFiring ? heading : null,
+    touchHeading: runner ? null : (usingTouchControls ? touchControls.aimHeading : null)
       ?? (player.tapTimer > 0 ? player.touchTapHeading : null),
-    steerWithMouse: mouseAim.following,
+    steerWithMouse: !runner && mouseAim.following,
   });
 }
 
@@ -967,7 +959,9 @@ function updateSpray(dt, firing, groundTargets, powered = false) {
 function updateSprayFeedback(spray) {
   updateReticleCharge(mouseAim.enabled ? spray.charge : 0);
   const range = spray.range.toFixed(1);
-  const mode = spray.airborne ? 'Spraying upward; flick down to lower' : `Tap to spray, hold for range, drag to aim. Range ${range} metres. Flick up to spray at birds`;
+  const mode = isRunner()
+    ? spray.airborne ? 'Spraying upward' : `Tap to spray, hold for range. Range ${range} metres. Flick up to spray at birds`
+    : spray.airborne ? 'Spraying upward; flick down to lower' : `Tap to spray, hold for range, drag to aim. Range ${range} metres. Flick up to spray at birds`;
   const label = `${mode}${spray.blocked ? ', blocked' : ''}`;
   sprayButton.dataset.blocked = String(spray.blocked);
   if (sprayZone.getAttribute('aria-label') !== label) sprayZone.setAttribute('aria-label', label);

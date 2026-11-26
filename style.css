@@ -225,9 +225,7 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 800 clamp(38px, 6vw, 58px
 @media (prefers-reduced-motion: no-preference) {
   .fire-button.returning, .fire-button.returning .spray-icon { transition: transform .22s cubic-bezier(.18,.72,.23,1); }
 }
-.spray-up-cue { position: absolute; top: -34px; left: 0; right: 0; color: #fff0beaa; font: 26px/1 sans-serif; pointer-events: none; }
 .fire-button.aiming-up { border-color: #e7f5ff; color: #e7f5ff; }
-.fire-button.aiming-up .spray-up-cue { color: #e7f5ff; }
 .fire-button[data-blocked="true"] { border-color: #ff7952; color: #763b32; }
 .fire-button.pressed .spray-icon { background: #e1b549; color: #332811; box-shadow: 0 0 22px #ffd34e70; }
 .fire-button.aiming-up .spray-icon { background: #dcefff; color: #132a40; box-shadow: 0 0 22px #c4e7ff7a; }
