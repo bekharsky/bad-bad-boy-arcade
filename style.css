@@ -27,6 +27,9 @@ button { font: inherit; }
 .mouse-reticle { position: absolute; z-index: 3; transform: translate(-50%, -50%); fill: none; stroke-linecap: round; pointer-events: none; }
 .mouse-reticle-charge { stroke-dasharray: var(--reticle-charge, 0) 100; stroke-linecap: butt; }
 .cameo-speech { position: absolute; top: 0; left: 0; z-index: 3; width: max-content; max-width: min(182px, calc(100% - 24px)); --speech-padding: 5px 8px; --speech-background: #fff3d8d4; padding: var(--speech-padding); border-radius: 6px; background: var(--speech-background); color: #231c25; box-shadow: 0 2px 5px #1216224d; font: 650 12px/1.24 Inter, sans-serif; text-align: left; overflow-wrap: anywhere; pointer-events: none; }
+@media (min-width: 1024px) and (pointer: fine) {
+  .cameo-speech { max-width: min(300px, calc(100% - 40px)); --speech-padding: 9px 12px; font-size: 16px; line-height: 1.35; }
+}
 .cameo-speech[hidden] { display: none; }
 .cameo-speech::before { content: attr(data-line); display: block; visibility: hidden; }
 .cameo-speech > span { position: absolute; inset: var(--speech-padding); }

@@ -262,15 +262,22 @@ export function createSleighIntro(overlay, { reducedMotion, onImpact, heroModel,
   scene.add(moonlight);
 
   const witnessScene = new THREE.Scene();
-  witnessScene.background = new THREE.Color('#111d31');
-  witnessScene.fog = new THREE.FogExp2('#253550', .012);
+  witnessScene.background = new THREE.Color('#17263b');
+  witnessScene.fog = new THREE.FogExp2('#34455d', .008);
   addSky(witnessScene);
   createWitnessHarbor(witnessScene);
-  witnessScene.add(new THREE.HemisphereLight('#a9c4f5', '#352a35', .86));
-  const witnessMoonlight = new THREE.DirectionalLight('#b7d0f4', .72);
+  witnessScene.add(new THREE.HemisphereLight('#d4e3ff', '#51464c', 1.12));
+  const witnessMoonlight = new THREE.DirectionalLight('#c8d9ff', 1.02);
   witnessMoonlight.position.set(-18, 36, -45);
   witnessScene.add(witnessMoonlight);
-  const witnessHeroLight = new THREE.PointLight('#ffc47e', 26, 13, 1.55);
+  const witnessPartsLight = new THREE.SpotLight('#ffe0b4', 430, 76, .9, .72, 1.35);
+  witnessPartsLight.position.set(5, 22, 1);
+  witnessPartsLight.target.position.set(6, 7, -8);
+  witnessScene.add(witnessPartsLight, witnessPartsLight.target);
+  const witnessPartsBounce = new THREE.PointLight('#ffd19a', 38, 24, 1.6);
+  witnessPartsBounce.position.set(6, 11, -8);
+  witnessScene.add(witnessPartsBounce);
+  const witnessHeroLight = new THREE.PointLight('#ffd09b', 38, 17, 1.45);
   witnessHeroLight.position.set(-8, 3.2, 6.5);
   witnessScene.add(witnessHeroLight);
 
@@ -441,9 +448,9 @@ export function createSleighIntro(overlay, { reducedMotion, onImpact, heroModel,
 
   function frameWitnessCamera() {
     const portrait = witnessCamera.aspect < .8;
-    witnessCamera.fov = portrait ? 58 : 48;
-    witnessCamera.position.set(portrait ? -9 : -10, 3.35, 15);
-    witnessTarget.set(portrait ? -2.5 : -1, 6, -8);
+    witnessCamera.fov = portrait ? 58 : 56;
+    witnessCamera.position.set(portrait ? -9 : -5, portrait ? 2.7 : 2.15, portrait ? 15 : 18);
+    witnessTarget.set(portrait ? -2 : 4.5, portrait ? 6 : 7.5, -8);
     witnessCamera.lookAt(witnessTarget);
     witnessCamera.updateProjectionMatrix();
   }
