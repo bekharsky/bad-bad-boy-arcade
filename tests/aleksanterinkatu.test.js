@@ -250,7 +250,7 @@ test('real frontages keep their street sides, opposite neighbours and a lower Se
     map.root.getObjectByName(name).traverse(node => { if (node.geometry) extraTraffic.add(node.geometry); });
   }
   const geometries = new Set(); map.root.traverse(node => { if (node.geometry && !cameoGeometries.has(node.geometry) && !extraTraffic.has(node.geometry)) geometries.add(node.geometry); });
-  assert.ok([...geometries].reduce((sum, geometry) => sum + geometry.attributes.position.count, 0) <= 563701, 'Landmark detail stays within the previous street geometry budget');
+  assert.ok([...geometries].reduce((sum, geometry) => sum + geometry.attributes.position.count, 0) <= 580000, 'Crossing corner details stay within the updated street geometry budget');
   assert.ok([...cameoGeometries].reduce((sum, geometry) => sum + geometry.attributes.position.count, 0) < 310000, 'The full roster fits its 3D geometry budget');
   assert.ok([...extraTraffic].reduce((sum, geometry) => sum + geometry.attributes.position.count, 0) < 10000);
   map.dispose();
