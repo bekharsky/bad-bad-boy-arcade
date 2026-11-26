@@ -89,6 +89,71 @@ function disposeFadingPieces(pieces) {
   }
 }
 
+function addWitnessHeadBone(model) {
+  const originalSkeleton = model.skeleton;
+  const bodyBone = originalSkeleton?.bones.find(bone => bone.name === 'body');
+  if (!originalSkeleton || !bodyBone) return null;
+
+  const bindMatrix = model.bindMatrix.clone();
+  const position = model.position.clone();
+  const rotation = model.quaternion.clone();
+  const scale = model.scale.clone();
+  const headBone = new THREE.Bone();
+  headBone.name = 'witness-head';
+  headBone.position.y = 1.02;
+  bodyBone.add(headBone);
+
+  // Build the extra joint at unit scale so its inverse bind pose matches the
+  // geometry's local coordinates, then restore the rendered hero transform.
+  model.position.set(0, 0, 0);
+  model.quaternion.identity();
+  model.scale.setScalar(1);
+  model.updateMatrixWorld(true);
+  const bones = [...originalSkeleton.bones, headBone];
+  const skeleton = new THREE.Skeleton(bones);
+  model.bind(skeleton, bindMatrix);
+  originalSkeleton.dispose();
+
+  const positions = model.geometry.getAttribute('position');
+  const skinIndices = model.geometry.getAttribute('skinIndex');
+  const skinWeights = model.geometry.getAttribute('skinWeight');
+  const bodyIndex = bones.indexOf(bodyBone);
+  const headIndex = bones.indexOf(headBone);
+  for (let i = 0; i < positions.count; i++) {
+    const offset = i * 4;
+    if (skinIndices.array[offset] !== bodyIndex) continue;
+    const influence = smoothstep(positions.getY(i), .98, 1.27);
+    const transferred = skinWeights.array[offset] * influence;
+    if (transferred <= .001) continue;
+    skinWeights.array[offset] -= transferred;
+    skinIndices.array[offset + 1] = headIndex;
+    skinWeights.array[offset + 1] = transferred;
+  }
+  skinIndices.needsUpdate = true;
+  skinWeights.needsUpdate = true;
+
+  model.position.copy(position);
+  model.quaternion.copy(rotation);
+  model.scale.copy(scale);
+  model.updateMatrixWorld(true);
+  return headBone;
+}
+
+function softenWitnessMaterial(material) {
+  material.map = null;
+  material.color.set('#a36555');
+  const originalOnBeforeCompile = material.onBeforeCompile;
+  material.onBeforeCompile = shader => {
+    originalOnBeforeCompile(shader);
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        'vec3 clay = mix(vec3(.16,.046,.036), vec3(.82,.45,.32), smoothstep(.08,.89,value));',
+        'vec3 clay = vec3(.48,.22,.18);',
+      )
+      .replace('diffuseColor.rgb = mix(clay, diffuseColor.rgb, .34);', 'diffuseColor.rgb = mix(clay, diffuseColor.rgb, .035);');
+  };
+}
+
 function addSky(scene) {
   const sky = new THREE.Mesh(new THREE.SphereGeometry(410, 24, 16), new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false, toneMapped: false,
@@ -205,7 +270,7 @@ export function createSleighIntro(overlay, { reducedMotion, onImpact, heroModel,
   addSky(witnessScene);
   const witnessDistrict = harborMap.create();
   witnessScene.add(witnessDistrict.root);
-  witnessScene.add(new THREE.HemisphereLight('#d9e6ff', '#776859', 1.3));
+  witnessScene.add(new THREE.HemisphereLight('#d9e6ff', '#776859', 1.45));
   const witnessMoonlight = new THREE.DirectionalLight('#d3def2', 1.05);
   witnessMoonlight.position.set(-18, 42, 15);
   witnessScene.add(witnessMoonlight);
@@ -220,22 +285,24 @@ export function createSleighIntro(overlay, { reducedMotion, onImpact, heroModel,
   const witnessPartsBounce = new THREE.PointLight('#ffd19a', 48, 26, 1.6);
   witnessPartsBounce.position.set(-3.5, 11, -12);
   witnessScene.add(witnessPartsBounce);
-  const witnessHeroLight = new THREE.PointLight('#ffd09b', 55, 18, 1.45);
-  witnessHeroLight.position.set(-5, 3.2, 7);
-  witnessScene.add(witnessHeroLight);
-
   const witnessHero = cloneSkinned(heroModel);
   witnessHero.name = 'Bad Bad Boy watching the sleigh';
   witnessHero.geometry = heroModel.geometry.clone();
   const witnessHeroMaterials = (Array.isArray(heroModel.material) ? heroModel.material : [heroModel.material])
     .map(material => material.clone());
   witnessHero.material = Array.isArray(heroModel.material) ? witnessHeroMaterials : witnessHeroMaterials[0];
+  witnessHeroMaterials.forEach(softenWitnessMaterial);
   witnessHero.position.set(-5, 0, 7);
   witnessHero.rotation.y = Math.atan2(1.5, -26.2);
   witnessHero.scale.copy(heroModel.scale);
+  const witnessHeadBone = addWitnessHeadBone(witnessHero);
   witnessScene.add(witnessHero);
   const witnessCamera = new THREE.PerspectiveCamera(48, 1, .2, 520);
   const witnessTarget = new THREE.Vector3();
+  const witnessLookTarget = new THREE.Vector3();
+  const witnessHeadPosition = new THREE.Vector3();
+  const witnessLookDirection = new THREE.Vector3();
+  const witnessInverseRotation = new THREE.Quaternion();
 
   const sleigh = new THREE.Group();
   scene.add(sleigh);
@@ -379,25 +446,45 @@ export function createSleighIntro(overlay, { reducedMotion, onImpact, heroModel,
     }
   }
 
-  function poseWitness(time) {
+  function poseWitness(time, dt) {
     const scatter = .95 + time * 1.05;
+    witnessLookTarget.set(0, 0, 0);
     for (let i = 0; i < witnessPieces.length; i++) {
       const { pivot, center, velocity, materials } = witnessPieces[i];
+      const verticalVelocity = THREE.MathUtils.clamp(velocity[1], -.8, 1.2);
       pivot.position.set(
         -3.5 + center.x + velocity[0] * scatter,
-        10.5 + center.y + velocity[1] * scatter - 1.04 * scatter ** 2,
+        Math.max(12.4, 20.5 + center.y + verticalVelocity * scatter - scatter ** 2),
         -12 + center.z + velocity[2] * scatter,
       );
       pivot.rotation.set((i % 2 ? 1 : -1) * scatter * (1.2 + i * .24), scatter * (1.7 - i * .58), scatter * (.9 - i * .35));
       fadeModel(pivot, materials, 1 - smoothstep(time, 2.18, 2.75));
+      witnessLookTarget.add(pivot.position);
+    }
+    witnessLookTarget.multiplyScalar(1 / witnessPieces.length);
+
+    if (witnessHeadBone) {
+      witnessHeadPosition.set(
+        witnessHero.position.x,
+        witnessHero.position.y + 1.28 * witnessHero.scale.y,
+        witnessHero.position.z,
+      );
+      witnessLookDirection.subVectors(witnessLookTarget, witnessHeadPosition)
+        .applyQuaternion(witnessInverseRotation.copy(witnessHero.quaternion).invert());
+      const horizontal = Math.hypot(witnessLookDirection.x, witnessLookDirection.z);
+      const yaw = THREE.MathUtils.clamp(Math.atan2(witnessLookDirection.x, witnessLookDirection.z), -.68, .68);
+      const pitch = THREE.MathUtils.clamp(Math.atan2(witnessLookDirection.y, horizontal), -.62, .72);
+      const tracking = reducedMotion ? 5 : 8;
+      witnessHeadBone.rotation.y = THREE.MathUtils.damp(witnessHeadBone.rotation.y, yaw * 1.25, tracking, dt);
+      witnessHeadBone.rotation.x = THREE.MathUtils.damp(witnessHeadBone.rotation.x, -pitch * 1.35, tracking, dt);
     }
   }
 
   function frameWitnessCamera() {
     const portrait = witnessCamera.aspect < .8;
-    witnessCamera.fov = portrait ? 70 : 56;
-    witnessCamera.position.set(portrait ? -5 : 0, 1.65, portrait ? 13.5 : 15);
-    witnessTarget.set(-3.5, 4.5, -14.5);
+    witnessCamera.fov = portrait ? 92 : 68;
+    witnessCamera.position.set(portrait ? -2 : 4, 1.65, portrait ? 13.5 : 15);
+    witnessTarget.set(portrait ? -5.2 : -3.5, 8, -14.5);
     witnessCamera.lookAt(witnessTarget);
     witnessCamera.updateProjectionMatrix();
   }
@@ -417,7 +504,7 @@ export function createSleighIntro(overlay, { reducedMotion, onImpact, heroModel,
       elapsed += dt;
       const time = reducedMotion ? (elapsed < 2.35 ? 3.68 : 5.87) : elapsed * FLIGHT_RATE;
       if (elapsed < witnessStart) pose(time);
-      else poseWitness(elapsed - witnessStart);
+      else poseWitness(elapsed - witnessStart, dt);
       if (!reducedMotion && last * FLIGHT_RATE < IMPACT && time >= IMPACT) {
         impactSparks.burst(droneContact.x, droneContact.y, droneContact.z, '#ffb963', 24, null, 1.75);
         onImpact();
