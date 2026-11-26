@@ -14,21 +14,21 @@ const hidden = (x, z) => ({ x, z, jitter: .25 });
 export const kamppiSquareMap = {
   id: 'kamppi',
   name: 'Kamppi · Amos Rex',
-  spawn: { x: -20, z: 38, heading: Math.PI * .75 },
+  spawn: { x: -20, z: 34, heading: Math.atan2(3, 1) },
   bounds: { minX: -43, maxX: 43, minZ: -43, maxZ: 68.5 },
-  openingCameoRoute: [[-17, 31], [-16, 31]],
+  openingCameoRoute: [[-17, 28], [-19.2, 33]],
   // Hidden entrances lead into and around Narinkkatori.
   pedestrianRoutes: [
     [[-16, 12], [-13, 8], [-10, 7], [-6, 4], [2, 3.5]],
     [[5, 12], [2, 8], [-1, 6], [-4, 3], [-9, 2]],
-    [[-22, 12], [-24, 16], [-26, 21], [-31, 24]],
+    [[-19.5, 13.5], [-21, 13.5], [-24, 16], [-26, 21], [-31, 24]],
     [[11, 12], [10, 9], [15, 8], [23, 8], [30, 6]],
-    [[-21, 15], [-21, 24], [-14, 24], [-9, 24]],
+    [[-18, 13.5], [-21, 13.5], [-21, 24.2], [-14, 24.2], [-9, 24.2]],
   ],
   pickups: {
-    sleigh: [{ x: -38, z: 4.5 }],
-    medkit: [{ x: -2, z: 6 }, hidden(-12, -39), hidden(-38, 8), hidden(25, 27), hidden(-5, 57.5)],
-    battery: [hidden(12, -39), hidden(-38, 12), hidden(-12.5, 26), hidden(18, 57.5)],
+    sleigh: [{ x: -35, z: 43 }],
+    medkit: [{ x: -2, z: 6 }, hidden(-12, -39), hidden(-16, 8), hidden(25, 27), hidden(-5, 57.5)],
+    battery: [hidden(12, -39), hidden(-12, 8), hidden(-8, 8), hidden(18, 57.5)],
     skates: [{ x: 23, z: 8 }],
   },
   create() { return createMap(kamppiSquareMap, buildKamppi); },
@@ -306,7 +306,7 @@ function buildKamppi(root) {
   const marketLights = [27, 33.2, 39.4, 45.6].map(z => ({
     from: [33.2, 4.4, z], to: [38.3, 4.4, z], sag: .4, spacing: .75, lanternSpacing: 2.8, figureSpacing: 8,
   }));
-  const rinkTree = { x: rinkX, z: rinkFar + 1.6, scale: .56 };
+  const rinkTree = { x: rinkX, z: rinkNear - 3.2, scale: .56 };
 
   const bikeParking = createSceneryModel('Kamppi Narinkkatori bicycle parking');
   for (const z of [-17]) {

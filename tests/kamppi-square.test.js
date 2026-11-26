@@ -95,7 +95,7 @@ test('surrounding city stays outside combat bounds, keeps tram portals clear and
 
 test('both sides of Kasarmi connect the playable squares and the far tram edge', () => {
   const map = kamppiSquareMap.create();
-  for (const point of [{ x: -22, z: 27 }, { x: 35.8, z: 27 }, { x: 0, z: 35 }, { x: 8, z: 43 }, { x: 35, z: 61.5 }, { x: -35, z: 61.5 }]) {
+  for (const point of [{ x: -22, z: 27 }, { x: 35.8, z: 27 }, { x: 0, z: 35 }, { x: 8, z: 43 }, { x: 35.8, z: 61.5 }, { x: -35, z: 61.5 }]) {
     map.routeTo(point.x, point.z);
     const actor = { ...map.spawn };
     for (let step = 0; step < 7000 && Math.hypot(actor.x - point.x, actor.z - point.z) > .5; step++) {
