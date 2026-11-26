@@ -5,7 +5,7 @@ const overlay = Buffer.from(`<svg width="1200" height="630" xmlns="http://www.w3
 <rect y="220" width="1200" height="410" fill="url(#shade)"/>
 <g font-family="sans-serif" font-weight="bold">
 <text x="56" y="398" fill="#ffcf69" font-size="24" letter-spacing="4">PISS DEAL</text>
-<text x="50" y="514" fill="#fff5de" font-size="82" letter-spacing="-3">Santa wrecked his ride.</text>
-<text x="56" y="574" fill="white" font-size="43">Find all 6 sleigh parts.</text>
+<text x="50" y="514" fill="#fff5de" font-size="68" letter-spacing="-2">Help Joulupukki fix his sleigh!</text>
+<text x="56" y="574" fill="white" font-size="43">Find all 6 missing parts.</text>
 </g></svg>`);
 await sharp('art/harbor.jpg').extract({left:155,top:64,width:900,height:473}).resize(1200,630).composite([{input:overlay}]).png().toFile('public/share-card.png');

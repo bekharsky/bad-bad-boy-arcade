@@ -69,7 +69,7 @@ export function bindShareButtons({ gameButton, gameStatus, scoreButton, scoreSta
     try {
       await shareOrCopy({
         title: 'Piss Deal',
-        text: 'Santa wrecked his ride. Find all 6 sleigh parts.',
+        text: 'Help Joulupukki fix his sleigh! Find all 6 missing parts.',
         url: GAME_URL,
       }, GAME_URL, gameStatus, 'Game link copied.');
     } finally {
@@ -99,7 +99,7 @@ export function bindShareButtons({ gameButton, gameStatus, scoreButton, scoreSta
         }
       }
 
-      const message = `${result.nickname} scored ${result.score.toLocaleString()} points in Piss Deal. Santa wrecked his ride. Find all 6 sleigh parts.`;
+      const message = `${result.nickname} scored ${result.score.toLocaleString()} points in Piss Deal. Help Joulupukki fix his sleigh! Find all 6 missing parts.`;
       await shareOrCopy({
         title: `${result.score.toLocaleString()} points in Piss Deal`,
         text: message,
@@ -114,7 +114,7 @@ export function bindShareButtons({ gameButton, gameStatus, scoreButton, scoreSta
         if (navigator.share) {
           await navigator.share({
             title: `${result.score.toLocaleString()} points in Piss Deal`,
-            text: `${result.nickname} scored ${result.score.toLocaleString()} points in Piss Deal. Santa wrecked his ride. Find all 6 sleigh parts.`,
+            text: `${result.nickname} scored ${result.score.toLocaleString()} points in Piss Deal. Help Joulupukki fix his sleigh! Find all 6 missing parts.`,
             url: fallbackUrl,
           });
         } else {
