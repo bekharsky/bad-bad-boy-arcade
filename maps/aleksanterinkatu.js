@@ -9,6 +9,7 @@ import { createAleksiLandmarks, createAleksiFacade as facade, remainingFacadeSpa
 import { createAleksiWaterfront, ALEKSI_SHORE, ALEKSI_TRAM_TURN, aleksiTramRoute } from './aleksi-waterfront.js';
 import { TRAM_CAR_OFFSET, TRAM_CAR_HALF_LENGTH, TRAM_CAR_HALF_WIDTH } from '../runner/tram-route.js';
 import { createAleksiPaving } from './aleksi-paving.js';
+import { addChristmasDecorations } from './christmas-decor.js';
 
 export const ALEKSI_LENGTH = 640;
 export const ALEKSI_CROSSINGS = Object.freeze([140, 280, 420, 560]);
@@ -27,7 +28,7 @@ export function aleksiRoadSpans(from, to) {
 }
 export const aleksanterinkatuMap = {
   id: 'aleksanterinkatu', name: 'Aleksanterinkatu', mode: 'runner',
-  runner: { length: ALEKSI_LENGTH, variety: true, busy: true, cameoShoulder: 6.12, riderKinds: ['bike', 'scooter', 'goose', ...CAMEO_KINDS], lanes: TRAM_LANES, tramChance: .54, tramRoute: aleksiTramRoute, roadworkKinds: ['cone', 'barrier'], crossingPoints: ALEKSI_CROSSINGS, startSpeed: 10.5, speedLimit: 18, acceleration: .12 },
+  runner: { length: ALEKSI_LENGTH, variety: true, busy: true, cameoShoulder: 6.12, riderKinds: ['bike', 'scooter', 'goose', ...CAMEO_KINDS], lanes: TRAM_LANES, tramChance: .72, tramStartDelay: 35, tramRoute: aleksiTramRoute, roadworkKinds: ['cone', 'barrier'], crossingPoints: ALEKSI_CROSSINGS, startSpeed: 10.5, speedLimit: 18, acceleration: .12 },
   spawn: { x: TRAM_LANES[0], z: 0, heading: Math.PI },
   pickups: { medkit: [{ x: TRAM_LANES[0], z: -300 }] },
   bounds: { minX: -5.3, maxX: 5.3, minZ: -150, maxZ: 35 },
@@ -119,6 +120,14 @@ function buildAleksi(root) {
     lamp.position.z = z; lamp.castShadow = false;
     city.add(lamp); lamps.push(lamp);
   }
+  const aleksiWreaths = [], aleksiLights = [];
+  for (let z = 12; z > -642; z -= 24) {
+    aleksiWreaths.push({ x: 0, y: 7.12, z });
+    const apex = [0, 9.45, z];
+    aleksiLights.push({ from: [-8.7, 8.8, z - 4], to: apex, sag: .08, spacing: 1.15 });
+    aleksiLights.push({ from: apex, to: [8.7, 8.8, z + 4], sag: .08, spacing: 1.15 });
+  }
+  addChristmasDecorations(city, { wreaths: aleksiWreaths, strands: aleksiLights });
   lampTemplate.material.dispose();
   city.add(ground.finish({ vertexColors: true }));
   const squares = ALEKSI_CROSSINGS.map((progress, index) => junction(progress, index, paving));

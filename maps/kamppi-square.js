@@ -6,6 +6,7 @@ import { addTree } from './vegetation.js';
 import { createSceneryModel } from './scenery-model.js';
 import { createTram } from './tram.js';
 import { createKamppiCentre, createKamppiChapel, createEntrepreneursMonument, createKasarmi, createLasipalatsi, createLasipalatsiClockTower, createAmosRexMound, createKamppiCityBlock } from './kamppi-landmarks.js';
+import { addChristmasDecorations } from './christmas-decor.js';
 
 const TRAM_Z = 61.5;
 const hidden = (x, z) => ({ x, z, jitter: .25 });
@@ -228,6 +229,10 @@ function buildKamppi(root) {
     }
   }
   root.add(street.finish({ vertexColors: true }));
+  addChristmasDecorations(root, {
+    wreaths: [-11, 11].flatMap(x => [-15, 6].map(z => ({ x, y: 5.05, z }))),
+    strands: [-15, 6].map(z => ({ from: [-11, 6.6, z], to: [11, 6.6, z], sag: .9, spacing: 1.15 })),
+  });
 
   const boundary = createSceneryModel('Kamppi Square boundary');
   const { minX, maxX, minZ, maxZ } = kamppiSquareMap.bounds;
@@ -245,7 +250,7 @@ function buildKamppi(root) {
   }
   root.add(boundary.finish({ vertexColors: true }));
 
-  const tram = createTram(root, { z: TRAM_Z, display: '', extent: 52, initialWait: 7 });
+  const tram = createTram(root, { z: TRAM_Z, display: '', extent: 52, initialWait: 9 });
   let tramCell = null;
   return {
     colliders, buildings,

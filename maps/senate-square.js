@@ -6,6 +6,7 @@ import { addFacadeDetails } from './facade-details.js';
 import { createSceneryModel } from './scenery-model.js';
 import { createTram } from './tram.js';
 import { createCathedral, createCathedralSteps, createAlexanderMonument } from './senate-landmarks.js';
+import { addChristmasDecorations } from './christmas-decor.js';
 
 const TRAM_Z = 14.5;
 const hidden = (x, z) => ({ x, z, jitter: .3 });
@@ -245,8 +246,12 @@ function buildSenateSquare(root) {
   }
   root.add(boundary.finish({ vertexColors: true }));
   root.add(street.finish());
+  addChristmasDecorations(root, {
+    wreaths: [-22, 22].flatMap(x => [-14, -6, 4, 19.5].map(z => ({ x, y: 3.3, z }))),
+    strands: [-9, 8, 19.5].map(z => ({ from: [-22, 5.25, z], to: [22, 5.25, z], sag: 1, spacing: 1.35 })),
+  });
 
-  const tram = createTram(root, { z: TRAM_Z, display: '7', extent: 44, initialWait: 6 });
+  const tram = createTram(root, { z: TRAM_Z, display: '7', extent: 44, initialWait: 8 });
   let tramCell = null;
   return {
     colliders, buildings,

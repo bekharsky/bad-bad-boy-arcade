@@ -68,7 +68,7 @@ function contactFraction(x0, gap0, x1, gap1, width, depth) {
   return enter <= Math.min(1, xFar, zFar) ? enter : null;
 }
 
-export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, riderKinds = ['bike', 'scooter'], lanes = RUN_LANES, tramChance = 0, tramRoute = null, roadworkKinds = ROADWORK_TYPES, crossingPoints = [], startSpeed = 9, speedLimit = 17, acceleration = .08, variety = false, cameoShoulder, busy = false } = {}) {
+export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, riderKinds = ['bike', 'scooter'], lanes = RUN_LANES, tramChance = 0, tramStartDelay = 0, tramRoute = null, roadworkKinds = ROADWORK_TYPES, crossingPoints = [], startSpeed = 9, speedLimit = 17, acceleration = .08, variety = false, cameoShoulder, busy = false } = {}) {
   if (!Number.isFinite(length) || length <= 0) throw new Error('Runner length must be positive');
   if (!Array.isArray(riderKinds) || !riderKinds.length || riderKinds.some(kind => !canSpray(kind))) throw new Error('Runner requires supported rider kinds');
   if (!Array.isArray(lanes) || lanes.length < 2 || lanes.some((x, i) => !Number.isFinite(x) || (i && x <= lanes[i - 1]))) throw new Error('Runner lanes must be ordered positions');
@@ -76,6 +76,7 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
   cameoShoulder ??= roadEdge + 1.5;
   if (!Number.isFinite(cameoShoulder) || cameoShoulder <= roadEdge + PASSERBY_LANE_OFFSET) throw new Error('Runner cameo shoulder must be outside the lanes');
   if (!Number.isFinite(tramChance) || tramChance < 0 || tramChance > 1) throw new Error('Invalid tram chance');
+  if (!Number.isFinite(tramStartDelay) || tramStartDelay < 0) throw new Error('Invalid tram start delay');
   if (tramRoute !== null && typeof tramRoute !== 'function') throw new Error('Invalid tram route');
   if (!Array.isArray(roadworkKinds) || roadworkKinds.some(kind => !ROADWORK_TYPES.includes(kind))) throw new Error('Invalid roadwork kinds');
   if (![startSpeed, speedLimit, acceleration].every(Number.isFinite) || startSpeed <= 0 || speedLimit < startSpeed || acceleration < 0) throw new Error('Invalid runner speed');
@@ -179,7 +180,7 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
     const encounter = encounters.row();
     const choices = [safeLane - 1, safeLane, safeLane + 1].filter(lane => lane >= 0 && lane < lanes.length);
     const goose = hasGeese && state.distance >= nextGeese;
-    const tram = !goose && tramChance > 0 && random() < encounter.tramChance;
+    const tram = !goose && tramChance > 0 && state.distance >= tramStartDelay && random() < encounter.tramChance;
     const roadworks = !goose && !tram && roadworkKinds.length > 0 && (variety ? random() < encounter.roadworkChance + (busy ? .1 : 0) : choose(4) === 0);
     const speed = tram ? 7.5 : roadworks ? 0 : goose ? 3.35 : encounter.riderSpeed;
     // Reserve arrival times, not world-space spacing: parked roadworks and
