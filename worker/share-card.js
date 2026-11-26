@@ -10,19 +10,16 @@ export async function renderScoreCard({ nickname, score }) {
   const name = nickname.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
   const points = Number(score).toLocaleString('en');
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1200" height="630">
-    <image width="1200" height="630" xlink:href="${background}"/>
-    <path fill="#26221d" d="M645 0H1200V630H596Z"/>
+    <image y="-54" width="1200" height="630" xlink:href="${background}"/>
+    <path fill="#26221d" d="M0 448L1200 463V630H0Z"/>
+    <path fill="#b03225" d="M40 32H247L242 94H35Z"/>
     <g font-family="Barlow Condensed" font-weight="700">
-      <path fill="#b03225" d="M40 36H247L242 96H35Z"/>
-      <text x="54" y="82" font-size="46" fill="#fff0cb">PISS DEAL</text>
-      <text x="681" y="93" font-size="40" fill="#fff0cb">${name}</text>
-      <path d="M681 121H1153" stroke="#ffce75" stroke-width="2"/>
-      <text x="675" y="286" font-size="${Math.min(148, Math.floor(880 / points.length))}" fill="#ffce75">${points}</text>
-      <text x="682" y="337" font-size="38" letter-spacing="4" fill="#ffce75">POINTS</text>
-      <path d="M681 384H1153" stroke="#8f8068" stroke-width="2"/>
-      <text x="679" y="456" font-size="51" fill="#fff0cb">Bad Bad Boy needs you.</text>
-      <text x="679" y="511" font-size="51" fill="#fff0cb">Find all 6 sleigh parts.</text>
-      </g></svg>`;
+      <text x="55" y="80" fill="#fff0cb" font-size="48">PISS DEAL</text>
+      <text x="43" y="528" fill="#fff0cb" font-size="54">Bad Bad Boy needs you.</text>
+      <text x="44" y="584" fill="#ffce75" font-size="38">Find Joulupukki’s 6 sleigh parts.</text>
+      <text x="1156" y="511" text-anchor="end" fill="#fff0cb" font-size="36">${name}</text>
+      <text x="1156" y="592" text-anchor="end" fill="#ffce75" font-size="${points.length > 9 ? 55 : 78}">${points} POINTS</text>
+    </g></svg>`;
   const renderer = new Resvg(svg, {font:{fontBuffers:[new Uint8Array(font)]}});
   try {
     const image = renderer.render();
