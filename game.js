@@ -132,7 +132,6 @@ const touchControls = createTouchControls({
   zone: document.querySelector('#joystick-zone'),
   stick: document.querySelector('#joystick'),
   thumb: document.querySelector('#joystick-thumb'),
-  home: document.querySelector('.joystick-hint'),
   fireZone: sprayZone,
   fireButton: sprayButton,
   fireHome: document.querySelector('#spray-home'),

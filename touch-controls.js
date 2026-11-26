@@ -1,5 +1,5 @@
 // Each control owns its pointer so moving and spraying work with two thumbs.
-export function createTouchControls({ zone, stick, thumb, home, fireZone, fireButton, fireHome, getAimHeading, onFireStart, onRunnerDodge, onFireCancel = () => {}, onInput = () => {} }) {
+export function createTouchControls({ zone, stick, thumb, fireZone, fireButton, fireHome, getAimHeading, onFireStart, onRunnerDodge, onFireCancel = () => {}, onInput = () => {} }) {
   const radius = 44;
   const deadzone = 0.1;
   const aimDeadzone = 16;
@@ -79,13 +79,9 @@ export function createTouchControls({ zone, stick, thumb, home, fireZone, fireBu
     if (!enabled || movePointer !== null || event.button !== 0) return;
     event.preventDefault();
     movePointer = event.pointerId;
+    // Anchor each gesture where the finger lands so its starting position is neutral.
     originX = event.clientX;
     originY = event.clientY;
-    const bounds = home?.getBoundingClientRect();
-    if (bounds && Math.hypot(event.clientX - (bounds.left + bounds.width / 2), event.clientY - (bounds.top + bounds.height / 2)) <= bounds.width / 2) {
-      originX = bounds.left + bounds.width / 2;
-      originY = bounds.top + bounds.height / 2;
-    }
     zone.setPointerCapture(movePointer);
     stick.hidden = false;
     zone.classList.add('engaged');
