@@ -200,13 +200,16 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
     }
     if (arrival > 5 || state.traffic.length + 2 > TRAFFIC_CAPACITY) return;
     const guest = state.traffic.find(agent => isCameo(agent.kind) && !agent.passed);
+    const guestTargetX = guest?.panicSide === undefined
+      ? guest?.jogX ?? guest?.x
+      : guest.panicSide * cameoShoulder;
     const candidates = [];
     for (let lane = 0; lane < lanes.length; lane++) {
       if (!tram && !roadworks && !goose && !regularRiders.length) continue;
       const kind = tram ? 'tram' : roadworks ? roadworkKinds[choose(roadworkKinds.length)] : goose ? 'goose' : regularRiders[choose(regularRiders.length)];
       const profile = trafficProfile(kind), progress = state.distance + arrival * (state.speed + speed) + (tramChance > 0 ? profile.depth : 0);
       if (kind !== 'tram' && progress > length) continue;
-      if (guest && Math.abs(guest.x - lanes[lane]) < profile.width + .55) {
+      if (guest && Math.min(Math.abs(guest.x - lanes[lane]), Math.abs(guestTargetX - lanes[lane])) < profile.width + .55) {
         const gap = progress - guest.progress;
         const arrivalGap = gap - speed * Math.max(1, STUMBLE_DURATION - (guest.stumbleTime ?? STUMBLE_DURATION));
         const clearance = profile.halfLength + 3.5;

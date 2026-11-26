@@ -106,7 +106,7 @@ test('both runners leave a safe path at full brake, boost and changing pace betw
 });
 
 test('trams collide along their full length and cannot be destroyed by spray', () => {
-  const run = createRunnerRun({ ...aleksanterinkatuMap.runner, riderKinds: ['bike'], tramChance: 1, crossingPoints: [], random: () => .2 });
+  const run = createRunnerRun({ ...aleksanterinkatuMap.runner, riderKinds: ['bike'], tramChance: 1, tramStartDelay: 0, crossingPoints: [], random: () => .2 });
   run.update(.01);
   const tram = run.state.traffic[0]; assert.equal(tram.kind, 'tram');
   Object.assign(tram, { lane: run.state.lane, x: run.state.x, progress: run.state.distance + 8.1 });
