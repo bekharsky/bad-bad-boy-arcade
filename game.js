@@ -1105,7 +1105,7 @@ function playFromMenu() {
   }
   introSeen = true;
   try {
-    intro = createSleighIntro(introOverlay, { reducedMotion: reducedMotion.matches, onImpact: () => blip(133, .32) });
+    intro = createSleighIntro(introOverlay, { reducedMotion: reducedMotion.matches, onImpact: () => blip(133, .32), heroModel: player.model });
     intro.resize(canvas.clientWidth, canvas.clientHeight);
     intro.update(0);
     startScreen.classList.add('hidden');

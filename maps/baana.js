@@ -85,7 +85,16 @@ function buildBaana(root) {
     const group = scenery.finish({ vertexColors: true });
     addChristmasDecorations(group, {
       wreaths: [-5.92, 5.92].map(x => ({ x, y: 3.65, z: 0 })),
-      strands: [-12, 0, 12].map(z => ({ from: [-5.5, 8.25, z], to: [5.5, 8.25, z], sag: .65, spacing: .9 })),
+      strands: [
+        ...[-12, 0, 12].map(z => ({
+          from: [-5.5, 8.25, z], to: [5.5, 8.25, z],
+          sag: .65, spacing: .9, lanternSpacing: 2.35, figureSpacing: 6.8,
+        })),
+        ...[-5.5, 5.5].map(x => ({
+          from: [x, 8.25, 12], to: [x, 8.25, -12],
+          sag: .8, spacing: 1, lanternSpacing: 2.65, figureSpacing: 7.2,
+        })),
+      ],
     });
     root.add(group); sections.push(group);
     if (section === 1 || section === 4) {

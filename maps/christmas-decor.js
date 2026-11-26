@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-const LIT_COLORS = ['#ffe6ac', '#ffe6ac', '#f5c15f', '#e35750', '#75a77a'];
+const LIT_COLORS = ['#fff0ba', '#ffd76c', '#fff0ba', '#f5c65a', '#fff0ba'];
 
 function setInstance(mesh, index, position, quaternion, scale) {
   const object = new THREE.Object3D();
@@ -11,9 +11,20 @@ function setInstance(mesh, index, position, quaternion, scale) {
   mesh.setMatrixAt(index, object.matrix);
 }
 
+function addSegment(instances, from, to, radius) {
+  const delta = to.clone().sub(from);
+  const length = delta.length();
+  if (length < 1e-4) return;
+  instances.push({
+    position: from.clone().add(to).multiplyScalar(.5),
+    quaternion: new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), delta.multiplyScalar(1 / length)),
+    scale: new THREE.Vector3(radius, length, radius),
+  });
+}
+
 function addLights(root, strands) {
   if (!strands.length) return;
-  const wireMatrices = [], bulbPositions = [], bulbColors = [];
+  const wireMatrices = [], bulbPositions = [], bulbColors = [], lanternPositions = [];
   const yAxis = new THREE.Vector3(0, 1, 0);
   for (const strand of strands) {
     const from = new THREE.Vector3(...strand.from), to = new THREE.Vector3(...strand.to);
@@ -39,11 +50,19 @@ function addLights(root, strands) {
       }
       previous = point;
     }
-    const count = Math.max(2, Math.floor(length / spacing));
-    for (let bulb = 0; bulb <= count; bulb++) {
-      const t = bulb / count;
+    const bulbCount = Math.max(2, Math.floor(length / spacing));
+    for (let bulb = 0; bulb <= bulbCount; bulb++) {
+      const t = bulb / bulbCount;
       bulbPositions.push(pointAt(t));
       bulbColors.push(LIT_COLORS[bulb % LIT_COLORS.length]);
+    }
+
+    const lanternCount = Math.max(2, Math.floor(length / (strand.lanternSpacing ?? 2.7)));
+    for (let lantern = 0; lantern < lanternCount; lantern++) {
+      const t = (lantern + 1) / (lanternCount + 1);
+      const point = pointAt(t);
+      lanternPositions.push(point);
+      addSegment(wireMatrices, point, point.clone().add(new THREE.Vector3(0, -.075, 0)), .012);
     }
   }
   if (wireMatrices.length) {
@@ -74,6 +93,82 @@ function addLights(root, strands) {
     bulbs.receiveShadow = false;
     root.add(bulbs);
   }
+  if (lanternPositions.length) {
+    const profile = [
+      [.045, 0], [.12, .025], [.17, .09], [.15, .14],
+      [.105, .19], [.16, .24], [.18, .32], [.16, .39],
+      [.105, .44], [.15, .48], [.12, .5], [.045, .52],
+    ].map(([radius, height]) => new THREE.Vector2(radius, height));
+    const lanterns = new THREE.InstancedMesh(
+      new THREE.LatheGeometry(profile, 10),
+      new THREE.MeshStandardMaterial({
+        color: '#ffc943', emissive: '#df8b12', emissiveIntensity: .7,
+        roughness: .45, metalness: .04,
+      }),
+      lanternPositions.length,
+    );
+    lanternPositions.forEach((position, index) => {
+      setInstance(lanterns, index, position.clone().add(new THREE.Vector3(0, -.59, 0)), new THREE.Quaternion(), new THREE.Vector3(1, 1, 1));
+    });
+    lanterns.instanceMatrix.needsUpdate = true;
+    lanterns.castShadow = false;
+    lanterns.receiveShadow = false;
+    root.add(lanterns);
+  }
+}
+
+function addWireFigures(root, strands) {
+  const segments = [];
+  for (const strand of strands) {
+    if (strand.wireFigures === false) continue;
+    const from = new THREE.Vector3(...strand.from), to = new THREE.Vector3(...strand.to);
+    const span = to.clone().sub(from), length = span.length();
+    if (!length) continue;
+    const count = Math.max(1, Math.floor(length / (strand.figureSpacing ?? 6.2)));
+    const direction = span.clone().normalize();
+    const side = new THREE.Vector3().crossVectors(direction, new THREE.Vector3(0, 1, 0)).normalize();
+    if (side.lengthSq() < 1e-6) side.set(1, 0, 0);
+    const pointAt = t => new THREE.Vector3(
+      from.x + span.x * t,
+      from.y + span.y * t - (strand.sag ?? .7) * 4 * t * (1 - t),
+      from.z + span.z * t,
+    );
+    const outer = [[0, .5], [.18, .19], [.46, 0], [.18, -.19], [0, -.5], [-.18, -.19], [-.46, 0], [-.18, .19]];
+    const inner = [[0, .3], [.27, 0], [0, -.3], [-.27, 0]];
+    const makePoints = (center, outline, depth) => outline.map(([x, y]) => center.clone()
+      .addScaledVector(side, x)
+      .add(new THREE.Vector3(0, y, 0))
+      .addScaledVector(direction, depth));
+    const connectLoop = points => {
+      for (let index = 0; index < points.length; index++) addSegment(segments, points[index], points[(index + 1) % points.length], .012);
+    };
+
+    for (let figure = 0; figure < count; figure++) {
+      const anchor = pointAt((figure + (strand.figurePhase ?? .38)) / count);
+      const center = anchor.clone().add(new THREE.Vector3(0, -.69, 0));
+      const frontOuter = makePoints(center, outer, .11), backOuter = makePoints(center, outer, -.11);
+      const frontInner = makePoints(center, inner, .11), backInner = makePoints(center, inner, -.11);
+      connectLoop(frontOuter); connectLoop(backOuter);
+      connectLoop(frontInner); connectLoop(backInner);
+      for (const index of [0, 2, 4, 6]) {
+        addSegment(segments, frontOuter[index], frontInner[index / 2], .011);
+        addSegment(segments, backOuter[index], backInner[index / 2], .011);
+      }
+      for (let index = 0; index < outer.length; index++) addSegment(segments, frontOuter[index], backOuter[index], .011);
+      for (let index = 0; index < inner.length; index++) addSegment(segments, frontInner[index], backInner[index], .011);
+    }
+  }
+  if (!segments.length) return;
+  const figures = new THREE.InstancedMesh(
+    new THREE.CylinderGeometry(1, 1, 1, 5),
+    new THREE.MeshStandardMaterial({ color: '#dba938', roughness: .5, metalness: .28 }),
+    segments.length,
+  );
+  segments.forEach((part, index) => setInstance(figures, index, part.position, part.quaternion, part.scale));
+  figures.instanceMatrix.needsUpdate = true;
+  figures.castShadow = false;
+  figures.receiveShadow = false;
+  root.add(figures);
 }
 
 function addWreaths(root, wreaths) {
@@ -133,6 +228,7 @@ export function addChristmasDecorations(root, { strands = [], wreaths = [] } = {
   const decorations = new THREE.Group();
   decorations.name = 'Christmas decorations';
   addLights(decorations, strands);
+  addWireFigures(decorations, strands);
   addWreaths(decorations, wreaths);
   root.add(decorations);
   return decorations;

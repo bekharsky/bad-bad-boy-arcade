@@ -124,8 +124,13 @@ function buildAleksi(root) {
   for (let z = 12; z > -642; z -= 24) {
     aleksiWreaths.push({ x: 0, y: 7.12, z });
     const apex = [0, 9.45, z];
-    aleksiLights.push({ from: [-8.7, 8.8, z - 4], to: apex, sag: .08, spacing: 1.15 });
-    aleksiLights.push({ from: apex, to: [8.7, 8.8, z + 4], sag: .08, spacing: 1.15 });
+    aleksiLights.push(
+      { from: [-8.7, 8.8, z - 4], to: apex, sag: .08, spacing: 1.05, lanternSpacing: 2.55, figureSpacing: 8 },
+      { from: apex, to: [8.7, 8.8, z + 4], sag: .08, spacing: 1.05, lanternSpacing: 2.55, figureSpacing: 8 },
+      { from: [-8.7, 8.8, z - 4], to: [8.7, 8.8, z + 4], sag: .45, spacing: 1.05, lanternSpacing: 2.7, figureSpacing: 8, wireFigures: false },
+      { from: [-8.7, 8.8, z], to: [-8.7, 8.8, z - 24], sag: .55, spacing: 1.1, lanternSpacing: 3.1, figureSpacing: 9 },
+      { from: [8.7, 8.8, z], to: [8.7, 8.8, z - 24], sag: .55, spacing: 1.1, lanternSpacing: 3.1, figureSpacing: 9 },
+    );
   }
   addChristmasDecorations(city, { wreaths: aleksiWreaths, strands: aleksiLights });
   lampTemplate.material.dispose();

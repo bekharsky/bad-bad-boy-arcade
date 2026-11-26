@@ -248,7 +248,16 @@ function buildSenateSquare(root) {
   root.add(street.finish());
   addChristmasDecorations(root, {
     wreaths: [-22, 22].flatMap(x => [-14, -6, 4, 19.5].map(z => ({ x, y: 3.3, z }))),
-    strands: [-9, 8, 19.5].map(z => ({ from: [-22, 5.25, z], to: [22, 5.25, z], sag: 1, spacing: 1.35 })),
+    strands: [
+      ...[-14, -9, -2, 8, 19.5].map(z => ({
+        from: [-22, 5.25, z], to: [22, 5.25, z],
+        sag: 1, spacing: 1.15, lanternSpacing: 3.1, figureSpacing: 8.5,
+      })),
+      ...[-22, 22].map(x => ({
+        from: [x, 5.25, -14], to: [x, 5.25, 19.5],
+        sag: 1.1, spacing: 1.15, lanternSpacing: 3.1, figureSpacing: 8.5,
+      })),
+    ],
   });
 
   const tram = createTram(root, { z: TRAM_Z, display: '7', extent: 44, initialWait: 8 });

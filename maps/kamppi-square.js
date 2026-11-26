@@ -230,8 +230,17 @@ function buildKamppi(root) {
   }
   root.add(street.finish({ vertexColors: true }));
   addChristmasDecorations(root, {
-    wreaths: [-11, 11].flatMap(x => [-15, 6].map(z => ({ x, y: 5.05, z }))),
-    strands: [-15, 6].map(z => ({ from: [-11, 6.6, z], to: [11, 6.6, z], sag: .9, spacing: 1.15 })),
+    wreaths: [-11, 11].flatMap(x => [-15, -8, 0, 6].map(z => ({ x, y: 5.05, z }))),
+    strands: [
+      ...[-15, -8, 0, 6].map(z => ({
+        from: [-11, 6.6, z], to: [11, 6.6, z],
+        sag: .9, spacing: 1.05, lanternSpacing: 2.6, figureSpacing: 7.5,
+      })),
+      ...[-11, 11].map(x => ({
+        from: [x, 6.6, -15], to: [x, 6.6, 6],
+        sag: .9, spacing: 1.05, lanternSpacing: 2.6, figureSpacing: 7.5,
+      })),
+    ],
   });
 
   const boundary = createSceneryModel('Kamppi Square boundary');

@@ -1,16 +1,16 @@
 import * as THREE from 'three';
+import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { senateSquareMap } from './maps/senate-square.js';
+import { harborMap } from './maps/harbor.js';
 import { createSleighParts } from './models/sleigh.js';
 import { createJoulupukki } from './models/joulupukki.js';
 import { createSceneryModel } from './maps/scenery-model.js';
 import { createBurstEffects } from './burst-effects.js';
 import { disposeObject } from './world/dispose.js';
-import harborPortrait from './assets/intro-harbor-portrait.mp4';
-import harborWide from './assets/intro-harbor-wide.mp4';
 
 const { lerp, smoothstep } = THREE.MathUtils;
 const IMPACT = 4.18, BREAK = 4.8;
-const FLIGHT_RATE = .78, WITNESS_RATE = .68;
+const FLIGHT_RATE = .78;
 const DRONE_SCALE = .76, ROTOR_OFFSET = 1.15, ROTOR_HEIGHT = .30, BLADE_LENGTH = 1.14;
 const debrisVelocity = [
   [-5.1, .75, 1.75], [5.7, 1.45, 3.8], [-2.7, -2.35, -2.6],
@@ -164,7 +164,7 @@ function lightCity(scene) {
   scene.add(flood, flood.target);
 }
 
-export function createSleighIntro(overlay, { reducedMotion, onImpact }) {
+export function createSleighIntro(overlay, { reducedMotion, onImpact, heroModel }) {
   const scene = new THREE.Scene();
   scene.fog = new THREE.FogExp2('#283956', .006);
   const camera = new THREE.PerspectiveCamera(52, 1, .2, 520);
@@ -176,6 +176,31 @@ export function createSleighIntro(overlay, { reducedMotion, onImpact }) {
   const moonlight = new THREE.DirectionalLight('#a9c9ff', .77);
   moonlight.position.set(-22, 42, -53);
   scene.add(moonlight);
+
+  const witnessScene = new THREE.Scene();
+  witnessScene.background = new THREE.Color('#111d31');
+  witnessScene.fog = new THREE.FogExp2('#253550', .012);
+  const witnessDistrict = harborMap.create();
+  witnessScene.add(witnessDistrict.root);
+  addSky(witnessScene);
+  witnessScene.add(new THREE.HemisphereLight('#a9c4f5', '#352a35', .86));
+  const witnessMoonlight = new THREE.DirectionalLight('#b7d0f4', .72);
+  witnessMoonlight.position.set(-18, 36, -45);
+  witnessScene.add(witnessMoonlight);
+  for (const [x, z] of [[-8, 1.1], [8, 1.1], [8, -24.7]]) {
+    const streetGlow = new THREE.PointLight('#ffc47e', 32, 15, 1.55);
+    streetGlow.position.set(x, 3.15, z);
+    witnessScene.add(streetGlow);
+  }
+
+  const witnessHero = cloneSkinned(heroModel);
+  witnessHero.name = 'Bad Bad Boy watching the sleigh';
+  witnessHero.position.set(-8, 0, 8.5);
+  witnessHero.rotation.y = Math.atan2(13.5, -16);
+  witnessHero.scale.copy(heroModel.scale);
+  witnessScene.add(witnessHero);
+  const witnessCamera = new THREE.PerspectiveCamera(48, 1, .2, 520);
+  const witnessTarget = new THREE.Vector3();
 
   const sleigh = new THREE.Group();
   scene.add(sleigh);
@@ -202,6 +227,21 @@ export function createSleighIntro(overlay, { reducedMotion, onImpact }) {
     sleigh.add(pivot);
     return { pivot, center, velocity: debrisVelocity[index], materials: fadeMaterials(model) };
   });
+  const witnessPieces = createSleighParts().map(({ model }, index) => {
+    // The rendered street-level shot owns its fades without changing gameplay's sleigh materials.
+    const ownedMaterials = new Map();
+    model.traverse(node => {
+      if (!node.isMesh) return;
+      if (!ownedMaterials.has(node.material)) ownedMaterials.set(node.material, node.material.clone());
+      node.material = ownedMaterials.get(node.material);
+    });
+    const pivot = new THREE.Group();
+    const center = new THREE.Box3().setFromObject(model).getCenter(new THREE.Vector3());
+    model.position.sub(center);
+    pivot.add(model);
+    witnessScene.add(pivot);
+    return { pivot, center, velocity: debrisVelocity[index], materials: fadeMaterials(model) };
+  });
   const lantern = new THREE.PointLight('#ffcd9b', 94, 15, 1.4);
   sleigh.add(lantern);
   lantern.position.set(3.4, 5.2, 5.2);
@@ -226,7 +266,6 @@ export function createSleighIntro(overlay, { reducedMotion, onImpact }) {
   sleigh.add(wind);
 
   let elapsed = 0;
-  const witness = overlay.querySelector('#intro-witness');
   const witnessStart = reducedMotion ? 3.65 : (BREAK + 1.95) / FLIGHT_RATE;
   const duration = witnessStart + (reducedMotion ? 1.8 : 2.7);
   const color = new THREE.Color('#ffbf73');
@@ -246,12 +285,6 @@ export function createSleighIntro(overlay, { reducedMotion, onImpact }) {
   const flash = new THREE.PointLight('#ffba70', 0, 9);
   flash.position.copy(droneContact);
   scene.add(flash);
-  let witnessSource = '', witnessReady = false;
-  function showWitnessStill() {
-    if (witness.hidden || witness.readyState < 2) return;
-    witness.currentTime = .75;
-    witnessReady = true;
-  }
 
   function poseSleigh(time) {
     const pullBack = smoothstep(time, 4.73, 8.25);
@@ -327,55 +360,60 @@ export function createSleighIntro(overlay, { reducedMotion, onImpact }) {
     }
   }
 
+  function poseWitness(time) {
+    const scatter = .95 + time * 1.05;
+    for (const [i, { pivot, center, velocity, materials }] of witnessPieces.entries()) {
+      pivot.position.set(
+        6 + center.x + velocity[0] * scatter,
+        12 + center.y + velocity[1] * scatter - 1.04 * scatter ** 2,
+        -8 + center.z + velocity[2] * scatter,
+      );
+      pivot.rotation.set((i % 2 ? 1 : -1) * scatter * (1.2 + i * .24), scatter * (1.7 - i * .58), scatter * (.9 - i * .35));
+      fadeModel(pivot, materials, 1 - smoothstep(time, 2.18, 2.75));
+    }
+    const portrait = witnessCamera.aspect < .8;
+    witnessCamera.fov = portrait ? 58 : 48;
+    witnessCamera.position.set(portrait ? -9 : -10, 3.35, 15);
+    witnessTarget.set(portrait ? -2.5 : -1, 6, -8);
+    witnessCamera.lookAt(witnessTarget);
+    witnessCamera.updateProjectionMatrix();
+  }
+
   return {
     resize(width, height) {
       camera.aspect = width / height;
       camera.fov = camera.aspect < .8 ? 57 : 52;
       camera.updateProjectionMatrix();
-      const source = width < height ? harborPortrait : harborWide;
-      if (elapsed < witnessStart && source !== witnessSource) {
-        witnessSource = source;
-        witness.src = source;
-        witness.load();
-      }
+      witnessCamera.aspect = width / height;
+      witnessCamera.fov = witnessCamera.aspect < .8 ? 58 : 48;
+      witnessCamera.updateProjectionMatrix();
     },
     update(dt) {
       const last = elapsed;
       elapsed += dt;
       const time = reducedMotion ? (elapsed < 2.35 ? 3.68 : 5.87) : elapsed * FLIGHT_RATE;
-      if (!witnessReady || elapsed < witnessStart + .24) pose(time);
+      if (elapsed < witnessStart) pose(time);
+      else poseWitness(elapsed - witnessStart);
       if (!reducedMotion && last * FLIGHT_RATE < IMPACT && time >= IMPACT) {
         impactSparks.burst(droneContact.x, droneContact.y, droneContact.z, '#ffb963', 24, null, 1.75);
         onImpact();
       }
       if (!reducedMotion && time >= IMPACT && time < IMPACT + 1) impactSparks.update(dt);
-      if (last < witnessStart && elapsed >= witnessStart) {
-        witness.hidden = false;
-        if (reducedMotion) {
-          if (witness.readyState >= 2) showWitnessStill();
-          else witness.addEventListener('loadeddata', showWitnessStill, { once: true });
-        } else {
-          witness.playbackRate = WITNESS_RATE;
-          witness.play().then(() => { witnessReady = true; }).catch(showWitnessStill);
-        }
-      }
       const fade = Math.max(1 - smoothstep(elapsed, 0, .75), smoothstep(elapsed, duration - .45, duration));
       const cut = reducedMotion ? Math.max(0, 1 - Math.abs(elapsed - 2.35) / .19) : 0;
       overlay.style.setProperty('--intro-shade', Math.max(fade, cut).toFixed(3));
-      overlay.style.setProperty('--witness-opacity', witnessReady ? smoothstep(elapsed, witnessStart, witnessStart + .24).toFixed(3) : '0');
       overlay.style.setProperty('--intro-caption', (smoothstep(elapsed, .6, 1.12) * (1 - smoothstep(elapsed, 2.4, 3.28))).toFixed(3));
       return elapsed >= duration;
     },
     render(renderer) {
-      if (!witnessReady || elapsed < witnessStart + .24) renderer.render(scene, camera);
+      if (elapsed >= witnessStart) renderer.render(witnessScene, witnessCamera);
+      else renderer.render(scene, camera);
     },
     dispose() {
-      witness.pause();
-      witness.hidden = true;
-      witness.removeEventListener('loadeddata', showWitnessStill);
-      witness.removeAttribute('src');
-      witness.load();
-      overlay.style.removeProperty('--witness-opacity');
+      witnessDistrict.dispose();
+      witnessHero.removeFromParent();
+      witnessHero.skeleton?.dispose();
+      disposeObject(witnessScene);
       district.dispose();
       disposeObject(scene);
     },

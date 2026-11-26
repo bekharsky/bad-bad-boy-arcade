@@ -290,9 +290,16 @@ function buildHarbor(scene) {
     lamp(x, -24.7);
   }
   const harborWreaths = [-24, -8, 8, 25].flatMap(x => [1.1, -24.7].map(z => ({ x, y: 2.15, z })));
-  const harborLights = [1.1, -24.7].flatMap(z => [-24, -8, 8].map((x, index) => ({
-    from: [x, 4.65, z], to: [[-8, 8, 25][index], 4.65, z], sag: .7, spacing: 1.15,
-  })));
+  const harborLights = [
+    ...[1.1, -24.7].flatMap(z => [-24, -8, 8].map((x, index) => ({
+      from: [x, 4.65, z], to: [[-8, 8, 25][index], 4.65, z],
+      sag: .7, spacing: 1.05, lanternSpacing: 2.55, figureSpacing: 7.5,
+    }))),
+    ...[-24, -8, 8, 25].map(x => ({
+      from: [x, 4.65, 1.1], to: [x, 4.65, -24.7],
+      sag: 1.05, spacing: 1.05, lanternSpacing: 2.7, figureSpacing: 8,
+    })),
+  ];
   addChristmasDecorations(scene, { wreaths: harborWreaths, strands: harborLights });
   for (const [x, z] of [[-9, 13.7], [9.2, 13.7], [9.2, 3.3], [-10, -25.6], [7, -25.6]]) planter(x, z);
   scene.add(planting.finish({ vertexColors: true, roughness: .9 }));
