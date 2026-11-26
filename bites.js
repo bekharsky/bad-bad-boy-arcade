@@ -58,7 +58,7 @@ export function createBiteEffects(scene) {
   }
 
   function burst(origin, outward, scale) {
-    const count = 18;
+    const count = 30;
     // A fixed pool also bounds the effect if attack rates change later.
     particles.splice(0, Math.max(0, particles.length + count - capacity));
     for (let i = 0; i < count; i++) {

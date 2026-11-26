@@ -59,6 +59,7 @@ const startScreen = document.querySelector('#start-screen');
 const endScreen = document.querySelector('#end-screen');
 const startButton = document.querySelector('#start');
 const restartButton = document.querySelector('#restart');
+const restartPenaltyLabel = document.querySelector('#restart-penalty');
 const resetCampaignButton = document.querySelector('#reset-campaign');
 const leaderboard = createLeaderboard({
   nameInput: document.querySelector('#player-name'),
@@ -329,7 +330,7 @@ const runnerSession = createRunnerSession({
   heroHeight: HERO_HEIGHT, heroScale: HERO_SCALE,
   isPlaying: () => playing,
   onImpact({ x, z }, fatal) {
-    burst(x, HERO_HEIGHT * (fatal ? .32 : .42), z, 0xff343e, fatal ? 42 : 22, null, fatal ? 2.7 : 1.8);
+    burst(x, HERO_HEIGHT * (fatal ? .32 : .42), z, 0xff343e, fatal ? 72 : 40, null, fatal ? 2.7 : 1.8);
   },
   onCrash() {
     runnerCrash = CRASH_HOLD;
@@ -1222,7 +1223,9 @@ function endGame(won = false, { crashed = false } = {}) {
   document.querySelector('#end-title').textContent = won ? 'SLEIGH COMPLETE' : crashed ? 'CRASHED' : 'WASTED';
   document.querySelector('#end-score').textContent = score.toLocaleString();
   restartTargetIndex = won ? null : levelIndex;
-  restartButton.textContent = won ? 'START AGAIN' : `RETRY THIS LEVEL (-${RESTART_PENALTY} PTS)`;
+  restartButton.textContent = won ? 'RESTART GAME' : 'RESTART LEVEL';
+  restartPenaltyLabel.textContent = `−${RESTART_PENALTY} SCORE`;
+  restartPenaltyLabel.hidden = won;
   resetCampaignButton.hidden = won;
   leaderboard.submit(score, levelIndex + 1);
   player.model.material.opacity = 1;
