@@ -85,6 +85,10 @@ function buildBaana(root) {
     const group = scenery.finish({ vertexColors: true });
     addChristmasDecorations(group, {
       wreaths: [-5.92, 5.92].map(x => ({ x, y: 3.65, z: 0 })),
+      groundFigures: {
+        trees: [{ x: -12, z: 0, scale: .58 }],
+        deer: [{ x: 12, z: 0, scale: .5, rotationY: Math.PI / 2 }],
+      },
       strands: [
         ...[-12, 0, 12].map(z => ({
           from: [-5.5, 8.25, z], to: [5.5, 8.25, z],

@@ -300,7 +300,14 @@ function buildHarbor(scene) {
       sag: 1.05, spacing: 1.05, lanternSpacing: 2.7, figureSpacing: 8,
     })),
   ];
-  addChristmasDecorations(scene, { wreaths: harborWreaths, strands: harborLights });
+  addChristmasDecorations(scene, {
+    wreaths: harborWreaths,
+    strands: harborLights,
+    groundFigures: {
+      trees: [{ x: -14, z: -14, scale: .62 }],
+      deer: [{ x: 16, z: -14, scale: .54, rotationY: Math.PI / 2 }],
+    },
+  });
   for (const [x, z] of [[-9, 13.7], [9.2, 13.7], [9.2, 3.3], [-10, -25.6], [7, -25.6]]) planter(x, z);
   scene.add(planting.finish({ vertexColors: true, roughness: .9 }));
   // Café terraces face the open square, leaving broad paths around the tables.

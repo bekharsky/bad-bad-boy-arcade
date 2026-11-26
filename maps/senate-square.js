@@ -248,6 +248,10 @@ function buildSenateSquare(root) {
   root.add(street.finish());
   addChristmasDecorations(root, {
     wreaths: [-22, 22].flatMap(x => [-14, -6, 4, 19.5].map(z => ({ x, y: 3.3, z }))),
+    groundFigures: {
+      trees: [{ x: -21, z: 1, scale: .62 }],
+      deer: [{ x: 21, z: 1, scale: .54, rotationY: Math.PI / 2 }],
+    },
     strands: [
       ...[-14, -9, -2, 8, 19.5].map(z => ({
         from: [-22, 5.25, z], to: [22, 5.25, z],

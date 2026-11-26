@@ -111,7 +111,6 @@ function buildAleksi(root) {
     }
     rod(ground, '#596c62', [-9, 10.5, z], [0, 7.7, z], .023);
     rod(ground, '#596c62', [9, 10.5, z], [0, 7.7, z], .023);
-    rod(ground, '#596c62', [-9, 8.8, z - 4], [9, 8.8, z + 4], .017);
     for (const lane of TRAM_LANES) rod(ground, '#596c62', [lane, 8.4, z], [lane, 5.12, z], .018);
     const lamp = lampTemplate.clone();
     lamp.name = 'Aleksi suspended lamp';
@@ -120,19 +119,23 @@ function buildAleksi(root) {
     lamp.position.z = z; lamp.castShadow = false;
     city.add(lamp); lamps.push(lamp);
   }
-  const aleksiWreaths = [], aleksiLights = [];
+  const aleksiLights = [], aleksiLetters = [];
   for (let z = 12; z > -642; z -= 24) {
-    aleksiWreaths.push({ x: 0, y: 7.12, z });
     const apex = [0, 9.45, z];
     aleksiLights.push(
-      { from: [-8.7, 8.8, z - 4], to: apex, sag: .08, spacing: 1.05, lanternSpacing: 2.55, figureSpacing: 8 },
-      { from: apex, to: [8.7, 8.8, z + 4], sag: .08, spacing: 1.05, lanternSpacing: 2.55, figureSpacing: 8 },
-      { from: [-8.7, 8.8, z - 4], to: [8.7, 8.8, z + 4], sag: .45, spacing: 1.05, lanternSpacing: 2.7, figureSpacing: 8, wireFigures: false },
-      { from: [-8.7, 8.8, z], to: [-8.7, 8.8, z - 24], sag: .55, spacing: 1.1, lanternSpacing: 3.1, figureSpacing: 9 },
-      { from: [8.7, 8.8, z], to: [8.7, 8.8, z - 24], sag: .55, spacing: 1.1, lanternSpacing: 3.1, figureSpacing: 9 },
+      { from: [-9, 10.5, z], to: [0, 7.7, z], sag: .05, spacing: .95, lanternSpacing: 4.2, wire: false, wireFigures: false },
+      { from: [0, 7.7, z], to: [9, 10.5, z], sag: .05, spacing: .95, lanternSpacing: 4.2, wire: false, wireFigures: false },
     );
+    aleksiLetters.push({ x: 0, y: 7.7, z: z + 1.2, scale: .72 });
   }
-  addChristmasDecorations(city, { wreaths: aleksiWreaths, strands: aleksiLights });
+  addChristmasDecorations(city, {
+    strands: aleksiLights,
+    letters: aleksiLetters,
+    groundFigures: {
+      trees: [{ x: -7.2, z: -100, scale: .62 }, { x: 7.2, z: -380, scale: .62 }],
+      deer: [{ x: 7.2, z: -250, scale: .56, rotationY: Math.PI / 2 }, { x: -7.2, z: -530, scale: .56, rotationY: Math.PI / 2 }],
+    },
+  });
   lampTemplate.material.dispose();
   city.add(ground.finish({ vertexColors: true }));
   const squares = ALEKSI_CROSSINGS.map((progress, index) => junction(progress, index, paving));

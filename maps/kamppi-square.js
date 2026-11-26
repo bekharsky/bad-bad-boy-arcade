@@ -231,6 +231,10 @@ function buildKamppi(root) {
   root.add(street.finish({ vertexColors: true }));
   addChristmasDecorations(root, {
     wreaths: [-11, 11].flatMap(x => [-15, -8, 0, 6].map(z => ({ x, y: 5.05, z }))),
+    groundFigures: {
+      trees: [{ x: -22, z: -3, scale: .62 }],
+      deer: [{ x: 22, z: -3, scale: .54, rotationY: Math.PI / 2 }],
+    },
     strands: [
       ...[-15, -8, 0, 6].map(z => ({
         from: [-11, 6.6, z], to: [11, 6.6, z],

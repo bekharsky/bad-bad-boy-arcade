@@ -22,6 +22,44 @@ function addSegment(instances, from, to, radius) {
   });
 }
 
+function addLitSegment(segments, bulbs, from, to, radius = .022, bulbSpacing = .3) {
+  addSegment(segments, from, to, radius);
+  const length = from.distanceTo(to), count = Math.max(1, Math.ceil(length / bulbSpacing));
+  for (let index = 0; index <= count; index++) bulbs.push(from.clone().lerp(to, index / count));
+}
+
+function addLitWirework(root, segments, bulbs, name, bulbRadius = .045) {
+  if (segments.length) {
+    const wire = new THREE.InstancedMesh(
+      new THREE.CylinderGeometry(1, 1, 1, 5),
+      new THREE.MeshStandardMaterial({
+        color: '#d4a447', emissive: '#a86912', emissiveIntensity: .65,
+        roughness: .5, metalness: .2,
+      }),
+      segments.length,
+    );
+    wire.name = `${name} wire frame`;
+    segments.forEach((part, index) => setInstance(wire, index, part.position, part.quaternion, part.scale));
+    wire.instanceMatrix.needsUpdate = true;
+    wire.castShadow = false; wire.receiveShadow = false;
+    root.add(wire);
+  }
+  if (bulbs.length) {
+    const lights = new THREE.InstancedMesh(
+      new THREE.SphereGeometry(1, 6, 4),
+      new THREE.MeshBasicMaterial({ color: '#ffe1a0', toneMapped: false }),
+      bulbs.length,
+    );
+    lights.name = `${name} warm bulbs`;
+    bulbs.forEach((position, index) => setInstance(
+      lights, index, position, new THREE.Quaternion(), new THREE.Vector3(bulbRadius, bulbRadius, bulbRadius),
+    ));
+    lights.instanceMatrix.needsUpdate = true;
+    lights.castShadow = false; lights.receiveShadow = false;
+    root.add(lights);
+  }
+}
+
 function addLights(root, strands) {
   if (!strands.length) return;
   const wireMatrices = [], bulbPositions = [], bulbColors = [], lanternPositions = [];
@@ -40,7 +78,7 @@ function addLights(root, strands) {
     );
     for (let step = 0; step <= segments; step++) {
       const t = step / segments, point = pointAt(t);
-      if (previous) {
+      if (previous && strand.wire !== false) {
         const delta = point.clone().sub(previous), direction = delta.clone().normalize();
         wireMatrices.push({
           position: previous.clone().add(point).multiplyScalar(.5),
@@ -62,7 +100,7 @@ function addLights(root, strands) {
       const t = (lantern + 1) / (lanternCount + 1);
       const point = pointAt(t);
       lanternPositions.push(point);
-      addSegment(wireMatrices, point, point.clone().add(new THREE.Vector3(0, -.075, 0)), .012);
+      if (strand.wire !== false) addSegment(wireMatrices, point, point.clone().add(new THREE.Vector3(0, -.045, 0)), .009);
     }
   }
   if (wireMatrices.length) {
@@ -79,7 +117,7 @@ function addLights(root, strands) {
   }
   if (bulbPositions.length) {
     const bulbs = new THREE.InstancedMesh(
-      new THREE.SphereGeometry(.085, 7, 5),
+      new THREE.SphereGeometry(.06, 7, 5),
       new THREE.MeshBasicMaterial({ color: '#ffffff', toneMapped: false }),
       bulbPositions.length,
     );
@@ -108,7 +146,7 @@ function addLights(root, strands) {
       lanternPositions.length,
     );
     lanternPositions.forEach((position, index) => {
-      setInstance(lanterns, index, position.clone().add(new THREE.Vector3(0, -.59, 0)), new THREE.Quaternion(), new THREE.Vector3(1, 1, 1));
+      setInstance(lanterns, index, position.clone().add(new THREE.Vector3(0, -.35, 0)), new THREE.Quaternion(), new THREE.Vector3(.58, .58, .58));
     });
     lanterns.instanceMatrix.needsUpdate = true;
     lanterns.castShadow = false;
@@ -224,11 +262,131 @@ function addWreaths(root, wreaths) {
   createSpheres(ornaments, .085, '#ffffff');
 }
 
-export function addChristmasDecorations(root, { strands = [], wreaths = [] } = {}) {
+function addWireLetters(root, letters) {
+  const segments = [], bulbs = [];
+  for (const letter of letters) {
+    const scale = letter.scale ?? 1, width = 1.8, height = 2.45, depth = .28;
+    const point = (x, y, z) => new THREE.Vector3(
+      letter.x + x * scale,
+      (letter.y ?? 0) + y * scale,
+      letter.z + z * scale,
+    );
+    for (const side of [-1, 1]) {
+      const z = side * depth / 2;
+      const apex = point(0, height, z), leftBase = point(-width / 2, 0, z), rightBase = point(width / 2, 0, z);
+      addLitSegment(segments, bulbs, leftBase, apex, .026, .24);
+      addLitSegment(segments, bulbs, apex, rightBase, .026, .24);
+      const crossbarY = height * .43, crossbarHalf = width * .5 * (1 - crossbarY / height) * .78;
+      addLitSegment(segments, bulbs, point(-crossbarHalf, crossbarY, z), point(crossbarHalf, crossbarY, z), .024, .24);
+      for (const fraction of [.22, .68]) {
+        const y = height * fraction, half = width * .5 * (1 - fraction) * .7;
+        addLitSegment(segments, bulbs, point(-half, y, z), point(half, y, z), .016, .32);
+      }
+      const lowerY = height * .22, upperY = height * .43;
+      addLitSegment(segments, bulbs, point(-width * .24, lowerY, z), point(width * .16, upperY, z), .016, .32);
+      addLitSegment(segments, bulbs, point(width * .24, lowerY, z), point(-width * .16, upperY, z), .016, .32);
+    }
+    for (const [x, y] of [[-width / 2, 0], [0, height], [width / 2, 0], [-width * .16, height * .43], [width * .16, height * .43]]) {
+      addLitSegment(segments, bulbs, point(x, y, -depth / 2), point(x, y, depth / 2), .016, .34);
+    }
+  }
+  addLitWirework(root, segments, bulbs, 'Luminous A', .04);
+}
+
+function figurePoint(figure, local, scale, rotation) {
+  const cosine = Math.cos(rotation), sine = Math.sin(rotation);
+  const [x, y, z] = local;
+  return new THREE.Vector3(
+    figure.x + (x * cosine + z * sine) * scale,
+    (figure.y ?? .04) + y * scale,
+    figure.z + (-x * sine + z * cosine) * scale,
+  );
+}
+
+function addTreeFigure(segments, bulbs, figure) {
+  const scale = figure.scale ?? .72, rotation = figure.rotationY ?? 0;
+  const point = (x, y, z) => figurePoint(figure, [x, y, z], scale, rotation);
+  const sides = 8;
+  const ring = (y, radius, depthScale = .72) => Array.from({ length: sides }, (_, index) => {
+    const angle = index * Math.PI * 2 / sides;
+    return point(Math.cos(angle) * radius, y, Math.sin(angle) * radius * depthScale);
+  });
+  const tiers = [[.3, 1.12, 1.22], [1.02, .88, 1.92], [1.72, .64, 2.62], [2.42, .39, 3.32]];
+  addLitSegment(segments, bulbs, point(0, .06, 0), point(0, 3.55, 0), .027, .36);
+  for (const [baseY, radius, tipY] of tiers) {
+    const base = ring(baseY, radius), tip = ring(tipY, .055);
+    for (let index = 0; index < sides; index++) {
+      const next = (index + 1) % sides;
+      addLitSegment(segments, bulbs, base[index], base[next], .021, .38);
+      addLitSegment(segments, bulbs, base[index], tip[index], .022, .36);
+      addLitSegment(segments, bulbs, base[index], tip[(index + 1) % sides], .015, .4);
+    }
+  }
+  const star = [];
+  for (let index = 0; index < 10; index++) {
+    const angle = Math.PI / 2 + index * Math.PI / 5;
+    const radius = index % 2 ? .14 : .32;
+    star.push(point(Math.cos(angle) * radius, 3.7 + Math.sin(angle) * radius, 0));
+  }
+  for (let index = 0; index < star.length; index++) addLitSegment(segments, bulbs, star[index], star[(index + 1) % star.length], .018, .26);
+}
+
+function addDeerFigure(segments, bulbs, figure) {
+  const scale = figure.scale ?? .66, rotation = figure.rotationY ?? 0;
+  const point = (x, y, z) => figurePoint(figure, [x, y, z], scale, rotation);
+  const ribs = [-.72, -.36, 0, .36, .72].map(x => Array.from({ length: 8 }, (_, index) => {
+    const angle = index * Math.PI / 4;
+    return point(x, 1.38 + Math.sin(angle) * .38, Math.cos(angle) * .32);
+  }));
+  for (let rib = 0; rib < ribs.length; rib++) {
+    for (let index = 0; index < 8; index++) {
+      addLitSegment(segments, bulbs, ribs[rib][index], ribs[rib][(index + 1) % 8], .02, .3);
+      if (rib < ribs.length - 1) {
+        addLitSegment(segments, bulbs, ribs[rib][index], ribs[rib + 1][index], .018, .34);
+        if (index % 2 === 0) addLitSegment(segments, bulbs, ribs[rib][index], ribs[rib + 1][(index + 1) % 8], .014, .4);
+      }
+    }
+  }
+  for (const side of [-1, 1]) {
+    const z = side * .27;
+    addLitSegment(segments, bulbs, point(.48, 1.55, z), point(.83, 2.02, z * .78), .025, .28);
+    addLitSegment(segments, bulbs, point(.83, 2.02, z * .78), point(1.18, 2.1, z * .72), .023, .26);
+    for (const [x, y, width, height] of [[1.02, 2.12, .2, .18], [1.25, 2.08, .16, .12]]) {
+      const head = Array.from({ length: 8 }, (_, index) => {
+        const angle = index * Math.PI / 4;
+        return point(x + Math.cos(angle) * width, y + Math.sin(angle) * height, z * .72);
+      });
+      for (let index = 0; index < head.length; index++) addLitSegment(segments, bulbs, head[index], head[(index + 1) % head.length], .018, .26);
+    }
+    const antler = [
+      [1.1, 2.23], [1.12, 2.56], [.96, 2.77], [.97, 2.96],
+      [1.12, 2.56], [1.31, 2.78], [1.34, 2.99], [1.31, 2.78], [1.49, 2.85],
+    ].map(([x, y]) => point(x, y, z * .58));
+    for (let index = 0; index < antler.length - 1; index++) addLitSegment(segments, bulbs, antler[index], antler[index + 1], .018, .25);
+  }
+  for (const x of [-.55, .52]) for (const side of [-1, 1]) {
+    const z = side * .23, knee = x > 0 ? x + .06 : x - .08;
+    addLitSegment(segments, bulbs, point(x, 1.15, z), point(knee, .66, z * 1.1), .026, .28);
+    addLitSegment(segments, bulbs, point(knee, .66, z * 1.1), point(knee - .08, .08, z * 1.15), .022, .25);
+    addLitSegment(segments, bulbs, point(knee - .08, .08, z * 1.15), point(knee + .16, .08, z * 1.15), .022, .25);
+  }
+  addLitSegment(segments, bulbs, point(-.68, 1.48, 0), point(-1.03, 1.72, 0), .02, .28);
+}
+
+function addGroundFigures(root, groundFigures) {
+  const segments = [], bulbs = [];
+  for (const tree of groundFigures.trees ?? []) addTreeFigure(segments, bulbs, tree);
+  for (const deer of groundFigures.deer ?? []) addDeerFigure(segments, bulbs, deer);
+  addLitWirework(root, segments, bulbs, 'Ground holiday sculpture', .047);
+}
+
+export function addChristmasDecorations(root, { strands = [], wreaths = [], letters = [], groundFigures = {} } = {}) {
   const decorations = new THREE.Group();
   decorations.name = 'Christmas decorations';
   addLights(decorations, strands);
   addWireFigures(decorations, strands);
+  addWireLetters(decorations, letters);
+  addGroundFigures(decorations, groundFigures);
   addWreaths(decorations, wreaths);
   root.add(decorations);
   return decorations;
