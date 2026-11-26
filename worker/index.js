@@ -120,10 +120,10 @@ async function serveScoreShare(request, env, id) {
   if (!result) return new Response('Score share not found.', { status: 404 });
 
   const pageUrl = new URL(`/share/${id}`, request.url).href;
-  const imageUrl = `${pageUrl}/card.png?v=8`;
+  const imageUrl = `${pageUrl}/card.png?v=9`;
   const formattedScore = Number(result.score).toLocaleString('en');
   const title = `${formattedScore} points in Piss Deal`;
-  const description = `${result.nickname} scored ${formattedScore} points in Piss Deal. Help Bad Bad Boy find all 6 missing parts and fix Joulupukki’s sleigh.`;
+  const description = `${result.nickname} scored ${formattedScore} points in Piss Deal. Bad Bad Boy needs you. Find all 6 sleigh parts.`;
 
   if (new URL(request.url).pathname.endsWith('/card.png')) {
     try {

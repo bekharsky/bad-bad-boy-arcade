@@ -20,9 +20,9 @@ export async function renderScoreCard({ nickname, score }) {
       <text x="675" y="286" font-size="${Math.min(148, Math.floor(880 / points.length))}" fill="#ffce75">${points}</text>
       <text x="682" y="337" font-size="38" letter-spacing="4" fill="#ffce75">POINTS</text>
       <path d="M681 384H1153" stroke="#8f8068" stroke-width="2"/>
-      <text x="679" y="456" font-size="51" fill="#fff0cb">Help Bad Bad Boy</text>
-      <text x="679" y="511" font-size="51" fill="#fff0cb">find all 6 missing parts</text>
-      <text x="681" y="579" font-size="34" fill="#ffce75">and fix Joulupukki’s sleigh!</text></g></svg>`;
+      <text x="679" y="456" font-size="51" fill="#fff0cb">Bad Bad Boy needs you.</text>
+      <text x="679" y="511" font-size="51" fill="#fff0cb">Find all 6 sleigh parts.</text>
+      </g></svg>`;
   const renderer = new Resvg(svg, {font:{fontBuffers:[new Uint8Array(font)]}});
   try {
     const image = renderer.render();
