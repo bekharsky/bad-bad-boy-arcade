@@ -259,7 +259,7 @@ function buildKamppi(root) {
   // A few winter stalls sit along Narinkkatori's eastern edge, away from Amos Rex.
   const winterMarket = createSceneryModel('Narinkkatori winter market');
   const canopies = ['#b95345', '#557761', '#c59a4c', '#426b78'];
-  const marketStalls = [-13.2, -3.8, 5.6].map((z, index) => ({ x: 23.5, z, color: canopies[index] }));
+  const marketStalls = [-23, -13.2, -3.8].map((z, index) => ({ x: 23.5, z, color: canopies[index] }));
   for (const { x, z, color } of marketStalls) {
     const facing = -1;
     winterMarket.box('#6b5039', x, .13, z, 3.35, .22, 3.85);
@@ -289,7 +289,7 @@ function buildKamppi(root) {
   root.add(winterMarket.finish({ vertexColors: true, roughness: .82 }));
 
   const marketLights = [{
-    from: [23.5, 4.4, -15.5], to: [23.5, 4.4, 7.5], sag: .45, spacing: .75, lanternSpacing: 2.8, figureSpacing: 8,
+    from: [23.5, 4.4, -25.3], to: [23.5, 4.4, -1.9], sag: .45, spacing: .75, lanternSpacing: 2.8, figureSpacing: 8,
   }];
   const rinkTree = { x: rinkX, z: rinkNear - 3.2, scale: .56 };
 
