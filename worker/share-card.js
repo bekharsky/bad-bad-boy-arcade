@@ -10,14 +10,21 @@ export async function renderScoreCard({ nickname, score }) {
   const name = nickname.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
   const points = Number(score).toLocaleString('en');
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1200" height="630">
-    <defs><linearGradient id="shade" x2="0" y2="1"><stop stop-color="#101b25" stop-opacity="0"/><stop offset="1" stop-color="#101b25"/></linearGradient></defs>
-    <image x="-170" y="-64" width="1540" height="810" xlink:href="${background}"/>
-    <rect y="180" width="1200" height="450" fill="url(#shade)"/>
+    <image width="1200" height="630" xlink:href="${background}"/>
+    <path fill="#26221d" d="M645 0H1200V630H596Z"/>
     <g font-family="Barlow Condensed" font-weight="700">
-    <text x="56" y="388" font-size="24" fill="#ffcf69">PISS DEAL<tspan dx="22" font-size="36" fill="white">${name}</tspan></text>
-    <text x="52" y="477" font-size="98" fill="#fff5de">${points} POINTS</text>
-    <text x="56" y="548" font-size="52" fill="white">Help Joulupukki fix his sleigh!</text>
-    <text x="56" y="598" font-size="38" fill="white">Find all 6 missing parts.</text></g></svg>`;
+      <path fill="#b03225" d="M40 36H247L242 96H35Z"/>
+      <text x="54" y="82" font-size="46" fill="#fff0cb">PISS DEAL</text>
+      <rect x="36" y="538" width="306" height="65" fill="#fff0cb"/>
+      <text x="56" y="584" font-size="43" fill="#26221d">BAD BAD BOY</text>
+      <text x="681" y="93" font-size="40" fill="#fff0cb">${name}</text>
+      <path d="M681 121H1153" stroke="#ffce75" stroke-width="2"/>
+      <text x="675" y="286" font-size="${Math.min(148, Math.floor(880 / points.length))}" fill="#ffce75">${points}</text>
+      <text x="682" y="337" font-size="38" letter-spacing="4" fill="#ffce75">POINTS</text>
+      <path d="M681 384H1153" stroke="#8f8068" stroke-width="2"/>
+      <text x="679" y="456" font-size="51" fill="#fff0cb">Help Joulupukki</text>
+      <text x="679" y="511" font-size="51" fill="#fff0cb">fix his sleigh!</text>
+      <text x="681" y="579" font-size="34" fill="#ffce75">Find all 6 missing parts.</text></g></svg>`;
   const renderer = new Resvg(svg, {font:{fontBuffers:[new Uint8Array(font)]}});
   try {
     const image = renderer.render();

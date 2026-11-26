@@ -1,11 +1,26 @@
-import sharp from 'sharp';
+import { readFile, writeFile } from 'node:fs/promises';
+import { initWasm, Resvg } from '@resvg/resvg-wasm';
 
-const overlay = Buffer.from(`<svg width="1200" height="630" xmlns="http://www.w3.org/2000/svg">
-<defs><linearGradient id="shade" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#101b25" stop-opacity="0"/><stop offset="1" stop-color="#101b25" stop-opacity=".94"/></linearGradient></defs>
-<rect y="220" width="1200" height="410" fill="url(#shade)"/>
-<g font-family="sans-serif" font-weight="bold">
-<text x="56" y="398" fill="#ffcf69" font-size="24" letter-spacing="4">PISS DEAL</text>
-<text x="50" y="514" fill="#fff5de" font-size="68" letter-spacing="-2">Help Joulupukki fix his sleigh!</text>
-<text x="56" y="574" fill="white" font-size="43">Find all 6 missing parts.</text>
-</g></svg>`);
-await sharp('art/harbor.jpg').extract({left:155,top:64,width:900,height:473}).resize(1200,630).composite([{input:overlay}]).png().toFile('public/share-card.png');
+await initWasm(await readFile(new URL(import.meta.resolve('@resvg/resvg-wasm/index_bg.wasm'))));
+const image = (await readFile('art/harbor.jpg')).toString('base64');
+const font = await readFile('art/BarlowCondensed-Bold.ttf');
+const poster = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1200" height="630">
+  <image width="1200" height="630" xlink:href="data:image/jpeg;base64,${image}"/>
+  <path fill="#fff0cb" d="M0 0H615L568 630H0Z"/>
+  <path fill="#b03225" d="M48 46H259L254 108H43Z"/>
+  <g font-family="Barlow Condensed" font-weight="700">
+    <text x="62" y="93" fill="#fff0cb" font-size="48" letter-spacing="1">PISS DEAL</text>
+    <g fill="#26221d" font-size="88">
+      <text x="44" y="251">Help Joulupukki</text>
+      <text x="44" y="338">fix his sleigh!</text>
+    </g>
+    <path stroke="#26221d" stroke-width="2" d="M48 414H523"/>
+    <text x="40" y="580" font-size="174" fill="#b03225">6</text>
+    <text x="148" y="488" font-size="30" fill="#714735">MISSING PARTS</text>
+    <text x="145" y="548" font-size="51" fill="#26221d">Find them all.</text>
+    <path fill="#26221d" d="M723 542H1160L1155 605H718Z"/>
+    <text x="740" y="582" fill="#ffce75" font-size="26">PLAY AS</text>
+    <text x="838" y="589" fill="#fff0cb" font-size="46">BAD BAD BOY</text>
+  </g></svg>`;
+const renderer = new Resvg(poster, {font:{fontBuffers:[font]}});
+await writeFile('public/share-card.png', renderer.render().asPng());
