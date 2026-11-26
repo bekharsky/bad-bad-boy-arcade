@@ -28,19 +28,17 @@ function pointer(element, type, pointerId = 1, clientX = 100, clientY = 200, tim
   element.dispatchEvent(event);
 }
 
-function setup({ withHome = false, heading = 0 } = {}) {
+function setup({ heading = 0 } = {}) {
   globalThis.window = new EventTarget();
   globalThis.document = new EventTarget();
   const zone = new Element(), stick = new Element(), thumb = new Element(), fireZone = new Element(), fireButton = new Element(), fireHome = new Element();
-  const home = withHome ? new Element() : undefined;
-  if (home) home.getBoundingClientRect = () => ({ left: 40, top: 220, width: 112, height: 112 });
   zone.parentElement = new Element();
   fireHome.getBoundingClientRect = () => ({ left: 256, top: 256, width: 88, height: 88 });
   let bursts = 0;
   let inputs = 0;
   const shots = [];
   const controls = createTouchControls({
-    zone, stick, thumb, home, fireZone, fireButton, fireHome,
+    zone, stick, thumb, fireZone, fireButton, fireHome,
     getAimHeading: previous => previous ?? heading,
     onFireStart(airborne, heading, fresh) { shots.push({ airborne, heading }); if (fresh) bursts++; },
     onInput: () => inputs++,
@@ -93,13 +91,17 @@ test('long drags keep the base stable, cap diagonal speed, and reverse across th
   assert.ok(controls.input.x < 0 && controls.input.z < 0);
 });
 
-test('pressing the visible stick uses its centre; touching elsewhere creates a floating origin', () => {
-  const { zone, stick, controls, inputs } = setup({ withHome: true });
+test('touchdown is a neutral stick origin regardless of where the finger lands', () => {
+  const { zone, stick, controls, inputs } = setup();
   pointer(zone, 'pointerdown', 1, 120, 276);
-  assert.equal(stick.style.left, '86px');
+  assert.equal(stick.style.left, '110px');
   assert.equal(stick.style.top, '156px');
-  assert.ok(controls.input.x > .4, 'An edge press starts moving without another drag');
+  assert.equal(controls.input.x, 0);
   assert.equal(controls.input.z, 0);
+  pointer(zone, 'pointermove', 1, 100, 276);
+  assert.ok(controls.input.x < -.3, 'Dragging left from a right-offset touchdown steers left');
+  pointer(zone, 'pointermove', 1, 140, 276);
+  assert.ok(controls.input.x > .3, 'Dragging back across the touchdown point steers right');
   pointer(zone, 'pointerup', 1);
   pointer(zone, 'pointerdown', 2, 200, 150);
   assert.equal(stick.style.left, '190px');
