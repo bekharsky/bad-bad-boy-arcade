@@ -86,7 +86,6 @@ const introOverlay = document.querySelector('#sleigh-intro');
 const skipIntro = document.querySelector('#skip-intro');
 const missionScreen = document.querySelector('#mission-screen');
 const beginSearch = document.querySelector('#begin-search');
-const passerbyCard = document.querySelector('.passerby');
 const cameoSpeechTemplate = document.querySelector('#cameo-speech');
 const cameoSpeeches = new Map();
 const cameoSpeechPoint = new THREE.Vector3();
@@ -100,7 +99,6 @@ const CAMEO_LINES = [
   'We’ll review the matter in due course',
   'We’ll consider the appropriate steps',
 ];
-let shownCameo = null;
 let nextLine = 0;
 const toast = document.querySelector('#toast');
 const encounterHint = document.querySelector('#encounter-hint');
@@ -170,7 +168,8 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color('#7c929f');
 scene.fog = new THREE.Fog('#7c929f', 40, 100);
 let itinerary = mapOrder(query.get('map'));
-const world = createMapManager(scene, maps, .32 * HERO_SCALE);
+const PLAYER_COLLISION_RADIUS = .28 * HERO_SCALE;
+const world = createMapManager(scene, maps, PLAYER_COLLISION_RADIUS);
 const showSenatePreview = !query.has('map');
 world.activate(showSenatePreview ? 'senate-square' : itinerary[0].id);
 const sleighParts = createSleighParts();
@@ -232,7 +231,7 @@ const player = {
   hp: 5,
   maxHp: 5,
   speed: 3.6,
-  radius: 0.32 * HERO_SCALE,
+  radius: PLAYER_COLLISION_RADIUS,
   invulnerable: 0,
   powerTimer: 0,
   skateTimer: 0,
@@ -359,14 +358,11 @@ const runnerSession = createRunnerSession({
   },
   onSpray(dt, firing, traffic) { updateSprayFeedback(updateSpray(dt, firing, traffic)); },
   onCollect: collectMedkit,
-  onProgress(fraction, traffic) {
+  onProgress(fraction) {
     setLevelProgress(fraction);
     updateScore();
-    const { distance, elapsed, crossings } = runnerSession.state;
+    const { distance, elapsed } = runnerSession.state;
     runnerReward.update(distance, elapsed, reducedMotion.matches);
-    const crossingWarning = crossings.some(crossing => crossing.phase === 'warning' || crossing.phase === 'crossing');
-    const passerby = traffic.find(agent => isCameo(agent.kind) && agent.age >= .3 && !agent.passed && agent.panicSide === undefined);
-    showCameo(crossingWarning ? null : passerby);
   },
   onFinish() {
     runnerArrival = FINISH_HOLD;
@@ -415,17 +411,6 @@ async function prepareGraphics(root = scene) {
   renderingReady = true;
 }
 
-function showCameo(actor) {
-  const kind = actor?.kind ?? null;
-  if (kind === shownCameo) return;
-  shownCameo = kind;
-  passerbyCard.hidden = !kind;
-  if (kind) {
-    // The portrait strip follows the roster, one square frame per model.
-    passerbyCard.style.setProperty('--portrait-x', `${CAMEO_KINDS.indexOf(kind) * 100 / (CAMEO_KINDS.length - 1)}%`);
-  }
-}
-
 function updateCameoSpeech() {
   if (!playing || pauseDialog.open || gameInterlude()) {
     for (const { bubble } of cameoSpeeches.values()) bubble.hidden = true;
@@ -453,10 +438,10 @@ function updateCameoSpeech() {
     const bubble = cameoSpeechTemplate.content.firstElementChild.cloneNode(true);
     const line = CAMEO_LINES[nextLine];
     nextLine = (nextLine + 1) % CAMEO_LINES.length;
-    bubble.dataset.line = line;
+    bubble.textContent = line;
     bubble.setAttribute('aria-label', line);
     cameoSpeechTemplate.before(bubble);
-    cameoSpeeches.set(actor, { bubble, line, approach: actor.approaches, start: null, letters: 0 });
+    cameoSpeeches.set(actor, { bubble, line, approach: actor.approaches, start: null });
   }
   if (!cameoSpeeches.size) return;
   const w = viewWidth, h = viewHeight;
@@ -482,15 +467,7 @@ function updateCameoSpeech() {
       speech.start = gameTime;
       if (!runner) actor.nextSpeechAt = gameTime + 6 + 2 * CAMEO_KINDS.indexOf(actor.kind) / (CAMEO_KINDS.length - 1);
     }
-    const letters = reducedMotion.matches ? line.length : Math.min(line.length, 1 + Math.floor((gameTime - speech.start) * 24));
-    if (letters !== speech.letters) {
-      speech.letters = letters;
-      const text = bubble.firstElementChild;
-      text.textContent = line.slice(0, letters);
-      text.dataset.rest = line.slice(letters);
-    }
     bubble.hidden = false;
-    // The hidden full line sets the size independently of the typing.
     if (speech.viewWidth !== w) {
       speech.viewWidth = w;
       speech.halfWidth = bubble.getBoundingClientRect().width / 2;
@@ -505,7 +482,6 @@ function updateCameoSpeech() {
 
 function syncLevelUI() {
   const runner = isRunner();
-  showCameo(null);
   for (const { bubble } of cameoSpeeches.values()) bubble.remove();
   cameoSpeeches.clear();
   toast.hidden = runner;
@@ -691,8 +667,10 @@ function enterDistrict({ index }) {
     } else {
       const openingArena = strength === 1;
       const openingRing = openingArena ? 7.5 : 5.5;
-      spawnEnemies(player, openingArena ? 4 : 5 + strength, strength, { minPlayerDistance: openingRing, ringStart: openingRing });
-      spawnEnemies(cache, openingArena ? 3 : 6, strength, { minPlayerDistance: openingArena ? 11 : 8 });
+      const kamppiLevel = world.id === 'kamppi';
+      const openingKamppi = openingArena && kamppiLevel;
+      spawnEnemies(player, openingKamppi ? 6 : openingArena ? 4 : 5 + strength + (kamppiLevel ? 3 : 0), strength, { minPlayerDistance: openingRing, ringStart: openingRing });
+      spawnEnemies(cache, openingKamppi ? 4 : openingArena ? 3 : 6 + (kamppiLevel ? 1 : 0), strength, { minPlayerDistance: openingArena ? 11 : 8 });
     }
   }
   if (changedMap && world.root === preparedDistrict) preparedDistrict = null;
@@ -881,9 +859,6 @@ function update(dt) {
 
   player.root.position.set(player.x, 0, player.z);
   arenaCameos.update(dt, player, camera.position);
-  const follower = arenaCameos.actors.find(actor => (actor.phase === 'approach' || actor.phase === 'watch')
-    && !actor.fleeing && Math.hypot(actor.x - player.x, actor.z - player.z) < 4.2);
-  showCameo(follower);
   if (sleighCache.update(gameTime, player, reducedMotion.matches)) { collectSleighPart(); return; }
   if (moving) player.runAngle = Math.atan2(player.x - oldX, player.z - oldZ) - player.heading;
   player.runBlend = THREE.MathUtils.damp(player.runBlend, moving ? 1 : 0, 18, dt);
@@ -1220,7 +1195,6 @@ function clearArena() {
 }
 
 function endGame(won = false, { crashed = false } = {}) {
-  showCameo(null);
   sprayTutorial.reset();
   updateScore();
   playing = false;

@@ -115,7 +115,7 @@ function buildSenateSquare(root) {
     box('#314b48', 0, 1.15, front + .3, 1.15, 2.3, .1);
     if (grand) {
       for (let px = -width / 2 + .3; px < width / 2; px += 3.2) box('#e5d8b5', px, height / 2, front + .17, .2, height - .4, .26);
-      for (const px of [-2.5, -1.5, 1.5, 2.5]) {
+      for (const px of [-2.5, 0, 2.5]) {
         building.geometry('#f1e6c7', new THREE.CylinderGeometry(.21, .24, 4.9, 12).translate(px, 3.1, front + .65));
       }
       box('#e9dfc1', 0, 5.65, front + .55, 6.4, .25, 1.7);

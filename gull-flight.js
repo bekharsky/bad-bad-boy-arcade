@@ -1,12 +1,12 @@
 // Independent ambient hazards. One bird attacks at a time while the flock orbits.
 export const GULL_COUNT = 4;
-export const RUNNER_GULL_COUNT = 6;
+export const RUNNER_GULL_COUNT = 4;
 const STEP = 1 / 120;
 const WINDUP = 1.6;
 const STRIKE_TIME = .9;
 const APPROACH_TIME = 4.5;
 const EXIT_TIME = 3;
-const SETTLE_TIME = 1.8;
+const SETTLE_TIME = 1.2;
 const GRAVITY = 9;
 const smooth = t => t * t * (3 - 2 * t);
 
@@ -23,13 +23,13 @@ export function createGullFlight({ random = Math.random, canStandAt = () => true
   function reset(player, running = false, { attackDelay = 0 } = {}) {
     runner = running;
     birds.splice(0, birds.length, ...flock.slice(0, runner ? runnerGullCount : GULL_COUNT));
-    const biggerFlock = birds.length > GULL_COUNT;
-    time = accumulator = nextBird = 0; nextAttack = (biggerFlock ? 8 : 9) + random() * 2 + attackDelay;
+    const quickerRunnerFlock = runner;
+    time = accumulator = nextBird = 0; nextAttack = (quickerRunnerFlock ? 5.5 : 8) + random() * (quickerRunnerFlock ? 1.5 : 2) + attackDelay;
     attackGrace = attackDelay ? nextAttack : 0;
     previous.x = player.x; previous.z = player.z;
     for (const bird of birds) {
       Object.assign(bird, { phase: 'waiting', age: 0, alive: false, nextJetHit: 0, target: null, drop: null, start: null, vx: 0, vy: 0, vz: 0,
-        orbitScale: 1, nextOrbitCheck: 0, entryDelay: 2 + bird.id * (biggerFlock ? 1.55 : 2.45) + random(), returnAfter: 0, goal: {} });
+        orbitScale: 1, nextOrbitCheck: 0, entryDelay: 2 + bird.id * (quickerRunnerFlock ? 1.05 : 2.45) + random(), returnAfter: 0, goal: {} });
       bird.x = player.x; bird.z = player.z - 90; bird.hitHeight = 10;
     }
   }
@@ -99,7 +99,7 @@ export function createGullFlight({ random = Math.random, canStandAt = () => true
     bird.phase = 'recover'; bird.age = 0; bird.target = null;
     bird.start = { x: bird.x, y: bird.hitHeight, z: bird.z };
     if (!bird.alive) leave(bird);
-    nextAttack = time + (runner && birds.length === GULL_COUNT ? 6 + random() * 4 : 4.5 + random() * 3);
+    nextAttack = time + (runner ? 4 + random() * 1.5 : 4.5 + random() * 3);
   }
 
   function impact(bird, player, type) {
@@ -123,7 +123,7 @@ export function createGullFlight({ random = Math.random, canStandAt = () => true
         if (bird.age >= bird.entryDelay) approach(bird, player);
       } else if (bird.phase === 'approach') {
         blend(bird, orbitGoal(bird, player), smooth(Math.min(1, bird.age / APPROACH_TIME)));
-        if (bird.age >= APPROACH_TIME) { bird.phase = 'orbit'; bird.age = 0; }
+        if (bird.age >= (runner ? 3.8 : APPROACH_TIME)) { bird.phase = 'orbit'; bird.age = 0; }
       } else if (bird.phase === 'orbit') {
         const goal = orbitGoal(bird, player), response = 1 - Math.exp(-4 * STEP);
         // Wall avoidance and following the player change the desired orbit,

@@ -1,7 +1,7 @@
 export function bindRunnerInput({ canvas, canInteract, dodge }) {
   let swipe = null;
   canvas.addEventListener('pointerdown', event => {
-    if (!canInteract() || event.button !== 0) return;
+    if (!canInteract() || event.button !== 0 || event.pointerType === 'mouse') return;
     swipe = { id: event.pointerId, x: event.clientX, y: event.clientY, used: false };
     canvas.focus({ preventScroll: true });
     try { canvas.setPointerCapture(event.pointerId); } catch { /* Capture is optional in embedded browsers. */ }

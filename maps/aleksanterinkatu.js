@@ -48,6 +48,19 @@ function junction(progress, index, paving) {
   paving.rectangle('square', 90, 40, 0, -progress, .01);
   paving.rectangle('road', 90, 12, 0, -progress, .04);
   for (const z of [-15, 15]) for (let x = -4.7; x < 5; x += 1.15) m.box('#e0dcc9', x, .055, z, .65, .025, 2.2);
+  // Give every junction a clear pedestrian signal and a reflective curb edge.
+  for (const side of [-1, 1]) {
+    for (const z of [-8.5, 8.5]) {
+      const x = side * 6.25;
+      m.box('#425650', x, 1.72, z, .13, 3.44, .13);
+      m.box('#253736', x + side * .12, 2.1, z, .42, .78, .3);
+      for (const [lamp, color] of [[2.34, '#ed5b50'], [2.1, '#efc35e'], [1.86, '#76bd7b']]) {
+        m.box(color, x + side * .34, lamp, z, .045, .14, .14);
+      }
+      m.box('#e2c968', x, .09, z, .4, .12, .4);
+    }
+  }
+  for (const z of [-16.2, 16.2]) m.box('#d6c781', 0, .065, z, 11.5, .045, .12);
   for (const side of [-1, 1]) {
     // A square beyond the corner, with planting and benches instead of walls
     // across the side street from which the scooters will emerge.
@@ -57,6 +70,13 @@ function junction(progress, index, paving) {
       addTree(m, { x: side * 13, y: .9, z, height: 5.65, radius: 1.55, variant: index + (side > 0 ? 1 : 0) });
       m.box('#826b4d', side * 10, .65, z + 2, 2.3, .15, .7);
       m.box('#826b4d', side * 10, 1, z + 2.3, 2.3, .6, .1);
+    }
+    if (index === 2) {
+      // The third crossing gets a pair of small street kiosks beside its scooter approaches.
+      m.box('#52685d', side * 9.1, 1.25, -2, 1.45, 2.5, 1.1);
+      m.box('#c8b786', side * 9.1, 2.28, -2, 1.56, .18, 1.18);
+      m.box('#e6dbc0', side * 9.1, 1.42, -1.42, 1.05, 1.25, .05);
+      m.box('#b95c45', side * 9.1, 2.55, -2, .55, .28, .08);
     }
     for (const x of [24, 38]) {
       m.box(['#c9baa3', '#c3c6b2', '#bca591'][index % 3], side * x, 7, -15, 12, 14, 10);

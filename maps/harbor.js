@@ -275,7 +275,7 @@ function buildHarbor(scene) {
     part('box', '#33454b', x, 2.52, z, 0.4, 0.08, 0.4);
     part('box', '#ffe5a2', x, 2.7, z, 0.24, 0.3, 0.24, 0, true);
     part('box', '#33454b', x, 2.9, z, 0.4, 0.09, 0.4);
-    obstacle(x, z, 0.28, 0.28, 2.95);
+    obstacle(x, z, 0.22, 0.22, 2.95);
   }
   const planting = createSceneryModel('Harbor garden trees');
   let treeIndex = 0;
@@ -283,7 +283,8 @@ function buildHarbor(scene) {
     part('box', '#727a77', x, 0.22, z, 1.3, 0.44, 1.3);
     part('box', '#433e33', x, 0.45, z, 1.15, 0.05, 1.15);
     addTree(planting, { x, y: .48, z, height: 2.75, radius: .91, variant: treeIndex++ });
-    obstacle(x, z, 1.3, 1.3, 3.25);
+    // The planter is the solid footprint. The tree canopy must not behave like a wall.
+    obstacle(x, z, 0.92, 0.92, 3.25);
   }
   for (const x of [-24, -8, 8, 25]) {
     lamp(x, 1.1);
@@ -318,25 +319,25 @@ function buildHarbor(scene) {
       part('box', '#a57c4d', x, .43, z + side * .8, .5, .12, .5);
       part('box', '#40514d', x, .2, z + side * .8, .08, .4, .45);
     }
-    obstacle(x, z, 1.1, 2.2, 1);
+    obstacle(x, z, 0.92, 1.8, 1);
   }
   for (const x of [-7, 6]) {
     part('box', '#a57c4d', x, .44, 16.9, 1.9, .12, .55);
     part('box', '#a57c4d', x, .74, 17.17, 1.9, .65, .08);
-    obstacle(x, 16.95, 2, .7, 1.1);
+    obstacle(x, 16.95, 1.65, .48, 1.1);
   }
   for (const [x, z, color] of [[-25, -11.5, '#6593a0'], [25, -11.5, '#cc8058'], [-23, 5, '#9e5045']]) {
     part('box', color, x, .46, z, 1.8, .52, .85);
     part('box', '#384e59', x - .08, .86, z, .95, .42, .7);
     for (const wheel of [-.6, .6]) for (const side of [-1, 1]) part('sphere', '#30393e', x + wheel, .23, z + side * .43, .4, .4, .18);
-    obstacle(x, z, 1.9, 1, 1.1);
+    obstacle(x, z, 1.55, .72, 1.1);
   }
   // Overhead contact wire and cross spans make the tracks part of the street.
   part('box', '#455854', 0, 4.08, BOULEVARD_Z, 76, .025, .025);
   for (const x of [-26, -13, 0, 13, 26]) {
     for (const z of [-10.6, .9]) {
       part('cylinder', '#52625e', x, 2.2, z, .1, 4.4, .1);
-      obstacle(x, z, .2, .2, 4.4);
+      obstacle(x, z, .16, .16, 4.4);
     }
     part('box', '#52625e', x, 4.25, -4.85, .025, .025, 11.5);
   }
@@ -354,7 +355,7 @@ function buildHarbor(scene) {
   }
   const tram = createTram(scene, { z: BOULEVARD_Z, initialWait: 10 });
   const harbor = createHarbor(scene);
-  for (const x of [-26, 9, 26]) obstacle(x, -26.6, 1.7, .85, 5.4);
+  for (const x of [-26, 9, 26]) obstacle(x, -26.6, 1.3, .62, 5.4);
 
   for (const batch of batches.values()) {
     const material = new THREE.MeshStandardMaterial({ color: batch.color, roughness: 0.85, emissive: batch.glow ? batch.color : '#000000', emissiveIntensity: batch.glow ? 0.22 : 0 });

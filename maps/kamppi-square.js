@@ -38,6 +38,7 @@ function buildKamppi(root) {
   const colliders = [], buildings = [];
   const street = createSceneryModel('Narinkkatori street furniture');
   const obstacle = (x, z, w, d, height) => colliders.push({ minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2, height });
+  const propObstacle = (x, z, w, d, height) => obstacle(x, z, Math.max(.14, w - .36), Math.max(.14, d - .36), height);
   function addBuilding(group) {
     root.add(group);
     buildings.push(registerBuilding(group));
@@ -160,7 +161,7 @@ function buildKamppi(root) {
     part('#8d6748', 0, .47, 0, length, .14, .7);
     for (const dz of [-.24, 0, .24]) part('#a37c50', 0, .55, dz, length, .035, .16);
     for (const dx of [-length * .36, length * .36]) part('#4a5a55', dx, .23, 0, .12, .46, .7);
-    obstacle(x, z, alongStreet ? .8 : length + .1, alongStreet ? length + .1 : .8, .58);
+    propObstacle(x, z, alongStreet ? .8 : length + .1, alongStreet ? length + .1 : .8, .58);
   }
   function planter(x, z, width, depth, tree = false) {
     street.box('#8d6046', x, .37, z, width, .74, depth);
@@ -169,7 +170,7 @@ function buildKamppi(root) {
     if (tree) {
       addTree(street, { x, y: .82, z, height: 4.65, radius: 1.12, variant: Math.round(z + x) });
     }
-    obstacle(x, z, width + .4, depth + .4, tree ? 5.5 : .85);
+    propObstacle(x, z, width + .4, depth + .4, tree ? 5.5 : .85);
   }
   // Seating stays at the sides so the larger Narinkkatori centre remains open.
   for (const z of [-14, -2, 9]) {
@@ -184,7 +185,7 @@ function buildKamppi(root) {
   for (const z of [-19, 5]) {
     street.geometry('#899d96', new THREE.CylinderGeometry(.05, .09, 3.5, 8).translate(-40.5, 1.75, z));
     street.box('#e4dbb6', -40.5, 3.53, z, .55, .1, .55);
-    obstacle(-40.5, z, .22, .22, 3.6);
+    propObstacle(-40.5, z, .22, .22, 3.6);
   }
   for (const x of [-35, 35]) { planter(x, 28, 2, 2, true); bench(x, 33, 3); }
   const terrace = createSceneryModel('Narinkkatori cafe terrace');
@@ -195,7 +196,7 @@ function buildKamppi(root) {
       terrace.box('#8b6c48', x, .5, 11 + side * 1.05, .55, .1, .55);
       terrace.box('#8b6c48', x, .86, 11 + side * 1.3, .55, .65, .07);
     }
-    obstacle(x, 11, 1.8, 3, 1.2);
+    propObstacle(x, 11, 1.8, 3, 1.2);
     if (x === 22) {
       terrace.geometry('#d5c79f', new THREE.ConeGeometry(1.8, .65, 8).translate(x, 2.8, 11));
       terrace.geometry('#7f7963', new THREE.CylinderGeometry(.04, .04, 2.65, 8).translate(x, 1.33, 11));
@@ -211,21 +212,61 @@ function buildKamppi(root) {
     bikes.box('#596961', x - .16, .77, 12.5, .3, .07, .15);
     bikes.box('#ddc859', x + .65, .48, 12.5, .2, .9, .3);
   }
-  root.add(bikes.finish({ vertexColors: true })); obstacle(-5.5, 12.5, 18.9, .8, 1.05);
+  root.add(bikes.finish({ vertexColors: true })); propObstacle(-5.5, 12.5, 18.9, .8, 1.05);
+
+  // A raised crossing over Mannerheimintie gives the eastern edge a readable
+  // landmark. The stairs and bridge sit above street level and leave the path below open.
+  const overpass = createSceneryModel('Kamppi pedestrian overpass and bus shelter');
+  const deckY = 5.2, southZ = 54.8, northZ = 67.1, steps = 13;
+  const rise = deckY / steps, run = 6.25 / steps;
+  function rail(from, to, radius = .045) {
+    const a = new THREE.Vector3(...from), b = new THREE.Vector3(...to), direction = b.clone().sub(a);
+    const geometry = new THREE.CylinderGeometry(radius, radius, direction.length(), 6);
+    geometry.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.clone().normalize()));
+    geometry.translate(...a.addScaledVector(direction, .5).toArray());
+    overpass.geometry('#556962', geometry);
+  }
+  for (let i = 0; i < steps; i++) {
+    const y = (i + .5) * rise;
+    overpass.box('#83918a', 29.9 + (i + .5) * run, y, southZ, run + .08, .14, 2.5);
+    overpass.box('#83918a', 36.25 + (i + .5) * run, deckY - y, northZ, run + .08, .14, 2.5);
+  }
+  overpass.box('#687a72', 36.2, deckY - .08, 61.1, 2.55, .18, 14.2);
+  for (const x of [34.95, 37.45]) {
+    rail([x, deckY + .65, 54], [x, deckY + .65, 68.2], .05);
+    for (const z of [54.3, 68.1]) overpass.box('#586b64', x, deckY / 2, z, .24, deckY, .24);
+    for (let z = 54.5; z <= 68; z += 1.6) overpass.box('#64776f', x, deckY + .32, z, .07, .65, .07);
+  }
+  for (const z of [southZ - 1.25, southZ + 1.25]) {
+    rail([29.5, .65, z], [36.2, deckY + .4, z]);
+    for (let i = 0; i <= steps; i += 2) overpass.box('#64776f', 29.7 + i * run, i * rise + .5, z, .07, .8, .07);
+  }
+  for (const z of [northZ - 1.25, northZ + 1.25]) {
+    rail([36.25, deckY + .4, z], [42.95, .65, z]);
+    for (let i = 0; i <= steps; i += 2) overpass.box('#64776f', 36.4 + i * run, deckY - i * rise + .5, z, .07, .8, .07);
+  }
+  // A glass-sided stop and route board make the bridge land in a lived-in street.
+  overpass.box('#5a7068', 33, 1.42, 49.1, 4.2, 2.84, .16);
+  overpass.box('#9bb7ad', 33, 1.42, 49.2, 3.85, 2.38, .05);
+  overpass.box('#667c72', 33, 2.92, 49.05, 4.55, .16, .58);
+  overpass.box('#7a5b40', 33, .6, 49.85, 2.8, .14, .42);
+  overpass.box('#c8b66f', 31.05, 2.1, 48.94, .44, 1.18, .16);
+  root.add(overpass.finish({ vertexColors: true, roughness: .78 }));
+  propObstacle(33, 49.8, 2.8, .42, .75);
 
   // Simple modern light poles match the plaza, with taller contact wires at its edge.
   for (const x of [-11, 11]) for (const z of [-15, 6]) {
     street.geometry('#a1adaa', new THREE.CylinderGeometry(.05, .1, 5.8, 8).translate(x, 2.9, z));
     street.box('#596d6a', x, 5.75, z, 1.5, .08, .45);
     street.box('#e8e0b9', x, 5.7, z, 1.35, .035, .35);
-    obstacle(x, z, .25, .25, 5.9);
+    propObstacle(x, z, .25, .25, 5.9);
   }
   street.box('#5b6f69', 0, 4.08, TRAM_Z, 104, .025, .025);
   for (const x of [-40, -20, 0, 20, 40]) {
     street.box('#5b6f69', x, 4.3, TRAM_Z - .25, .025, .025, 11.5);
     for (const z of [TRAM_Z - 5.5, TRAM_Z + 5]) {
       street.geometry('#5b6f69', new THREE.CylinderGeometry(.055, .085, 4.5, 8).translate(x, 2.25, z));
-      obstacle(x, z, .22, .22, 4.5);
+      propObstacle(x, z, .22, .22, 4.5);
     }
   }
   root.add(street.finish({ vertexColors: true }));

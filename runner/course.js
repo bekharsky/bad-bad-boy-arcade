@@ -22,6 +22,7 @@ const CONTACT_MARGIN = .025;
 const PASSERBY_LANE_OFFSET = 1.35;
 const CAMEO_JOG_SPEED = 2.8;
 const FIRST_BUSY_CAMEO_DISTANCE = 22;
+const RUNNER_COLLISION_DAMAGE = 2;
 
 export const ROADWORK_TYPES = Object.freeze(['cone', 'tractor', 'barrier', 'trench']);
 const PROFILES = {
@@ -358,7 +359,7 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
     update(dt) {
       if (!Number.isFinite(dt) || dt < 0) throw new Error('Runner dt must be non-negative');
       const impacts = [];
-      let hits = 0, passed = 0, dodged = 0, warning = null, crash = null;
+      let hits = 0, damage = 0, passed = 0, dodged = 0, warning = null, crash = null;
       // Fixed maximum steps make collision, scoring and acceleration stable at
       // different refresh rates, including low-frame-rate mobile browsers.
       for (let remaining = dt; remaining > 1e-9 && !state.finished;) {
@@ -470,7 +471,7 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
           if (ROADWORK_TYPES.includes(traffic.kind)) { crash = impact; break; }
           traffic.recoiling = true;
           state.hitStop = RUNNER_IMPACT_PAUSE;
-          if (state.invulnerable <= 0) { hits++; state.invulnerable = traffic.crossing ? .45 : 1.2; }
+          if (state.invulnerable <= 0) { hits++; damage += RUNNER_COLLISION_DAMAGE; state.invulnerable = traffic.crossing ? .45 : 1.2; }
         }
         for (let i = state.traffic.length - 1; i >= 0; i--) {
           const agent = state.traffic[i], gap = agent.progress - state.distance;
@@ -493,7 +494,7 @@ export function createRunnerRun({ length = BAANA_LENGTH, random = Math.random, r
         }
         state.finished = state.distance >= length;
       }
-      return { hits, impacts, crash, passed, dodged, warning, finished: state.finished };
+      return { hits, damage, impacts, crash, passed, dodged, warning, finished: state.finished };
     },
   };
 }

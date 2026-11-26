@@ -195,8 +195,8 @@ export function createCathedral() {
     }
   }
   for (const [x, fz, turn, width, count, rise] of [
-    [0, -27.9, 0, 14.2, 6, 1.95], [0, -42.1, Math.PI, 14.2, 6, 1.95],
-    [-11, z, -Math.PI / 2, 8.2, 4, 1.5], [11, z, Math.PI / 2, 8.2, 4, 1.5],
+    [0, -27.9, 0, 14.2, 6, 1.95], [0, -42.1, Math.PI, 14.2, 4, 1.95],
+    [-11, z, -Math.PI / 2, 8.2, 2, 1.5], [11, z, Math.PI / 2, 8.2, 2, 1.5],
   ]) portico(church, x, fz, turn, base, width, count, rise);
   // One central double door with a glazed transom; side panels carry reliefs.
   box(STONE, 0, base + 1.55, -27.78, 1.9, 3.1, .2);

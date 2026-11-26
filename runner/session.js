@@ -55,9 +55,8 @@ export function createRunnerSession({
     const firing = keys.has('Space') || keys.has('Fire') || touchControls.input.firing || player.tapTimer > 0;
     for (const impact of result.impacts) onImpact(impact, impact === result.crash);
     if (result.crash) { onCrash(); return; }
-    if (result.hits && !onDamage(result.hits)) return;
-    const busyCrossing = state.crossings.some(crossing => crossing.phase === 'warning' || crossing.phase === 'crossing');
-    seagulls.update(dt, player, { scroll: player.moveSpeed, attacks: !state.finished && !busyCrossing });
+    if (result.damage && !onDamage(result.damage)) return;
+    seagulls.update(dt, player, { scroll: player.moveSpeed, attacks: !state.finished });
     if (!isPlaying()) return;
     onSpray(dt, firing, state.traffic);
     player.tapTimer = Math.max(0, player.tapTimer - dt);
