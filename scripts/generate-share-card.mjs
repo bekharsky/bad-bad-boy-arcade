@@ -10,17 +10,13 @@ const poster = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.
   <path fill="#b03225" d="M48 46H259L254 108H43Z"/>
   <g font-family="Barlow Condensed" font-weight="700">
     <text x="62" y="93" fill="#fff0cb" font-size="48" letter-spacing="1">PISS DEAL</text>
-    <g fill="#26221d" font-size="88">
-      <text x="44" y="251">Help Joulupukki</text>
-      <text x="44" y="338">fix his sleigh!</text>
+    <g fill="#26221d" font-size="76">
+      <text x="44" y="210">Help Bad Bad Boy</text>
+      <text x="44" y="292">find all 6 parts</text>
     </g>
-    <path stroke="#26221d" stroke-width="2" d="M48 414H523"/>
-    <text x="40" y="580" font-size="174" fill="#b03225">6</text>
-    <text x="148" y="488" font-size="30" fill="#714735">MISSING PARTS</text>
-    <text x="145" y="548" font-size="51" fill="#26221d">Find them all.</text>
-    <path fill="#26221d" d="M723 542H1160L1155 605H718Z"/>
-    <text x="740" y="582" fill="#ffce75" font-size="26">PLAY AS</text>
-    <text x="838" y="589" fill="#fff0cb" font-size="46">BAD BAD BOY</text>
+    <path stroke="#b03225" stroke-width="5" d="M48 361H150"/>
+    <text x="44" y="454" font-size="58" fill="#26221d">and fix</text>
+    <text x="44" y="521" font-size="58" fill="#26221d">Joulupukki’s sleigh!</text>
   </g></svg>`;
 const renderer = new Resvg(poster, {font:{fontBuffers:[font]}});
 await writeFile('public/share-card.png', renderer.render().asPng());
