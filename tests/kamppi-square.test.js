@@ -27,13 +27,14 @@ test('Kamppi follows Baana, supports direct/debug starts and retains normal diff
   assert.deepEqual(campaign.plan(1), { number: 1, enemyCount: 8, healthBonus: 0, mapId: 'kamppi' });
 });
 
-test('Narinkkatori has open combat lanes, solid landmarks and visible perimeter markers', () => {
+test('Amos Rex courtyard has open combat lanes, solid landmarks and visible perimeter markers', () => {
   const map = kamppiSquareMap.create();
   assert.equal(map.canStandAt(map.spawn.x, map.spawn.z, .736), true);
-  for (const [x, z] of [[0, -14], [0, -6], [8, 0], [12, -5], [-32, 19], [33, 19], [0, 26], [0, 35], [35, 52], [0, 61.5], [0, -39]]) {
+  assert.equal(map.name, 'Kamppi · Amos Rex');
+  for (const [x, z] of [[0, -14], [0, -6], [8, 0], [12, -5], [-32, 19], [33, 19], [0, 26], [0, 35], [35, 52], [35.8, 27], [-37.4, 34.5], [-32.7, 34.5], [0, 61.5], [0, -39]]) {
     assert.equal(map.canStandAt(x, z, .736), true, `Open lane at ${x}, ${z}`);
   }
-  for (const [x, z] of [[0, -29], [-31.5, -12], [-28, 7.5], [-22.8, 6.6], [5, 19], [14, -8], [30, 9], [0, 52], [-27, 42], [27, 42], [-17, 35], [-10, 31.5]]) {
+  for (const [x, z] of [[0, -29], [-31.5, -12], [-28, 7.5], [-22.8, 6.6], [5, 19], [14, -8], [30, 9], [0, 52], [-27, 42], [27, 42], [-17, 35], [-10, 31.5], [33.2, 27]]) {
     assert.equal(map.canStandAt(x, z, .736), false, `Solid scenery at ${x}, ${z}`);
   }
   assert.equal(map.lineClear3D({ x: -34, y: 1, z: 7.5 }, { x: -20, y: 1, z: 7.5 }), false, 'The chapel blocks liquid');
@@ -42,6 +43,8 @@ test('Narinkkatori has open combat lanes, solid landmarks and visible perimeter 
   assert.equal(map.lineClear3D({ x: -40, y: 1.5, z: -7 }, { x: -38.5, y: 1.5, z: -7 }), true, 'Liquid clears the low bench');
   assert.equal(map.lineClear(-37.5, -23, -37.5, 20, .736), true, 'Seating and planting leave the chapel promenade clear');
   assert.ok(map.root.getObjectByName('Kamppi Square boundary'));
+  assert.ok(map.root.getObjectByName('Amos Rex winter market'));
+  assert.ok(map.root.getObjectByName('Amos Rex ice rink'));
   for (const [x, z] of [[43, 0], [-43, 0], [0, -43], [0, 68.5]]) assert.equal(map.canStandAt(x, z, .736), false);
   map.dispose();
 });
@@ -52,11 +55,11 @@ test('the chapel is left of the mall and Kasarmi, Lasipalatsi and tram form succ
   const chapel = centre('Kamppi Chapel of Silence'), mall = centre('Kamppi shopping centre');
   const kasarmi = centre('Kulttuurikasarmi'), lasipalatsi = centre('Lasipalatsi'), clock = centre('Lasipalatsi clock tower');
   assert.ok(chapel.x < mall.x - 10, 'The chapel belongs on the left when facing the mall');
-  assert.ok(Math.abs(chapel.z - map.spawn.z) < 3, 'The chapel is at the near end of Narinkkatori');
+  assert.ok(Math.hypot(clock.x - map.spawn.x, clock.z - map.spawn.z) < 8, 'The player starts in the Amos Rex courtyard beside its clock tower');
   assert.ok(clock.x < 0, 'The clock moves toward the chapel side of the courtyard');
   assert.equal(map.canStandAt(-22, -6.5, .736), true, 'The old chapel footprint no longer blocks walking');
   assert.equal(map.canStandAt(8, 38, .736), true, 'The old clock footprint no longer blocks walking');
-  assert.ok(kasarmi.z > map.spawn.z && kasarmi.z - map.spawn.z < 15, 'The barracks sit close to the player');
+  assert.ok(kasarmi.z < map.spawn.z && map.spawn.z < lasipalatsi.z, 'The player starts in the courtyard behind Kasarmi');
   assert.ok(kasarmi.z < clock.z && clock.z < lasipalatsi.z, 'The clock courtyard sits behind Kasarmi');
   assert.ok(lasipalatsi.z < map.root.getObjectByName('Helsinki tram').position.z);
   const bounds = kamppiSquareMap.bounds;
@@ -73,7 +76,11 @@ test('surrounding city stays outside combat bounds, keeps tram portals clear and
   const bounds = kamppiSquareMap.bounds;
   for (const block of city.children) {
     const box = new THREE.Box3().setFromObject(block);
-    assert.ok(box.max.x < bounds.minX || box.min.x > bounds.maxX || box.max.z < bounds.minZ || box.min.z > bounds.maxZ, `${block.name} stays outside the playable map`);
+    if (['Salomonkatu offices backdrop', 'Arkadiankatu corner backdrop'].includes(block.name)) {
+      assert.ok(box.min.x > bounds.maxX - 2, `${block.name} sits close to the east edge`);
+    } else {
+      assert.ok(box.max.x < bounds.minX || box.min.x > bounds.maxX || box.max.z < bounds.minZ || box.min.z > bounds.maxZ, `${block.name} stays outside the playable map`);
+    }
     assert.ok(box.max.z < 60.5 || box.min.z > 62.5, `${block.name} leaves the tram entry and exit clear`);
   }
   const camera = new THREE.PerspectiveCamera(56, 1, .1, 150), hero = new THREE.Group();
@@ -88,7 +95,7 @@ test('surrounding city stays outside combat bounds, keeps tram portals clear and
 
 test('both sides of Kasarmi connect the playable squares and the far tram edge', () => {
   const map = kamppiSquareMap.create();
-  for (const point of [{ x: -22, z: 27 }, { x: 33, z: 27 }, { x: 0, z: 35 }, { x: 8, z: 43 }, { x: 35, z: 61.5 }, { x: -35, z: 61.5 }]) {
+  for (const point of [{ x: -22, z: 27 }, { x: 35.8, z: 27 }, { x: 0, z: 35 }, { x: 8, z: 43 }, { x: 35, z: 61.5 }, { x: -35, z: 61.5 }]) {
     map.routeTo(point.x, point.z);
     const actor = { ...map.spawn };
     for (let step = 0; step < 7000 && Math.hypot(actor.x - point.x, actor.z - point.z) > .5; step++) {

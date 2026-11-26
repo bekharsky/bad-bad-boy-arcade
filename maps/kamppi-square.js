@@ -13,10 +13,10 @@ const hidden = (x, z) => ({ x, z, jitter: .25 });
 
 export const kamppiSquareMap = {
   id: 'kamppi',
-  name: 'Kamppi · Narinkkatori',
-  spawn: { x: -5.5, z: 7.5, heading: Math.PI },
+  name: 'Kamppi · Amos Rex',
+  spawn: { x: -20, z: 38, heading: Math.PI * .75 },
   bounds: { minX: -43, maxX: 43, minZ: -43, maxZ: 68.5 },
-  openingCameoRoute: [[-12, 3.5], [-11, 3.5]],
+  openingCameoRoute: [[-17, 31], [-16, 31]],
   // Hidden entrances lead into and around Narinkkatori.
   pedestrianRoutes: [
     [[-16, 12], [-13, 8], [-10, 7], [-6, 4], [2, 3.5]],
@@ -28,7 +28,7 @@ export const kamppiSquareMap = {
   pickups: {
     sleigh: [{ x: -38, z: 4.5 }],
     medkit: [{ x: -2, z: 6 }, hidden(-12, -39), hidden(-38, 8), hidden(25, 27), hidden(-5, 57.5)],
-    battery: [hidden(12, -39), hidden(-38, 4.5), hidden(-15, 26), hidden(18, 57.5)],
+    battery: [hidden(12, -39), hidden(-38, 12), hidden(-12.5, 26), hidden(18, 57.5)],
     skates: [{ x: 23, z: 8 }],
   },
   create() { return createMap(kamppiSquareMap, buildKamppi); },
@@ -139,8 +139,8 @@ function buildKamppi(root) {
     { name: 'Simonkatu corner backdrop', x: -52, z: -32, width: 20, depth: 14, height: 8, color: '#c1aa92', turn: Math.PI / 2 },
     { name: 'Forum side backdrop', x: -52, z: 44, width: 28, depth: 14, height: 11, color: '#bfaa95', turn: Math.PI / 2 },
     { name: 'Hotel Presidentti backdrop', x: 51, z: -16, width: 40, depth: 12, height: 15, color: '#949c91', turn: -Math.PI / 2 },
-    { name: 'Salomonkatu offices backdrop', x: 51, z: 22, width: 28, depth: 12, height: 12, color: '#777f78', turn: -Math.PI / 2, glass: true },
-    { name: 'Arkadiankatu corner backdrop', x: 51, z: 48, width: 16, depth: 12, height: 10, color: '#d1bca2', turn: -Math.PI / 2 },
+    { name: 'Salomonkatu offices backdrop', x: 48, z: 22, width: 28, depth: 12, height: 12, color: '#777f78', turn: -Math.PI / 2, glass: true },
+    { name: 'Arkadiankatu corner backdrop', x: 48, z: 48, width: 16, depth: 12, height: 10, color: '#d1bca2', turn: -Math.PI / 2 },
     { name: 'Kamppi rear block west', x: -54, z: -53, width: 20, depth: 14, height: 9, color: '#cab79b' },
     { name: 'Simonkatu distant block', x: -54, z: -76, width: 26, depth: 12, height: 12, color: '#acb2a4' },
     { name: 'Kamppi rear block centre', x: -7, z: -53, width: 30, depth: 14, height: 13, color: '#a9b4aa', glass: true },
@@ -154,6 +154,8 @@ function buildKamppi(root) {
     const group = createKamppiCityBlock(block);
     // Even outside scenery must fade if the following camera enters a building.
     addBuilding(group); city.add(group);
+    if (block.name === 'Salomonkatu offices backdrop') obstacle(block.x, block.z, 12.4, 28.4, block.height + .5);
+    if (block.name === 'Arkadiankatu corner backdrop') obstacle(block.x, block.z, 12.4, 16.4, block.height + .5);
   }
 
   function bench(x, z, length = 3, alongStreet = false) {
@@ -187,7 +189,6 @@ function buildKamppi(root) {
     street.box('#e4dbb6', -40.5, 3.53, z, .55, .1, .55);
     propObstacle(-40.5, z, .22, .22, 3.6);
   }
-  for (const x of [-35, 35]) { planter(x, 28, 2, 2, true); bench(x, 33, 3); }
   const terrace = createSceneryModel('Narinkkatori cafe terrace');
   for (const x of [17, 22, 27]) {
     terrace.geometry('#aa8f65', new THREE.CylinderGeometry(.72, .72, .1, 16).translate(x, .95, 11));
@@ -214,8 +215,8 @@ function buildKamppi(root) {
   }
   root.add(bikes.finish({ vertexColors: true })); propObstacle(-5.5, 12.5, 18.9, .8, 1.05);
 
-  // The long eastern edge is an active promenade: cafes, bike parking, seats,
-  // lamps and planted trees break up the broad paved strip beside the blocks.
+  // The old Narinkkatori kiosk remains by the square; the courtyard gets a
+  // proper Christmas market below, beside the closer Salomonkatu buildings.
   function kiosk(x, z, bodyColor, canopyColor) {
     street.box(bodyColor, x, 1.02, z, 2.55, 2.04, 1.85);
     street.box('#e6dcc6', x, 1.12, z + .94, 2.04, 1.05, .08);
@@ -227,17 +228,88 @@ function buildKamppi(root) {
     propObstacle(x, z, 2.85, 2.2, 2.8);
   }
   kiosk(23.2, -17.5, '#4d675e', '#bf6849');
-  kiosk(23.8, 35.5, '#52696c', '#d1ad58');
-  for (const z of [-23, -7, 9, 26, 44]) planter(40.3, z, 1.45, 1.65, true);
-  for (const z of [-15, 1, 31, 48]) bench(37.1, z, 2.8, true);
-  for (const z of [-22, -5, 12, 29, 46]) {
-    street.geometry('#62766c', new THREE.CylinderGeometry(.06, .1, 5.3, 8).translate(32.8, 2.65, z));
-    street.box('#d4c98f', 32.8, 5.28, z, .7, .16, .38);
-    street.box('#e9ddb5', 32.8, 5.19, z, .54, .04, .26);
-    propObstacle(32.8, z, .23, .23, 5.35);
+  // A compact public rink fills the west side of Amos Rex courtyard. Its open
+  // east gate faces the clock tower and the new player start.
+  const rinkX = -37.4, rinkZ = 34.5, rinkWidth = 8.8, rinkDepth = 13.2;
+  const rinkLeft = rinkX - rinkWidth / 2, rinkRight = rinkX + rinkWidth / 2;
+  const rinkNear = rinkZ - rinkDepth / 2, rinkFar = rinkZ + rinkDepth / 2;
+  const ice = new THREE.Mesh(
+    new THREE.PlaneGeometry(rinkWidth, rinkDepth),
+    new THREE.MeshStandardMaterial({ color: '#b9dce4', roughness: .24, metalness: .06 }),
+  );
+  ice.name = 'Amos Rex ice rink'; ice.rotation.x = -Math.PI / 2; ice.position.set(rinkX, .018, rinkZ); ice.receiveShadow = true; root.add(ice);
+  const rink = createSceneryModel('Amos Rex rink boards');
+  const rinkRail = (x, z, w, d) => {
+    rink.box('#f0eee3', x, .44, z, w, .82, d);
+    rink.box('#7d5840', x, .12, z, w + .04, .2, d + .04);
+    rink.box('#b85f50', x, .76, z, w + .04, .08, d + .04);
+    obstacle(x, z, w, d, .9);
+  };
+  rinkRail(rinkX, rinkNear, rinkWidth, .16);
+  rinkRail(rinkX, rinkFar, rinkWidth, .16);
+  rinkRail(rinkLeft, rinkZ, .16, rinkDepth);
+  for (const [start, end] of [[rinkNear, rinkZ - 1.85], [rinkZ + 1.85, rinkFar]]) {
+    rinkRail(rinkRight, (start + end) / 2, .16, end - start);
   }
-  const bikeParking = createSceneryModel('Kamppi east side bicycle parking');
-  for (const z of [-17, 34]) {
+  for (const z of [rinkNear, rinkFar]) for (const x of [rinkLeft, rinkRight]) {
+    rink.box('#eee8d8', x, 1.03, z, .13, .62, .13);
+  }
+  for (const x of [rinkLeft, rinkRight]) for (let z = rinkNear + 1.3; z < rinkFar; z += 1.65) {
+    if (x === rinkRight && Math.abs(z - rinkZ) < 2.2) continue;
+    rink.box('#eee8d8', x, 1.03, z, .13, .62, .13);
+  }
+  for (const z of [rinkNear, rinkFar]) for (let x = rinkLeft + 1.2; x < rinkRight; x += 1.55) {
+    rink.box('#eee8d8', x, 1.03, z, .13, .62, .13);
+  }
+  rink.box('#e9f3f1', rinkX, .045, rinkZ, .09, .012, rinkDepth - .7);
+  rink.box('#d46a5c', rinkX, .047, rinkZ, rinkWidth - .7, .014, .08);
+  rink.geometry('#f2fbf8', new THREE.TorusGeometry(1.05, .035, 6, 36).rotateX(Math.PI / 2).translate(rinkX, .055, rinkZ));
+  for (const x of [rinkX - 2.2, rinkX + 2.2]) for (const z of [rinkZ - 4.3, rinkZ + 4.3]) {
+    rink.geometry('#f2fbf8', new THREE.TorusGeometry(.28, .025, 5, 18).rotateX(Math.PI / 2).translate(x, .055, z));
+  }
+  root.add(rink.finish({ vertexColors: true, roughness: .78 }));
+
+  // Two rows of open-front timber stalls leave a generous central aisle.
+  // Their striped awnings and little counters read as a New Year market at a glance.
+  const winterMarket = createSceneryModel('Amos Rex winter market');
+  const canopies = ['#b95345', '#557761', '#c59a4c', '#426b78'];
+  const marketRows = [{ x: 33.2, facing: 1 }, { x: 38.3, facing: -1 }];
+  for (const [rowIndex, row] of marketRows.entries()) for (const [stallIndex, z] of [27, 33.2, 39.4, 45.6].entries()) {
+    const x = row.x, facing = row.facing, color = canopies[(rowIndex * 2 + stallIndex) % canopies.length];
+    winterMarket.box('#6b5039', x, .13, z, 3.35, .22, 3.85);
+    winterMarket.box('#e9e3d5', x, .27, z, 3.42, .08, 3.92);
+    for (const side of [-1, 1]) for (const end of [-1, 1]) {
+      winterMarket.box('#75563d', x + side * 1.48, 1.46, z + end * 1.73, .12, 2.56, .12);
+    }
+    // Back panel and counter face the lane between the two rows.
+    winterMarket.box('#6a5944', x - facing * 1.38, 1.35, z, .14, 2.1, 3.45);
+    winterMarket.box('#8b6543', x + facing * .83, .7, z, .32, 1.12, 3.12);
+    winterMarket.box('#c39b5a', x + facing * .83, 1.29, z, .38, .12, 3.24);
+    for (let item = -1; item <= 1; item++) {
+      winterMarket.box(item === 0 ? '#bd6750' : '#6d8a57', x + facing * .74, 1.43, z + item * .78, .38, .22, .48);
+      winterMarket.geometry(item === 0 ? '#e1b65a' : '#cf8150', new THREE.IcosahedronGeometry(.15, 0).translate(x + facing * .69, 1.61, z + item * .78));
+    }
+    for (let stripe = -3; stripe <= 3; stripe++) {
+      const stripeColor = Math.abs(stripe) % 2 ? '#f3e6cd' : color;
+      winterMarket.box(stripeColor, x, 2.76, z + stripe * .48, 3.42, .16, .48);
+      winterMarket.box(stripeColor, x + facing * 1.86, 2.54, z + stripe * .48, .08, .38, .48);
+    }
+    winterMarket.box('#f3e6cd', x, 2.69, z - 1.82, 3.48, .18, .12);
+    winterMarket.box('#f3e6cd', x, 2.69, z + 1.82, 3.48, .18, .12);
+    winterMarket.box('#f0dfbf', x + facing * 1.92, 2.14, z, .08, .34, .92);
+    winterMarket.box(color, x + facing * 1.97, 2.14, z, .05, .16, .62);
+    propObstacle(x, z, 3.2, 3.8, 2.9);
+  }
+  root.add(winterMarket.finish({ vertexColors: true, roughness: .82 }));
+
+  // Warm lights span the market lane; the shop fronts remain open and clear.
+  const marketLights = [27, 33.2, 39.4, 45.6].map(z => ({
+    from: [33.2, 4.4, z], to: [38.3, 4.4, z], sag: .4, spacing: .75, lanternSpacing: 2.8, figureSpacing: 8,
+  }));
+  const rinkTree = { x: rinkX, z: rinkFar + 1.6, scale: .56 };
+
+  const bikeParking = createSceneryModel('Kamppi Narinkkatori bicycle parking');
+  for (const z of [-17]) {
     bikeParking.box('#62756c', 29.7, .07, z, 3.3, .12, .12);
     for (let bike = 0; bike < 3; bike++) {
       const x = 28.7 + bike * 1;
@@ -309,7 +381,7 @@ function buildKamppi(root) {
   addChristmasDecorations(root, {
     wreaths: [-11, 11].flatMap(x => [-15, -8, 0, 6].map(z => ({ x, y: 5.05, z }))),
     groundFigures: {
-      trees: [{ x: -22, z: -3, scale: .62 }],
+      trees: [{ x: -22, z: -3, scale: .62 }, rinkTree],
       deer: [{ x: 22, z: -3, scale: .54, rotationY: Math.PI / 2 }],
     },
     strands: [
@@ -321,6 +393,7 @@ function buildKamppi(root) {
         from: [x, 6.6, -15], to: [x, 6.6, 6],
         sag: .9, spacing: 1.05, lanternSpacing: 2.6, figureSpacing: 7.5,
       })),
+      ...marketLights,
     ],
   });
 
