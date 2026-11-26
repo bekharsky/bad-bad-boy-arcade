@@ -25,10 +25,22 @@
       <div id="hero-hud" class="hero-hud" hidden>
         <div id="encounter-hint" class="encounter-hint" role="status" hidden>
           <svg class="mouse-hint-icon" viewBox="0 0 24 34" aria-hidden="true" focusable="false">
-            <path class="mouse-hint-left" d="M12 2a10 10 0 0 0-10 10v3h10Z"/>
-            <path class="mouse-hint-right" d="M12 2a10 10 0 0 1 10 10v3H12Z"/>
-            <rect x="2" y="2" width="20" height="30" rx="10"/>
-            <path d="M2 15h20M12 2v13"/>
+            <g class="mouse-hint-mouse">
+              <path class="mouse-hint-left" d="M12 2a10 10 0 0 0-10 10v3h10Z"/>
+              <path class="mouse-hint-right" d="M12 2a10 10 0 0 1 10 10v3H12Z"/>
+              <rect x="2" y="2" width="20" height="30" rx="10"/>
+              <path d="M2 15h20M12 2v13"/>
+            </g>
+          </svg>
+          <svg class="touch-hint-icon" viewBox="0 0 24 34" aria-hidden="true" focusable="false">
+            <g class="touch-hint-tap">
+              <circle cx="12" cy="19" r="8"/>
+              <circle class="touch-tap-point" cx="12" cy="19" r="2.4"/>
+              <path d="M12 2v5M2 19h4m12 0h4M5 9l3 3m11-3-3 3"/>
+            </g>
+            <g class="touch-hint-swipe">
+              <path d="M12 31V5m-6 6 6-6 6 6M5 32h14"/>
+            </g>
           </svg>
           <span class="encounter-hint-label"></span>
         </div>
@@ -73,38 +85,40 @@
             </g>
           </svg>
         </div>
-        <div class="boost-hud">
-          <svg id="battery-boost" viewBox="0 0 32 32" role="img" aria-label="Battery boost active" hidden>
-            <circle cx="16" cy="16" r="14" class="boost-bg"/>
-            <circle cx="16" cy="16" r="13" pathLength="100" class="boost-time" transform="rotate(-90 16 16)"/>
-            <path d="M17.5 8.5 10.5 17h5l-1 6.5 7-8.5h-5Z" fill="currentColor"/>
-          </svg>
-          <svg id="skates-boost" viewBox="0 0 32 32" role="img" aria-label="Speed skates active" hidden>
-            <circle cx="16" cy="16" r="14" class="boost-bg"/>
-            <circle cx="16" cy="16" r="13" pathLength="100" class="boost-time" transform="rotate(-90 16 16)"/>
-            <path d="M11 9h4.5l1 5 5 2.2c1.2.5 1.5 1.9 1 3H10Z" fill="currentColor"/>
-            <path d="M9 22h12q2 0 3-1.5M12 19v3m8-3v3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-          </svg>
-        </div>
         <button id="pause-game" class="icon-button pause-button" type="button" aria-label="Pause" aria-haspopup="dialog" aria-controls="pause-dialog">
           <svg aria-hidden="true" focusable="false"><use href="#pause-icon" /></svg>
         </button>
-        <div id="level-dial" class="level-dial" role="group" aria-label="Score 0000, level progress 0 percent, health 5 of 5">
-          <svg viewBox="0 0 100 100" aria-hidden="true" focusable="false">
-            <defs>
-              <linearGradient id="health-gradient" x1="17.1" y1="31" x2="82.9" y2="31" gradientUnits="userSpaceOnUse">
-                <stop offset="0" stop-color="#56d58d" />
-                <stop offset="0.38" stop-color="#f0d75c" />
-                <stop offset="0.70" stop-color="#f59b4d" />
-                <stop offset="1" stop-color="#ed5157" />
-              </linearGradient>
-            </defs>
-            <path class="health-arc-track" d="M 82.9 31 A 38 38 0 0 0 17.1 31" />
-            <path id="health-progress-arc" class="health-progress-arc" d="M 82.9 31 A 38 38 0 0 0 17.1 31" pathLength="100" stroke="url(#health-gradient)" stroke-dasharray="100 100" />
-            <path class="level-arc-track" d="M 12 50 A 38 38 0 0 0 88 50" />
-            <path id="level-progress-arc" class="level-progress-arc" d="M 12 50 A 38 38 0 0 0 88 50" pathLength="100" stroke-dasharray="0 100" />
-          </svg>
-          <strong id="score">0000</strong>
+        <div class="health-hud">
+          <div class="boost-hud">
+            <svg id="battery-boost" viewBox="0 0 32 32" role="img" aria-label="Battery boost active" hidden>
+              <circle cx="16" cy="16" r="14" class="boost-bg"/>
+              <circle cx="16" cy="16" r="13" pathLength="100" class="boost-time" transform="rotate(-90 16 16)"/>
+              <path d="M17.5 8.5 10.5 17h5l-1 6.5 7-8.5h-5Z" fill="currentColor"/>
+            </svg>
+            <svg id="skates-boost" viewBox="0 0 32 32" role="img" aria-label="Speed skates active" hidden>
+              <circle cx="16" cy="16" r="14" class="boost-bg"/>
+              <circle cx="16" cy="16" r="13" pathLength="100" class="boost-time" transform="rotate(-90 16 16)"/>
+              <path d="M11 9h4.5l1 5 5 2.2c1.2.5 1.5 1.9 1 3H10Z" fill="currentColor"/>
+              <path d="M9 22h12q2 0 3-1.5M12 19v3m8-3v3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div id="level-dial" class="level-dial" role="group" aria-label="Score 0000, level progress 0 percent, health 5 of 5">
+            <svg viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+              <defs>
+                <linearGradient id="health-gradient" x1="17.1" y1="31" x2="82.9" y2="31" gradientUnits="userSpaceOnUse">
+                  <stop offset="0" stop-color="#56d58d" />
+                  <stop offset="0.38" stop-color="#f0d75c" />
+                  <stop offset="0.70" stop-color="#f59b4d" />
+                  <stop offset="1" stop-color="#ed5157" />
+                </linearGradient>
+              </defs>
+              <path class="health-arc-track" d="M 82.9 31 A 38 38 0 0 0 17.1 31" />
+              <path id="health-progress-arc" class="health-progress-arc" d="M 82.9 31 A 38 38 0 0 0 17.1 31" pathLength="100" stroke="url(#health-gradient)" stroke-dasharray="100 100" />
+              <path class="level-arc-track" d="M 12 50 A 38 38 0 0 0 88 50" />
+              <path id="level-progress-arc" class="level-progress-arc" d="M 12 50 A 38 38 0 0 0 88 50" pathLength="100" stroke-dasharray="0 100" />
+            </svg>
+            <strong id="score">0000</strong>
+          </div>
         </div>
       </header>
 
@@ -221,7 +235,6 @@
         </div>
       </div>
       <div id="toast" class="toast" aria-live="polite"></div>
-      <div id="spray-tutorial" class="spray-tutorial" role="status"></div>
     </main>
   </body>
 </html>

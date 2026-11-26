@@ -58,18 +58,27 @@ button { font: inherit; }
 .hero-hud { position: absolute; left: 0; top: 0; width: 64px; height: 7px; pointer-events: none; }
 .encounter-hint { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 4px; padding: 5px 9px; border-radius: 6px; background: #121622ed; color: var(--gold); font: 700 13px/1.3 Inter, sans-serif; white-space: nowrap; }
 .mouse-hint-icon { display: block; width: 24px; height: 34px; fill: none; stroke: #fff2d6; stroke-width: 1.6; stroke-linejoin: round; }
+.touch-hint-icon { display: none; width: 24px; height: 34px; fill: none; stroke: #fff2d6; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .encounter-hint:not([data-button]) .mouse-hint-icon { display: none; }
 .encounter-hint[data-button] { padding: 5px 7px; border-radius: 9px; }
 .encounter-hint[data-button] .encounter-hint-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .encounter-hint[data-button="left"] .mouse-hint-left, .encounter-hint[data-button="right"] .mouse-hint-right { fill: var(--gold); }
+.encounter-hint[data-touch-action] { padding: 5px 7px; border-radius: 9px; }
+.encounter-hint[data-touch-action] .touch-hint-icon { display: block; }
+.encounter-hint[data-touch-action] .encounter-hint-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.touch-hint-tap, .touch-hint-swipe { display: none; }
+.encounter-hint[data-touch-action="tap"] .touch-hint-tap,
+.encounter-hint[data-touch-action="swipe"] .touch-hint-swipe { display: block; }
+.touch-tap-point { fill: var(--gold); }
 @keyframes encounter-hint-blink {
   from { opacity: 1; }
   50%, to { opacity: 0; }
 }
 @media (prefers-reduced-motion: no-preference) {
-  .encounter-hint:not([data-button]),
+  .encounter-hint:not([data-button]):not([data-touch-action]),
   .encounter-hint[data-button="left"] .mouse-hint-left,
-  .encounter-hint[data-button="right"] .mouse-hint-right { animation: encounter-hint-blink 500ms step-end 8 forwards; }
+  .encounter-hint[data-button="right"] .mouse-hint-right,
+  .encounter-hint[data-touch-action] .touch-hint-icon { animation: encounter-hint-blink 500ms step-end 8 forwards; }
 }
 
 .hud { position: absolute; z-index: 2; top: 0; left: 0; right: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 10px; padding: 10px clamp(16px, 4vw, 54px) 0; pointer-events: none; }
@@ -80,14 +89,15 @@ button { font: inherit; }
 #sleigh-segments .collected { stroke: #ffd069; }
 .sleigh-silhouette { fill: #554836a6; }
 .sleigh-filled { fill: #ffdb80; }
-.boost-hud { grid-column: 1; grid-row: 2; justify-self: center; display: flex; gap: 4px; margin-top: -7px; }
+.health-hud { grid-column: 3; grid-row: 1; justify-self: end; display: flex; align-items: center; gap: 8px; }
+.boost-hud { display: flex; align-items: center; gap: 4px; margin: 0; }
 .boost-hud:not(:has(svg:not([hidden]))) { display: none; }
 .boost-hud svg { width: 28px; height: 28px; }
 #battery-boost { color: #a3f17c; }
 #skates-boost { color: #a1e6ff; }
 .boost-bg { fill: #121d29e8; stroke: #eaf1ff46; stroke-width: 1.5; }
 .boost-time { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
-.level-dial { position: relative; grid-column: 3; grid-row: 1; justify-self: end; width: 72px; height: 72px; display: grid; place-items: center; }
+.level-dial { position: relative; flex: none; width: 72px; height: 72px; display: grid; place-items: center; }
 .level-dial svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 .level-arc-track, .health-arc-track, .level-progress-arc, .health-progress-arc { fill: none; stroke-linecap: round; stroke-width: 5; }
 .health-arc-track { stroke: #586573b5; }
@@ -144,9 +154,7 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 900 clamp(52px, 8vw, 78px
 .runner-mode .end-card h2 { font-size: clamp(28px, 4.5vw, 48px); line-height: 1; }
 .toast { position: absolute; z-index: 3; top: 82px; left: 50%; transform: translate(-50%, -10px); padding: 9px 15px; border: 1px solid #ffffff20; border-radius: 999px; color: var(--gold); background: #181925df; font: 700 12px/1 "Barlow Condensed", sans-serif; letter-spacing: .12em; opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; }
 .toast.visible { transform: translate(-50%, 0); opacity: 1; }
-.spray-tutorial { position: absolute; z-index: 3; left: 50%; bottom: max(32px, calc(env(safe-area-inset-bottom) + 18px)); width: max-content; max-width: calc(100% - 32px); transform: translateX(-50%); padding: 10px 15px; border-radius: 8px; background: #121622ed; color: var(--ink); font: 700 14px/1.4 Inter, sans-serif; text-align: center; pointer-events: none; }
-.spray-tutorial:empty { opacity: 0; }
-.map-changing .spray-tutorial, .game-shell:has(#pause-dialog[open]) :is(.spray-tutorial, .encounter-hint) { visibility: hidden; }
+.map-changing .encounter-hint, .game-shell:has(#pause-dialog[open]) .encounter-hint { visibility: hidden; }
 .mobile-controls { display: none; }
 .runner-start-hint { display: none; }
 .runner-mode .runner-start-hint { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; margin-top: 20px; color: var(--muted); font-size: 11px; letter-spacing: .08em; }
@@ -255,7 +263,6 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 900 clamp(52px, 8vw, 78px
 
 @media (pointer: coarse) {
   .start-controls { display: none; }
-  .spray-tutorial { bottom: calc(var(--control-bottom) + 123px); }
 }
 
 @media (max-width: 380px) {
@@ -264,6 +271,9 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 900 clamp(52px, 8vw, 78px
   .start-controls kbd { padding: 0 4px; font-size: 10px; }
   .runner-mode .runner-start-hint { font-size: 10px; }
   .runner-start-hint kbd { padding: 4px 6px; font-size: 16px; }
+  .health-hud { gap: 4px; }
+  .boost-hud svg { width: 24px; height: 24px; }
+  .level-dial { width: 64px; height: 64px; }
 }
 
 @media (max-height: 560px) and (min-width: 681px) {

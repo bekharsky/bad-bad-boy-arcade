@@ -102,7 +102,7 @@ let shownCameo = null;
 let nextLine = 0;
 const toast = document.querySelector('#toast');
 const encounterHint = document.querySelector('#encounter-hint');
-const sprayTutorial = createSprayTutorial(document.querySelector('#spray-tutorial'), encounterHint);
+const sprayTutorial = createSprayTutorial(encounterHint);
 const sprayButton = document.querySelector('#mobile-fire');
 const sprayZone = document.querySelector('#spray-zone');
 const pauseDialog = document.querySelector('#pause-dialog');
@@ -137,6 +137,16 @@ const touchControls = createTouchControls({
   fireButton: sprayButton,
   fireHome: document.querySelector('#spray-home'),
   getAimHeading: previous => usingTouchControls ? previous ?? player.heading : player.heading,
+  onRunnerDodge(direction) {
+    if (!playing || !isRunner() || pauseDialog.open || gameInterlude()) return false;
+    runnerSession.dodge(direction);
+    return true;
+  },
+  onFireCancel() {
+    player.tapTimer = 0;
+    player.upwardTap = false;
+    player.touchTapHeading = null;
+  },
   onFireStart: (airborne, heading, fresh) => beginSpray(false, airborne, heading, fresh),
   onInput() {
     canvas.focus({ preventScroll: true });
