@@ -5,7 +5,7 @@ import font from '../art/BarlowCondensed-Bold.ttf';
 
 const background = 'data:image/png;base64,' + btoa(Array.from(new Uint8Array(scene), byte => String.fromCharCode(byte)).join(''));
 let ready;
-export async function renderScoreCard({ nickname, score, wave }) {
+export async function renderScoreCard({ nickname, score }) {
   await (ready ??= initWasm(wasm));
   const name = nickname.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
   const points = Number(score).toLocaleString('en');
@@ -14,9 +14,9 @@ export async function renderScoreCard({ nickname, score, wave }) {
     <image x="-170" y="-64" width="1540" height="810" xlink:href="${background}"/>
     <rect y="180" width="1200" height="450" fill="url(#shade)"/>
     <g font-family="Barlow Condensed" font-weight="700">
-    <text x="56" y="388" font-size="34" fill="#ffcf69">PISS DEAL  /  ${name}  /  DISTRICT ${wave}</text>
+    <text x="56" y="388" font-size="24" fill="#ffcf69">PISS DEAL<tspan dx="22" font-size="36" fill="white">${name}</tspan></text>
     <text x="52" y="516" font-size="112" fill="#fff5de">${points} POINTS</text>
-    <text x="56" y="577" font-size="42" fill="white">Find all 6 parts. Rebuild Santa’s sleigh.</text></g></svg>`;
+    <text x="56" y="577" font-size="42" fill="white">Santa wrecked his ride. Find all 6 sleigh parts.</text></g></svg>`;
   const renderer = new Resvg(svg, {font:{fontBuffers:[new Uint8Array(font)]}});
   try {
     const image = renderer.render();
