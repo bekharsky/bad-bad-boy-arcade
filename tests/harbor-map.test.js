@@ -57,7 +57,12 @@ test('tram pushes actors clear, blocks ground spray, and restores the crossing a
   const across = () => city.lineClear3D(new THREE.Vector3(0, 1, -8), new THREE.Vector3(0, 1, -2), .05);
   assert.equal(tram.visible, false);
   assert.equal(across(), true);
-  for (let i = 0; i < 15 * 60; i++) city.update(1 / 60, [player, enemy]);
+  let delayedFrames = 0;
+  while (across() && delayedFrames < 20 * 60) {
+    city.update(1 / 60, [player, enemy]);
+    delayedFrames++;
+  }
+  assert.ok(delayedFrames >= 10 * 60, 'The first tram arrives after its opening delay');
   assert.equal(tram.visible, true);
   assert.equal(across(), false);
   assert.equal(city.lineClear3D(new THREE.Vector3(0, 4.5, -8), new THREE.Vector3(0, 4.5, -2), .05), true);
@@ -79,14 +84,14 @@ test('tram pushes actors clear, blocks ground spray, and restores the crossing a
 
 test('West Harbor players can draw a pack of enemies onto the tracks for one tram pass', () => {
   const { city } = setup();
-  const player = { x: 0, z: -8, radius: .6, hp: 5, invulnerable: 0, root: new THREE.Group() };
+  const player = { x: 0, z: -6.3, radius: .6, hp: 5, invulnerable: 60, root: new THREE.Group() };
   const eliminated = [];
   const enemies = [-1.5, -.5, .5, 1.5].map((x, index) => ({
     x, z: 2.8 + index * .16, size: .47, speed: .62, attack: 0, hit: 0, alive: true, root: new THREE.Group(),
     onTramHit(enemy) { enemy.alive = false; eliminated.push(enemy); },
   }));
   const combat = createArenaCombat({ world: city, player, enemies, animateEnemy() {}, onBite() {} });
-  for (let frame = 0; frame < 16 * 60; frame++) {
+  for (let frame = 0; frame < 30 * 60 && eliminated.length < enemies.length; frame++) {
     city.update(1 / 60, [player, ...enemies]);
     combat.update(1 / 60, frame / 60);
   }

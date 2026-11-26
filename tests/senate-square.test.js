@@ -269,7 +269,7 @@ test('the square tram clears actors, blocks liquid while passing and resets its 
   const crossing = () => map.lineClear3D({ x: 0, y: 1, z: 11.5 }, { x: 0, y: 1, z: 17.5 });
   assert.equal(tram.visible, false);
   assert.equal(crossing(), true);
-  for (let i = 0; i < 14.5 * 60; i++) map.update(1 / 60, actors);
+  for (let i = 0; i < 20 * 60 && crossing(); i++) map.update(1 / 60, actors);
   assert.equal(tram.visible, true);
   assert.equal(crossing(), false);
   for (const actor of actors) {

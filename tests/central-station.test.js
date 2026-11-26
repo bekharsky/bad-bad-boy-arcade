@@ -39,9 +39,16 @@ test('station tram crosses the forecourt, yields a clear crossing and returns on
     const waiting = { x: 12, z, radius: .74, root: new THREE.Group() };
     let passed = 0;
     const enemy = { x: 12, z, size: .6, alive: true, onTramHit() { this.alive = false; passed++; } };
-    assert.ok(tram.visible && map.lineClear3D(from, to));
+    assert.equal(tram.visible, false);
+    assert.ok(map.lineClear3D(from, to));
     assert.equal(map.canStandAt(x, z, .5), false);
-    for (let i = 0; i < 120; i++) map.update(1 / 60, [waiting, enemy]);
+    let delayedFrames = 0;
+    while (map.lineClear3D(from, to) && delayedFrames < 35 * 60) {
+      map.update(1 / 60, [waiting, enemy]);
+      delayedFrames++;
+    }
+    assert.ok(delayedFrames >= 10 * 60, 'The first service waits before entering the station');
+    assert.ok(tram.visible);
     assert.equal(map.lineClear3D(from, to), false);
     assert.ok(map.canStandAt(waiting.x, waiting.z, waiting.radius));
     assert.equal(passed, 1);

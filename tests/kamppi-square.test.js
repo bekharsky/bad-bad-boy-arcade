@@ -128,7 +128,7 @@ test('Mannerheimintie tram clears player and enemies, blocks liquid and resets w
   const actors = [{ x: 0, z: 61.5, radius: .736, root: new THREE.Group() }, { x: 0, z: 61.5, size: .52, alive: true, root: new THREE.Group() }];
   const crossing = () => map.lineClear3D({ x: 0, y: 1, z: 59 }, { x: 0, y: 1, z: 64 });
   assert.equal(tram.visible, false); assert.equal(crossing(), true);
-  for (let i = 0; i < 17 * 60; i++) map.update(1 / 60, actors);
+  for (let i = 0; i < 25 * 60 && crossing(); i++) map.update(1 / 60, actors);
   assert.equal(tram.visible, true); assert.equal(crossing(), false);
   for (const actor of actors) {
     assert.ok(Math.abs(actor.z - 61.5) > 1.4);
