@@ -1,3 +1,4 @@
+import { bindShareButtons } from './share.js';
 import * as THREE from 'three';
 import { createHero, animateHero, animateSkating, HERO_BASE_HEIGHT } from './hero.js';
 import { loadHero } from './models/hero-loader.js';
@@ -312,6 +313,17 @@ let geeseDefeated = 0;
 let healthLost = 0;
 let levelProgress = 0;
 let levelIndex = 0;
+bindShareButtons({
+  gameButton: document.querySelector('#share-game'),
+  gameStatus: document.querySelector('#share-game-status'),
+  scoreButton: document.querySelector('#share-score'),
+  scoreStatus: document.querySelector('#share-score-status'),
+  getResult: () => ({
+    nickname: document.querySelector('#player-name').value.trim() || 'Bad Bad Boy',
+    score,
+    wave: levelIndex + 1,
+  }),
+});
 let foundParts = 0;
 let intro = null;
 let introLoading = false;

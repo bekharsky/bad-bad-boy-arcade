@@ -14,3 +14,8 @@ enabled = true
 binding = "DB"
 database_name = "piss-deal-leaderboard"
 database_id = "f3e845dc-e03b-4ac2-8513-684b59af7e13"
+
+[[rules]]
+type = "Data"
+globs = ["**/*.jpg"]
+fallthrough = true

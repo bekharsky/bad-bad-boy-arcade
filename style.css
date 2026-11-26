@@ -190,6 +190,12 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 800 clamp(38px, 6vw, 58px
 .secondary-button { width: 100%; margin: -6px 0 16px; padding: 9px 12px; border: 1px solid #e3cfa258; border-radius: 2px; color: #fff2d3; background: #ffffff0b; font: 700 12px/1.2 Inter, sans-serif; letter-spacing: .02em; cursor: pointer; }
 .secondary-button:hover { border-color: #ffd34e; background: #ffd34e12; }
 .secondary-button[hidden] { display: none; }
+.game-share-button { margin: 10px 0 0; }
+.share-status { min-height: 0; margin: 0; color: #d8d5c4; font: 500 11px/1.4 Inter, sans-serif; }
+.share-status:not(:empty) { min-height: 16px; margin-top: 6px; }
+.score-share-button { margin: -12px 0 16px; }
+#start-screen.map-debug .game-share-button { display: none; }
+.share-status:empty { display: none; }
 #start-screen h1 { margin: 12px 0 0; color: #fff2d3; font-size: clamp(38px, 12vw, 62px); line-height: 1; white-space: nowrap; }
 .holiday-card .primary-button { border-radius: 6px; background: linear-gradient(115deg, #ffdf8d, #ffc456); box-shadow: none; color: #30212a; }
 #start-screen .start-control-label, #start-screen .runner-control { color: #d1d8c3; }
