@@ -17,5 +17,5 @@ database_id = "f3e845dc-e03b-4ac2-8513-684b59af7e13"
 
 [[rules]]
 type = "Data"
-globs = ["**/*.jpg"]
+globs = ["**/*.png", "**/*.ttf"]
 fallthrough = true

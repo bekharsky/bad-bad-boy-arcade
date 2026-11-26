@@ -1,17 +1,26 @@
-import { ImageResponse } from 'cf-workers-og/workerd/html';
-import scene from '../art/senate-square.jpg';
+import { initWasm, Resvg } from '@resvg/resvg-wasm';
+import wasm from '@resvg/resvg-wasm/index_bg.wasm';
+import scene from '../art/senate-square.png';
+import font from '../art/BarlowCondensed-Bold.ttf';
 
-const background = 'data:image/jpeg;base64,' + btoa(Array.from(new Uint8Array(scene), byte => String.fromCharCode(byte)).join(''));
-
-export function renderScoreCard({ nickname, score, wave }) {
-  const name = nickname.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const background = 'data:image/png;base64,' + btoa(Array.from(new Uint8Array(scene), byte => String.fromCharCode(byte)).join(''));
+let ready;
+export async function renderScoreCard({ nickname, score, wave }) {
+  await (ready ??= initWasm(wasm));
+  const name = nickname.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
   const points = Number(score).toLocaleString('en');
-  return ImageResponse.create(`<div style="display:flex;position:relative;width:1200px;height:630px;background:#172437;color:white">
-    <img src="${background}" width="1540" height="810" style="position:absolute;top:-64px;left:-170px"/>
-    <div style="display:flex;position:absolute;left:0;bottom:0;width:1200px;height:390px;background:linear-gradient(0deg,#101b25 0%,rgba(16,27,37,0.92) 46%,rgba(16,27,37,0) 100%)"></div>
-    <div style="display:flex;position:absolute;bottom:48px;left:56px;flex-direction:column">
-      <div style="display:flex;font-size:26px;color:#ffcf69;letter-spacing:2px">PISS DEAL · ${name} · DISTRICT ${wave}</div>
-      <div style="display:flex;font-size:${points.length > 9 ? 88 : 108}px;color:#fff5de">${points} points</div>
-      <div style="display:flex;font-size:36px">Your turn, Helsinki. Beat that run.</div>
-    </div></div>`, {width:1200,height:630});
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1200" height="630">
+    <defs><linearGradient id="shade" x2="0" y2="1"><stop stop-color="#101b25" stop-opacity="0"/><stop offset="1" stop-color="#101b25"/></linearGradient></defs>
+    <image x="-170" y="-64" width="1540" height="810" xlink:href="${background}"/>
+    <rect y="180" width="1200" height="450" fill="url(#shade)"/>
+    <g font-family="Barlow Condensed" font-weight="700">
+    <text x="56" y="388" font-size="34" fill="#ffcf69">PISS DEAL  /  ${name}  /  DISTRICT ${wave}</text>
+    <text x="52" y="516" font-size="112" fill="#fff5de">${points} POINTS</text>
+    <text x="56" y="577" font-size="42" fill="white">Your turn, Helsinki. Beat that run.</text></g></svg>`;
+  const renderer = new Resvg(svg, {font:{fontBuffers:[new Uint8Array(font)]}});
+  try {
+    const image = renderer.render();
+    try { return new Response(image.asPng(), {headers:{'Content-Type':'image/png'}}); }
+    finally { image.free(); }
+  } finally { renderer.free(); }
 }
