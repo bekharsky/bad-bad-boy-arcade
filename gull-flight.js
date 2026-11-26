@@ -6,7 +6,7 @@ const WINDUP = 1.6;
 const STRIKE_TIME = .9;
 const APPROACH_TIME = 4.5;
 const EXIT_TIME = 3;
-const SETTLE_TIME = 1.2;
+const SETTLE_TIME = 1.8;
 const GRAVITY = 9;
 const smooth = t => t * t * (3 - 2 * t);
 
@@ -185,7 +185,7 @@ export function createGullFlight({ random = Math.random, canStandAt = () => true
     }
     if (attacks && time >= Math.max(nextAttack, attackGrace) && !birds.some(b => b.target || b.drop)) {
       const bird = birds[nextBird++ % birds.length];
-      if (!bird.alive || bird.phase !== 'orbit' || bird.age < SETTLE_TIME || !launch(bird, player, velocity, scroll)) nextAttack = time + 1;
+      if (!bird.alive || bird.phase !== 'orbit' || bird.age < (runner ? 1.2 : SETTLE_TIME) || !launch(bird, player, velocity, scroll)) nextAttack = time + 1;
       else nextAttack = Infinity;
     }
   }

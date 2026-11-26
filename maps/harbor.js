@@ -337,7 +337,7 @@ function buildHarbor(scene) {
   for (const x of [-26, -13, 0, 13, 26]) {
     for (const z of [-10.6, .9]) {
       part('cylinder', '#52625e', x, 2.2, z, .1, 4.4, .1);
-      obstacle(x, z, .16, .16, 4.4);
+      obstacle(x, z, .2, .2, 4.4);
     }
     part('box', '#52625e', x, 4.25, -4.85, .025, .025, 11.5);
   }
