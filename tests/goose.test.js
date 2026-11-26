@@ -14,6 +14,7 @@ const { createLiquidStream } = await import('../liquid.js');
 const { ENEMY_HEALTH } = await import('../waves.js');
 
 test('geese load without model downloads and share geometry with independent animation and hit state', context => {
+  context.mock.method(Math, 'random', () => .5);
   const loaded = [];
   context.mock.method(GLTFLoader.prototype, 'loadAsync', async url => { loaded.push(url); });
   loadEnemyModels();
