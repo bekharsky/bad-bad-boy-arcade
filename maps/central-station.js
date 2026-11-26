@@ -171,6 +171,10 @@ function buildDistrict(root) {
   root.add(m.finish({ vertexColors: true }));
   addChristmasDecorations(root, {
     wreaths: [[-11, 8.8], [21, 9.6], [-12, -15], [13, -13], [-22, -30], [7, -30]].map(([x, z]) => ({ x, y: 4.45, z })),
+    groundFigures: {
+      trees: [{ x: -32, z: 14, scale: .62 }],
+      deer: [{ x: 30, z: 14, scale: .54, rotationY: Math.PI / 2 }],
+    },
     strands: [
       { from: [-11, 6.5, 8.8], to: [21, 6.5, 9.6], sag: 1.1, spacing: 1.15, lanternSpacing: 3, figureSpacing: 8 },
       { from: [-12, 6.5, -15], to: [13, 6.5, -13], sag: .9, spacing: 1.15, lanternSpacing: 2.8, figureSpacing: 8 },
