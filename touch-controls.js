@@ -1,5 +1,5 @@
 // Each control owns its pointer so moving and spraying work with two thumbs.
-export function createTouchControls({ zone, stick, thumb, home, fireZone, fireButton, fireHome, getAimHeading, onFireStart, onInput = () => {} }) {
+export function createTouchControls({ zone, stick, thumb, home, fireZone, fireButton, fireHome, getAimHeading, onFireStart, onRunnerDodge, onFireCancel = () => {}, onInput = () => {} }) {
   const radius = 44;
   const deadzone = 0.1;
   const aimDeadzone = 16;
@@ -7,6 +7,8 @@ export function createTouchControls({ zone, stick, thumb, home, fireZone, fireBu
   let enabled = false;
   let movePointer = null, firePointer = null;
   let originX = 0, originY = 0;
+  let moveStartX = 0, moveStartY = 0, moveSwipe = false;
+  let fireStartX = 0, fireStartY = 0, fireSwipe = false;
   let aimBaseX = 0, aimBaseY = 0, homeX = 0, homeY = 0;
   let aimHeading = null, flickX = null;
   const flickSamples = [];
@@ -14,6 +16,7 @@ export function createTouchControls({ zone, stick, thumb, home, fireZone, fireBu
   function resetMove() {
     const pointer = movePointer;
     movePointer = null;
+    moveSwipe = false;
     input.x = input.z = 0;
     stick.hidden = true;
     thumb.style.transform = '';
@@ -36,6 +39,7 @@ export function createTouchControls({ zone, stick, thumb, home, fireZone, fireBu
     input.aimX = input.aimZ = 0;
     flickX = null;
     flickSamples.length = 0;
+    fireSwipe = false;
     aimBaseX = homeX; aimBaseY = homeY;
     fireButton.classList.toggle('returning', !immediate);
     drawAim(0, 0);
@@ -53,6 +57,11 @@ export function createTouchControls({ zone, stick, thumb, home, fireZone, fireBu
   function move(event) {
     if (event.pointerId !== movePointer) return;
     event.preventDefault();
+    const swipeX = event.clientX - moveStartX, swipeY = event.clientY - moveStartY;
+    // Handle a short lane swipe here instead of waiting for the next simulation frame.
+    if (!moveSwipe && Math.abs(swipeX) >= 32 && Math.abs(swipeX) > Math.abs(swipeY)) {
+      moveSwipe = onRunnerDodge?.(Math.sign(swipeX)) === true;
+    }
     let dx = event.clientX - originX, dy = event.clientY - originY;
     const distance = Math.hypot(dx, dy);
     if (distance > radius) {
@@ -64,7 +73,7 @@ export function createTouchControls({ zone, stick, thumb, home, fireZone, fireBu
     const length = Math.min(distance, radius);
     const deflection = Math.max(0, (length / radius - deadzone) / (1 - deadzone));
     const strength = deflection;
-    input.x = length ? dx / length * strength : 0;
+    input.x = !moveSwipe && length ? dx / length * strength : 0;
     input.z = length ? dy / length * strength : 0;
     const bounds = zone.getBoundingClientRect();
     stick.style.left = `${originX - bounds.left}px`;
@@ -76,6 +85,9 @@ export function createTouchControls({ zone, stick, thumb, home, fireZone, fireBu
     if (!enabled || movePointer !== null || event.button !== 0) return;
     event.preventDefault();
     movePointer = event.pointerId;
+    moveStartX = event.clientX;
+    moveStartY = event.clientY;
+    moveSwipe = false;
     originX = event.clientX;
     originY = event.clientY;
     const bounds = home?.getBoundingClientRect();
@@ -158,6 +170,9 @@ export function createTouchControls({ zone, stick, thumb, home, fireZone, fireBu
     if (!enabled || firePointer !== null || event.button !== 0 || event.pointerType === 'mouse') return;
     event.preventDefault();
     firePointer = event.pointerId;
+    fireStartX = event.clientX;
+    fireStartY = event.clientY;
+    fireSwipe = false;
     const homeBounds = fireHome.getBoundingClientRect();
     homeX = homeBounds.left + homeBounds.width / 2;
     homeY = homeBounds.top + homeBounds.height / 2;
@@ -176,6 +191,20 @@ export function createTouchControls({ zone, stick, thumb, home, fireZone, fireBu
   fireZone.addEventListener('pointermove', event => {
     if (event.pointerId !== firePointer) return;
     event.preventDefault();
+    const dx = event.clientX - fireStartX, dy = event.clientY - fireStartY;
+    // A horizontal swipe on the firing side is a dodge, not a spray gesture.
+    if (!fireSwipe && Math.abs(dx) >= 32 && Math.abs(dx) > Math.abs(dy)
+      && onRunnerDodge?.(Math.sign(dx)) === true) {
+      fireSwipe = true;
+      input.firing = false;
+      input.airborne = false;
+      input.aimX = input.aimZ = 0;
+      fireButton.classList.remove('pressed', 'aiming-up');
+      drawAim(0, 0);
+      onFireCancel();
+      return;
+    }
+    if (fireSwipe) return;
     aim(event);
   });
   for (const element of [zone, fireZone]) {

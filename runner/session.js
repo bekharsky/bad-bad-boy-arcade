@@ -72,7 +72,7 @@ export function createRunnerSession({
   return {
     start, update, present,
     get state() { return run.state; },
-    dodge(direction) { run.dodge(direction); },
+    dodge(direction) { steering.reset(); run.dodge(direction); },
     sprayHit(id, impact) { return run.sprayHit(id, impact); },
     resetInput() { run.setThrottle(0); steering.reset(); },
   };
