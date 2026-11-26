@@ -214,6 +214,42 @@ function buildKamppi(root) {
   }
   root.add(bikes.finish({ vertexColors: true })); propObstacle(-5.5, 12.5, 18.9, .8, 1.05);
 
+  // The long eastern edge is an active promenade: cafes, bike parking, seats,
+  // lamps and planted trees break up the broad paved strip beside the blocks.
+  function kiosk(x, z, bodyColor, canopyColor) {
+    street.box(bodyColor, x, 1.02, z, 2.55, 2.04, 1.85);
+    street.box('#e6dcc6', x, 1.12, z + .94, 2.04, 1.05, .08);
+    street.box('#3e5c5d', x, 1.12, z + 1, 1.78, .78, .035);
+    street.box(canopyColor, x, 2.2, z, 2.92, .2, 2.16);
+    for (const dx of [-.75, 0, .75]) street.box(dx ? '#f0e4cc' : canopyColor, x + dx, 2.32, z + .12, .72, .12, 2.18);
+    street.box('#d5c79e', x, 2.55, z + .18, 1.5, .28, .12);
+    street.box('#7a6147', x, .32, z + 1.2, 2.7, .14, .48);
+    propObstacle(x, z, 2.85, 2.2, 2.8);
+  }
+  kiosk(23.2, -17.5, '#4d675e', '#bf6849');
+  kiosk(23.8, 35.5, '#52696c', '#d1ad58');
+  for (const z of [-23, -7, 9, 26, 44]) planter(40.3, z, 1.45, 1.65, true);
+  for (const z of [-15, 1, 31, 48]) bench(37.1, z, 2.8, true);
+  for (const z of [-22, -5, 12, 29, 46]) {
+    street.geometry('#62766c', new THREE.CylinderGeometry(.06, .1, 5.3, 8).translate(32.8, 2.65, z));
+    street.box('#d4c98f', 32.8, 5.28, z, .7, .16, .38);
+    street.box('#e9ddb5', 32.8, 5.19, z, .54, .04, .26);
+    propObstacle(32.8, z, .23, .23, 5.35);
+  }
+  const bikeParking = createSceneryModel('Kamppi east side bicycle parking');
+  for (const z of [-17, 34]) {
+    bikeParking.box('#62756c', 29.7, .07, z, 3.3, .12, .12);
+    for (let bike = 0; bike < 3; bike++) {
+      const x = 28.7 + bike * 1;
+      for (const dx of [-.34, .34]) bikeParking.geometry('#53645c', new THREE.TorusGeometry(.24, .035, 6, 12).translate(x + dx, .34, z));
+      bikeParking.box('#d1b852', x, .57, z, .82, .07, .08);
+      bikeParking.box('#53645c', x + .34, .79, z, .07, .43, .07);
+      bikeParking.box('#53645c', x - .33, .72, z, .07, .3, .07);
+    }
+    propObstacle(29.7, z, 3.6, .5, .9);
+  }
+  root.add(bikeParking.finish({ vertexColors: true }));
+
   // A raised crossing over Mannerheimintie gives the eastern edge a readable
   // landmark. The stairs and bridge sit above street level and leave the path below open.
   const overpass = createSceneryModel('Kamppi pedestrian overpass and bus shelter');

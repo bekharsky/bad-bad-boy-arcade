@@ -21,6 +21,7 @@ export function loadEnemyModels() {
 
 export function createEnemy(kind, level) {
   const hp = enemyHealth(kind, level);
+  const berserk = kind === 'goose' && Math.random() < .14;
   const model = clone(template.model);
   const root = new THREE.Group();
   const body = new THREE.Group();
@@ -47,19 +48,20 @@ export function createEnemy(kind, level) {
     root, body, model, kind, materials: [...materials.values()],
     goose: gooseRig(model), gait: Math.random() * Math.PI * 2,
     size: .47, hitHeight: .6 * template.scale, hp,
-    speed: .88 + Math.random() * .14 + Math.min(level, 12) * .045,
-    hit: 0, flashing: false, attack: Math.random() * .3, alive: true,
+    speed: .88 + Math.random() * .14 + Math.min(level, 12) * .045, berserk,
+    hit: 0, tint: null, attack: Math.random() * .3, alive: true,
   };
 }
 
 export function animateEnemy(enemy, dt, _time, attacking, speed = enemy.speed) {
   animateGoose(enemy, dt, attacking, speed);
   const flashing = enemy.hit > 0;
-  if (flashing === enemy.flashing) return;
-  enemy.flashing = flashing;
+  const tint = flashing ? 'hit' : enemy.berserk ? 'berserk' : 'normal';
+  if (tint === enemy.tint) return;
+  enemy.tint = tint;
   for (const material of enemy.materials) {
-    material.emissive.set(flashing ? '#ffe58c' : '#000000');
-    material.emissiveIntensity = flashing ? .7 : 0;
+    material.emissive.set(flashing ? '#ffe58c' : enemy.berserk ? '#8e321e' : '#000000');
+    material.emissiveIntensity = flashing ? .7 : enemy.berserk ? .22 : 0;
   }
 }
 

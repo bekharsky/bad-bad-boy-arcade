@@ -308,6 +308,8 @@ let bankedScore = 0;
 let restartPenalty = 0;
 let restartTargetIndex = null;
 let searchTime = 0;
+let nextGooseArrival = 16;
+let gooseReinforcementWave = 0;
 let geeseDefeated = 0;
 let healthLost = 0;
 let levelProgress = 0;
@@ -588,6 +590,23 @@ function spawnEnemies(around, count, level, { minPlayerDistance = 0, ringStart =
   }
 }
 
+function reinforceGeese() {
+  if (searchTime < nextGooseArrival) return;
+  const alive = enemies.reduce((count, enemy) => count + Number(enemy.alive), 0);
+  if (alive >= 40) { nextGooseArrival = searchTime + 8; return; }
+  gooseReinforcementWave++;
+  const count = Math.min(2 + Math.floor(gooseReinforcementWave / 2), 5, 40 - alive);
+  const strength = itinerary.slice(0, levelIndex + 1).filter(map => map.mode !== 'runner').length;
+  // Arrivals approach from farther away as the search drags on, so they enter
+  // the map as a visible threat instead of popping up beside the player.
+  world.routeTo(player.x, player.z);
+  spawnEnemies(player, count, strength, {
+    minPlayerDistance: 10,
+    ringStart: 13 + Math.min(7, gooseReinforcementWave * 1.1),
+  });
+  nextGooseArrival = searchTime + Math.max(8, 20 - gooseReinforcementWave * 2);
+}
+
 function collectSleighPart() {
   if (!playing || gameInterlude() || foundParts !== levelIndex) return;
   const award = currentDistrictScore(true);
@@ -618,6 +637,8 @@ function enterDistrict({ index }) {
   const changedMap = world.activate(district.id);
   levelIndex = index;
   searchTime = geeseDefeated = healthLost = 0;
+  nextGooseArrival = 16;
+  gooseReinforcementWave = 0;
   setLevelProgress(0);
   if (changedMap || !firstRound) setDistrictWeather();
   firstRound = false;
@@ -653,12 +674,14 @@ function enterDistrict({ index }) {
         [18.5, 22.5, 6.5], // Behind Cafe Helmi
         [6, 15, 6], // South of the plaza
         [14.5, -24, 6.5], // By the terminal
+        [-25, -6, 13], [-20, 23, 14], [-12, -18, 13], [-2, -22, 13],
+        [10, -19, 14], [25, -13, 14], [25, 22, 15], [4, 24, 13],
       ];
       for (const [x, z, range] of harborPosts) {
         const post = world.pickupPoint({ x, z }, .65);
         if (!post) continue;
         const goose = makeEnemy(post.x, post.z, strength, post);
-        goose.guardRange = range;
+        goose.guardRange = Math.max(16, range);
         if (x === 0) {
           goose.hp = 1;
           goose.speed *= .8;
@@ -666,11 +689,17 @@ function enterDistrict({ index }) {
       }
     } else {
       const openingArena = strength === 1;
-      const openingRing = openingArena ? 7.5 : 5.5;
+      const openingRing = openingArena ? 8.5 : 5.5;
       const kamppiLevel = world.id === 'kamppi';
       const openingKamppi = openingArena && kamppiLevel;
-      spawnEnemies(player, openingKamppi ? 6 : openingArena ? 4 : 5 + strength + (kamppiLevel ? 3 : 0), strength, { minPlayerDistance: openingRing, ringStart: openingRing });
-      spawnEnemies(cache, openingKamppi ? 4 : openingArena ? 3 : 6 + (kamppiLevel ? 1 : 0), strength, { minPlayerDistance: openingArena ? 11 : 8 });
+      spawnEnemies(player, openingKamppi ? 8 : openingArena ? 6 : 5 + strength + (kamppiLevel ? 3 : 0), strength, { minPlayerDistance: openingRing, ringStart: openingRing });
+      spawnEnemies(cache, openingKamppi ? 5 : openingArena ? 4 : 6 + (kamppiLevel ? 1 : 0), strength, { minPlayerDistance: openingArena ? 11 : 8, ringStart: openingArena ? 11 : 7 });
+      if (kamppiLevel) {
+        // Narinkkatori is wide, so keep a few patrols out by the eastern shops
+        // and upper promenade instead of packing the whole flock by the spawn.
+        spawnEnemies({ x: 33, z: 2 }, openingKamppi ? 5 : 4, strength, { minPlayerDistance: 12, ringStart: 5 });
+        spawnEnemies({ x: 32, z: 38 }, openingKamppi ? 4 : 3, strength, { minPlayerDistance: 12, ringStart: 5 });
+      }
     }
   }
   if (changedMap && world.root === preparedDistrict) preparedDistrict = null;
@@ -851,6 +880,7 @@ function update(dt) {
   if (!playing) return;
   if (isRunner()) { runnerSession.update(dt); return; }
   searchTime += dt;
+  reinforceGeese();
   world.update(dt, [player, ...enemies, ...arenaCameos.actors]);
 
   const firing = keys.has('Space') || keys.has('Fire') || touchControls.input.firing || player.tapTimer > 0;

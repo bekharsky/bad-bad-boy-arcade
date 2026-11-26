@@ -23,17 +23,18 @@ function setup(value = .1, runner = false, options = {}) {
   return { flight, player, impacts, advance };
 }
 
-test('four gulls attack one at a time, with both damaging attack types', () => {
-  assert.equal(GULL_COUNT, 4);
+test('three gulls arrive in a small group and attack one at a time', () => {
+  assert.equal(GULL_COUNT, 3);
   for (const value of [.1, .9]) for (const runner of [false, true]) {
     const { flight, impacts, advance } = setup(value, runner);
     advance(5); assert.equal(impacts.length, 0);
     for (let i = 0; i < 30 * 120; i++) {
       advance(1 / 120);
       assert.ok(flight.birds.filter(b => b.target).length <= 1);
-      assert.equal(flight.birds.length, 4);
+      assert.ok(flight.birds.filter(b => b.phase !== 'waiting' && b.phase !== 'away').length <= 2);
+      assert.equal(flight.birds.length, 3);
     }
-    assert.ok(impacts.length >= 2 && impacts.length <= 5);
+    assert.ok(impacts.length >= 3 && impacts.length <= 10);
     assert.ok(impacts.every(hit => hit.hit && hit.type === (value < .5 ? 'drop' : 'dive')));
   }
 });
@@ -60,7 +61,8 @@ test('repelling cancels a dive, prevents repeat hits, and lets the same bird ret
   assert.equal(flight.repel(bird), true); assert.equal(flight.repel(bird), false);
   assert.equal(bird.target, null); assert.equal(bird.alive, false);
   advance(3, { attacks: false }); assert.equal(impacts.length, 0);
-  advance(10, { attacks: false }); assert.equal(bird.alive, true);
+  advance(10, { attacks: false }); assert.equal(bird.alive, false, 'A shooed gull stays away for a while');
+  advance(27, { attacks: false }); assert.equal(bird.alive, true);
 });
 
 test('released droppings survive repelling the bird; reset clears every pending attack', () => {
@@ -159,7 +161,7 @@ test('air spray can repel moving birds in both arena and runner frames', () => {
       flight.update(1 / 60, player, { scroll: runner ? 15 : 0 });
       spray.update(1 / 60, true, emitter, aim(player, flight.birds, true), flight.birds);
     }
-    assert.equal(repelled.size, 4); assert.equal(impacts.length, 0);
+    assert.equal(repelled.size, 3); assert.equal(impacts.length, 0);
   }
 });
 
@@ -207,7 +209,7 @@ test('visible flight stays continuous through facade avoidance, retreat and re-e
     assert.equal(bird.phase, 'orbit');
     let repelled = false, sawAway = false, sawReturn = false;
     const hidden = phase => phase === 'waiting' || phase === 'away';
-    for (let frame = 0; frame < 20 * 60; frame++) {
+    for (let frame = 0; frame < 45 * 60; frame++) {
       wall = frame >= 30 && frame < 90;
       if (frame === 120) { repelled = flight.repel(bird); assert.equal(repelled, true); }
       const from = { x: bird.x, y: bird.hitHeight, z: bird.z, phase: bird.phase };

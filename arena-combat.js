@@ -13,7 +13,7 @@ export function createArenaCombat({ world, player, enemies, animateEnemy, onBite
         const vx = player.x - enemy.x, vz = player.z - enemy.z;
         const distance = Math.hypot(vx, vz);
         const post = enemy.guardPost;
-        const returning = post && (Math.hypot(player.x - post.x, player.z - post.z) > (enemy.guardRange ?? 13)
+        const returning = post && !enemy.berserk && (Math.hypot(player.x - post.x, player.z - post.z) > (enemy.guardRange ?? 18)
           || !world.lineClear(post.x, post.z, player.x, player.z, .6));
         const away = running && distance > 0 ? (playerDeltaX * vx + playerDeltaZ * vz) / (travel * distance) : 0;
         // Retain some sprint through sideways movement at a corner. A stop or
@@ -22,6 +22,7 @@ export function createArenaCombat({ world, player, enemies, animateEnemy, onBite
         const target = away > .2 ? running : away < -.55 ? 0 : Math.min(previous, running) * .8;
         const pursuit = running ? target + (previous - target) * Math.exp(-(target > previous ? 11 : 7) * dt) : 0;
         enemy.pursuit = pursuit;
+        const chaseSpeed = enemy.speed * (enemy.berserk ? 2.05 : 1);
         const biteReach = enemy.size + player.radius + .14;
         const attacking = !returning && distance <= biteReach && world.lineClear(enemy.x, enemy.z, player.x, player.z, .1);
         let heading = Math.atan2(vx, vz);
@@ -44,10 +45,10 @@ export function createArenaCombat({ world, player, enemies, animateEnemy, onBite
           }
           const length = Math.hypot(direction.x, direction.z);
           if (length > .01) {
-            let step = enemy.speed * dt;
+            let step = chaseSpeed * dt;
             if (returning) step = Math.min(step * 1.6, length);
             else if (pursuit > .1) {
-              const pace = enemy.speed + (player.speed * .83 - enemy.speed) * pursuit;
+              const pace = chaseSpeed + (player.speed * (enemy.berserk ? .96 : .83) - chaseSpeed) * pursuit;
               step = Math.min(pace * dt, Math.max(0, distance - biteReach * .85));
             }
             const oldX = enemy.x, oldZ = enemy.z;
@@ -64,7 +65,7 @@ export function createArenaCombat({ world, player, enemies, animateEnemy, onBite
         }
         const yaw = enemy.root.rotation.y ?? heading;
         const angle = Math.atan2(Math.sin(heading - yaw), Math.cos(heading - yaw));
-        const turn = (10 + 15 * pursuit) * dt;
+        const turn = ((enemy.berserk ? 21 : 10) + 15 * pursuit) * dt;
         enemy.root.rotation.y = Math.abs(angle) <= turn ? heading : yaw + Math.sign(angle) * turn;
         animateEnemy(enemy, dt, time, attacking, speed);
       }

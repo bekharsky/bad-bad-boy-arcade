@@ -1,12 +1,12 @@
-// Independent ambient hazards. One bird attacks at a time while the flock orbits.
-export const GULL_COUNT = 4;
-export const RUNNER_GULL_COUNT = 4;
+// Three ambient gulls rotate through one or two active fliers; only one attacks at a time.
+export const GULL_COUNT = 3;
+export const RUNNER_GULL_COUNT = 3;
 const STEP = 1 / 120;
 const WINDUP = 1.6;
 const STRIKE_TIME = .9;
 const APPROACH_TIME = 4.5;
 const EXIT_TIME = 3;
-const SETTLE_TIME = 1.8;
+const SETTLE_TIME = 1.15;
 const GRAVITY = 9;
 const smooth = t => t * t * (3 - 2 * t);
 
@@ -17,12 +17,18 @@ export function createGullFlight({ random = Math.random, canStandAt = () => true
     phase: 'waiting', age: 0, nextJetHit: 0, target: null, drop: null,
   }));
   const birds = flock.slice(0, GULL_COUNT);
-  let time = 0, accumulator = 0, nextAttack = 6, attackGrace = 0, nextBird = 0, runner = false;
+  let time = 0, accumulator = 0, nextAttack = 6, attackGrace = 0, nextBird = 0, runner = false, activeLimit = 2;
   const previous = { x: 0, z: 0 };
+
+  function activeBirds() {
+    return birds.filter(bird => bird.phase !== 'waiting' && bird.phase !== 'away').length;
+  }
 
   function reset(player, running = false, { attackDelay = 0 } = {}) {
     runner = running;
     birds.splice(0, birds.length, ...flock.slice(0, runner ? runnerGullCount : GULL_COUNT));
+    // One or two gulls work the player at a time; the third remains in reserve.
+    activeLimit = random() < .35 ? 2 : 1;
     const quickerRunnerFlock = runner;
     time = accumulator = nextBird = 0; nextAttack = (quickerRunnerFlock ? 5.5 : 9) + random() * (quickerRunnerFlock ? 1.5 : 2) + attackDelay;
     attackGrace = attackDelay ? nextAttack : 0;
@@ -99,7 +105,7 @@ export function createGullFlight({ random = Math.random, canStandAt = () => true
     bird.phase = 'recover'; bird.age = 0; bird.target = null;
     bird.start = { x: bird.x, y: bird.hitHeight, z: bird.z };
     if (!bird.alive) leave(bird);
-    nextAttack = time + (runner ? 4 + random() * 1.5 : 4.5 + random() * 3);
+    nextAttack = time + (runner ? 2.1 + random() * 1.2 : 2.6 + random() * 1.8);
   }
 
   function impact(bird, player, type) {
@@ -120,7 +126,7 @@ export function createGullFlight({ random = Math.random, canStandAt = () => true
       if (bird.drop) bird.drop.z += shift;
       bird.age += STEP;
       if (bird.phase === 'waiting') {
-        if (bird.age >= bird.entryDelay) approach(bird, player);
+        if (bird.age >= bird.entryDelay && activeBirds() < activeLimit) approach(bird, player);
       } else if (bird.phase === 'approach') {
         blend(bird, orbitGoal(bird, player), smooth(Math.min(1, bird.age / APPROACH_TIME)));
         if (bird.age >= (runner ? 3.8 : APPROACH_TIME)) { bird.phase = 'orbit'; bird.age = 0; }
@@ -174,7 +180,7 @@ export function createGullFlight({ random = Math.random, canStandAt = () => true
       } else if (bird.phase === 'flee') {
         blend(bird, { x: player.x + (bird.id % 2 ? -1 : 1) * 35, y: 35, z: player.z - 25 }, smooth(Math.min(1, bird.age / EXIT_TIME)));
         if (bird.age >= EXIT_TIME) { bird.phase = 'away'; bird.age = 0; }
-      } else if (bird.phase === 'away' && bird.age >= bird.returnAfter - EXIT_TIME) {
+      } else if (bird.phase === 'away' && bird.age >= bird.returnAfter - EXIT_TIME && activeBirds() < activeLimit) {
         approach(bird, player);
       }
       bird.vx = (bird.x - ox) / STEP;
@@ -211,9 +217,9 @@ export function createGullFlight({ random = Math.random, canStandAt = () => true
       // A falling parcel is already committed and survives its bird fleeing.
       // Cancel windups/dives, but retain an airborne dropping until impact.
       onRepel(bird);
-      bird.alive = false; bird.returnAfter = 8 + random() * 4;
+      bird.alive = false; bird.returnAfter = 30 + random() * 10;
       if (!bird.drop) { leave(bird); bird.target = null; }
-      nextAttack = Math.min(nextAttack, time + 6);
+      nextAttack = Math.min(nextAttack, time + 3);
       return true;
     },
   };

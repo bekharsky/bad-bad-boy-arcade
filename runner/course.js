@@ -22,7 +22,7 @@ const CONTACT_MARGIN = .025;
 const PASSERBY_LANE_OFFSET = 1.35;
 const CAMEO_JOG_SPEED = 2.8;
 const FIRST_BUSY_CAMEO_DISTANCE = 22;
-const RUNNER_COLLISION_DAMAGE = 2;
+const RUNNER_COLLISION_DAMAGE = 1;
 
 export const ROADWORK_TYPES = Object.freeze(['cone', 'tractor', 'barrier', 'trench']);
 const PROFILES = {

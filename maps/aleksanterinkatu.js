@@ -45,6 +45,7 @@ function rod(m, color, from, to, radius = .025) {
 
 function junction(progress, index, paving) {
   const m = model('Aleksi crossing square');
+  const awnings = ['#b85a42', '#5d7d69', '#c69c46', '#637e8c'];
   paving.rectangle('square', 90, 40, 0, -progress, .01);
   paving.rectangle('road', 90, 12, 0, -progress, .04);
   for (const z of [-15, 15]) for (let x = -4.7; x < 5; x += 1.15) m.box('#e0dcc9', x, .055, z, .65, .025, 2.2);
@@ -71,13 +72,34 @@ function junction(progress, index, paving) {
       m.box('#826b4d', side * 10, .65, z + 2, 2.3, .15, .7);
       m.box('#826b4d', side * 10, 1, z + 2.3, 2.3, .6, .1);
     }
-    if (index === 2) {
-      // The third crossing gets a pair of small street kiosks beside its scooter approaches.
-      m.box('#52685d', side * 9.1, 1.25, -2, 1.45, 2.5, 1.1);
-      m.box('#c8b786', side * 9.1, 2.28, -2, 1.56, .18, 1.18);
-      m.box('#e6dbc0', side * 9.1, 1.42, -1.42, 1.05, 1.25, .05);
-      m.box('#b95c45', side * 9.1, 2.55, -2, .55, .28, .08);
+    // Every scooter crossing gets two small corner kiosks with its own colour,
+    // plus parked bikes and extra street furniture along the side streets.
+    const kioskZ = side * (index % 2 ? -2.3 : 2.3), kioskX = side * 9.1;
+    m.box('#52685d', kioskX, 1.12, kioskZ, 1.65, 2.24, 1.25);
+    m.box(awnings[index], kioskX, 2.31, kioskZ, 1.95, .18, 1.5);
+    for (let stripe = -1; stripe <= 1; stripe++) {
+      m.box(stripe % 2 ? '#eee2c6' : awnings[index], kioskX + stripe * .32, 2.44, kioskZ + side * .12, .32, .13, 1.52);
     }
+    m.box('#e6dbc0', kioskX, 1.42, kioskZ + side * .64, 1.14, .93, .06);
+    m.box('#354b47', kioskX, 1.39, kioskZ + side * .69, .94, .68, .035);
+    m.box('#d2c49d', kioskX, 2.62, kioskZ + side * .12, .9, .25, .09);
+    for (let bin = 0; bin < 2; bin++) {
+      const x = side * (14.7 + bin * 1.25), z = side * (5.2 - bin * 1.2);
+      m.box('#546960', x, .45, z, .52, .9, .52);
+      m.box('#c3b779', x, .92, z, .58, .08, .58);
+      m.box('#d3b55b', x, .67, z + side * .27, .28, .28, .025);
+    }
+    const bikeX = side * 17, bikeZ = side * 7.1;
+    for (const x of [bikeX - .43, bikeX + .43]) {
+      m.geometry('#52615a', new THREE.TorusGeometry(.29, .035, 6, 14).translate(x, .34, bikeZ));
+    }
+    for (const [from, to] of [
+      [[bikeX - .43, .34, bikeZ], [bikeX - .12, .72, bikeZ]],
+      [[bikeX - .12, .72, bikeZ], [bikeX + .43, .34, bikeZ]],
+      [[bikeX + .43, .34, bikeZ], [bikeX - .43, .34, bikeZ]],
+      [[bikeX - .12, .72, bikeZ], [bikeX + .05, .79, bikeZ]],
+      [[bikeX + .43, .34, bikeZ], [bikeX + .53, .83, bikeZ]],
+    ]) rod(m, '#475d55', from, to, .045);
     for (const x of [24, 38]) {
       m.box(['#c9baa3', '#c3c6b2', '#bca591'][index % 3], side * x, 7, -15, 12, 14, 10);
       for (let y = 2; y < 14; y += 2.7) for (let dx = -4; dx <= 4; dx += 2) m.box('#47616a', side * x + dx, y, -9.95, 1.2, 1.6, .08);
