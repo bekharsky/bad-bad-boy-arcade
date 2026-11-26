@@ -59,6 +59,7 @@ const startScreen = document.querySelector('#start-screen');
 const endScreen = document.querySelector('#end-screen');
 const startButton = document.querySelector('#start');
 const restartButton = document.querySelector('#restart');
+const resetCampaignButton = document.querySelector('#reset-campaign');
 const leaderboard = createLeaderboard({
   nameInput: document.querySelector('#player-name'),
   list: document.querySelector('#end-leaderboard-list'),
@@ -304,7 +305,7 @@ let gameTime = 0;
 let score = 0;
 let bankedScore = 0;
 let restartPenalty = 0;
-let restartCurrentLevel = false;
+let restartTargetIndex = null;
 let searchTime = 0;
 let geeseDefeated = 0;
 let healthLost = 0;
@@ -1148,6 +1149,7 @@ function startGame({ transition = false } = {}) {
   mapTransition.cancel(); finishMapTransition();
   bankedScore = 0;
   restartPenalty = 0;
+  restartTargetIndex = null;
   updateScore();
   foundParts = 0;
   updateSleighProgress();
@@ -1163,7 +1165,7 @@ function startGame({ transition = false } = {}) {
   syncMouseAim();
 }
 
-function restartDistrict() {
+function restartDistrict(index = restartTargetIndex ?? levelIndex) {
   if (!player.model || !renderingReady) return;
   restartPenalty += RESTART_PENALTY;
   playing = false;
@@ -1172,7 +1174,7 @@ function restartDistrict() {
   sleighAssembly.clear();
   gameShell.classList.remove('sleigh-assembling');
   mapTransition.cancel(); finishMapTransition();
-  enterDistrict({ index: levelIndex });
+  enterDistrict({ index });
   playing = true;
   touchControls.setEnabled(true);
   endScreen.classList.add('hidden');
@@ -1219,8 +1221,9 @@ function endGame(won = false, { crashed = false } = {}) {
   endScreen.classList.remove('hidden');
   document.querySelector('#end-title').textContent = won ? 'SLEIGH COMPLETE' : crashed ? 'CRASHED' : 'WASTED';
   document.querySelector('#end-score').textContent = score.toLocaleString();
-  restartCurrentLevel = !won;
-  restartButton.textContent = won ? 'PLAY AGAIN' : `RESTART LEVEL (-${RESTART_PENALTY} PTS)`;
+  restartTargetIndex = won ? null : levelIndex;
+  restartButton.textContent = won ? 'START AGAIN' : `RETRY THIS LEVEL (-${RESTART_PENALTY} PTS)`;
+  resetCampaignButton.hidden = won;
   leaderboard.submit(score, levelIndex + 1);
   player.model.material.opacity = 1;
   player.model.material.transparent = false;
@@ -1386,9 +1389,10 @@ startOver.addEventListener('click', () => {
   startGame({ transition: true });
 });
 restartButton.addEventListener('click', () => {
-  if (restartCurrentLevel) restartDistrict();
+  if (restartTargetIndex !== null) restartDistrict(restartTargetIndex);
   else startGame();
 });
+resetCampaignButton.addEventListener('click', () => startGame({ transition: true }));
 function syncSound() {
   for (const button of soundButtons) {
     button.setAttribute('aria-pressed', String(soundEnabled));

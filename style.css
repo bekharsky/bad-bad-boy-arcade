@@ -148,6 +148,7 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 900 clamp(52px, 8vw, 78px
 .text-button:hover { background: #ffd34e23; }
 .text-button:focus-visible { outline: 2px solid var(--gold); }
 .text-button:disabled { opacity: .45; cursor: wait; }
+.reset-campaign-button { width: 100%; margin-top: 10px; }
 .pause-dialog::backdrop { background: #11131bd9; }
 .end-card { margin-right: 0; margin-left: 0; text-align: center; }
 .end-card h2 { margin: 0 0 28px; font-size: 58px; }
