@@ -34,7 +34,7 @@ test('Amos Rex courtyard has open combat lanes, solid landmarks and visible peri
   for (const [x, z] of [[0, -14], [0, -6], [8, 0], [12, -5], [-32, 19], [33, 19], [0, 26], [0, 35], [35, 52], [35.8, 27], [-37.4, 34.5], [-32.7, 34.5], [0, 61.5], [0, -39]]) {
     assert.equal(map.canStandAt(x, z, .736), true, `Open lane at ${x}, ${z}`);
   }
-  for (const [x, z] of [[0, -29], [-31.5, -12], [-28, 7.5], [-22.8, 6.6], [5, 19], [14, -8], [30, 9], [0, 52], [-27, 42], [27, 42], [-17, 35], [-10, 31.5], [33.2, 27]]) {
+  for (const [x, z] of [[0, -29], [-31.5, -12], [-28, 7.5], [-22.8, 6.6], [5, 19], [14, -8], [30, 9], [0, 52], [-27, 42], [27, 42], [-17, 35], [-10, 31.5], [23.5, -13.2]]) {
     assert.equal(map.canStandAt(x, z, .736), false, `Solid scenery at ${x}, ${z}`);
   }
   assert.equal(map.lineClear3D({ x: -34, y: 1, z: 7.5 }, { x: -20, y: 1, z: 7.5 }), false, 'The chapel blocks liquid');
@@ -43,7 +43,7 @@ test('Amos Rex courtyard has open combat lanes, solid landmarks and visible peri
   assert.equal(map.lineClear3D({ x: -40, y: 1.5, z: -7 }, { x: -38.5, y: 1.5, z: -7 }), true, 'Liquid clears the low bench');
   assert.equal(map.lineClear(-37.5, -23, -37.5, 20, .736), true, 'Seating and planting leave the chapel promenade clear');
   assert.ok(map.root.getObjectByName('Kamppi Square boundary'));
-  assert.ok(map.root.getObjectByName('Amos Rex winter market'));
+  assert.ok(map.root.getObjectByName('Narinkkatori winter market'));
   assert.ok(map.root.getObjectByName('Amos Rex ice rink'));
   for (const [x, z] of [[43, 0], [-43, 0], [0, -43], [0, 68.5]]) assert.equal(map.canStandAt(x, z, .736), false);
   map.dispose();

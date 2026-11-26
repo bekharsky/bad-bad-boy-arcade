@@ -215,19 +215,6 @@ function buildKamppi(root) {
   }
   root.add(bikes.finish({ vertexColors: true })); propObstacle(-5.5, 12.5, 18.9, .8, 1.05);
 
-  // The old Narinkkatori kiosk remains by the square; the courtyard gets a
-  // proper Christmas market below, beside the closer Salomonkatu buildings.
-  function kiosk(x, z, bodyColor, canopyColor) {
-    street.box(bodyColor, x, 1.02, z, 2.55, 2.04, 1.85);
-    street.box('#e6dcc6', x, 1.12, z + .94, 2.04, 1.05, .08);
-    street.box('#3e5c5d', x, 1.12, z + 1, 1.78, .78, .035);
-    street.box(canopyColor, x, 2.2, z, 2.92, .2, 2.16);
-    for (const dx of [-.75, 0, .75]) street.box(dx ? '#f0e4cc' : canopyColor, x + dx, 2.32, z + .12, .72, .12, 2.18);
-    street.box('#d5c79e', x, 2.55, z + .18, 1.5, .28, .12);
-    street.box('#7a6147', x, .32, z + 1.2, 2.7, .14, .48);
-    propObstacle(x, z, 2.85, 2.2, 2.8);
-  }
-  kiosk(23.2, -17.5, '#4d675e', '#bf6849');
   // A compact public rink fills the west side of Amos Rex courtyard. Its open
   // east gate faces the clock tower and the new player start.
   const rinkX = -37.4, rinkZ = 34.5, rinkWidth = 8.8, rinkDepth = 13.2;
@@ -269,13 +256,12 @@ function buildKamppi(root) {
   }
   root.add(rink.finish({ vertexColors: true, roughness: .78 }));
 
-  // Two rows of open-front timber stalls leave a generous central aisle.
-  // Their striped awnings and little counters read as a New Year market at a glance.
-  const winterMarket = createSceneryModel('Amos Rex winter market');
+  // A few winter stalls sit along Narinkkatori's eastern edge, away from Amos Rex.
+  const winterMarket = createSceneryModel('Narinkkatori winter market');
   const canopies = ['#b95345', '#557761', '#c59a4c', '#426b78'];
-  const marketRows = [{ x: 33.2, facing: 1 }, { x: 38.3, facing: -1 }];
-  for (const [rowIndex, row] of marketRows.entries()) for (const [stallIndex, z] of [27, 33.2, 39.4, 45.6].entries()) {
-    const x = row.x, facing = row.facing, color = canopies[(rowIndex * 2 + stallIndex) % canopies.length];
+  const marketStalls = [-13.2, -3.8, 5.6].map((z, index) => ({ x: 23.5, z, color: canopies[index] }));
+  for (const { x, z, color } of marketStalls) {
+    const facing = -1;
     winterMarket.box('#6b5039', x, .13, z, 3.35, .22, 3.85);
     winterMarket.box('#e9e3d5', x, .27, z, 3.42, .08, 3.92);
     for (const side of [-1, 1]) for (const end of [-1, 1]) {
@@ -302,10 +288,9 @@ function buildKamppi(root) {
   }
   root.add(winterMarket.finish({ vertexColors: true, roughness: .82 }));
 
-  // Warm lights span the market lane; the shop fronts remain open and clear.
-  const marketLights = [27, 33.2, 39.4, 45.6].map(z => ({
-    from: [33.2, 4.4, z], to: [38.3, 4.4, z], sag: .4, spacing: .75, lanternSpacing: 2.8, figureSpacing: 8,
-  }));
+  const marketLights = [{
+    from: [23.5, 4.4, -15.5], to: [23.5, 4.4, 7.5], sag: .45, spacing: .75, lanternSpacing: 2.8, figureSpacing: 8,
+  }];
   const rinkTree = { x: rinkX, z: rinkNear - 3.2, scale: .56 };
 
   const bikeParking = createSceneryModel('Kamppi Narinkkatori bicycle parking');

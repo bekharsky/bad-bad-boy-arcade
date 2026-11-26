@@ -555,13 +555,25 @@ async function loadModels() {
   }
 }
 
-function makeEnemy(x, z, level, guardPost = null) {
+function makeEnemy(x, z, level, guardPost = null, {
+  berserk = false, guardRange = 24, arrivalDelay = 0, arrivalDistance = 5.5, arrivalAngle = Math.random() * Math.PI * 2,
+} = {}) {
   const enemy = createEnemy('goose', level);
   enemy.onTramHit = removeEnemyByTram;
   enemy.guardPost = guardPost;
+  enemy.guardRange = guardRange;
+  enemy.berserk = berserk;
+  enemy.berserkActive = false;
+  enemy.age = 0;
   enemy.x = x;
   enemy.z = z;
-  enemy.root.position.set(x, 0, z);
+  const startX = x + Math.cos(arrivalAngle) * arrivalDistance;
+  const startZ = z + Math.sin(arrivalAngle) * arrivalDistance;
+  enemy.arrival = { startX, startZ, targetX: x, targetZ: z, elapsed: -arrivalDelay, duration: 1.45, height: 2.65 };
+  enemy.airborne = true;
+  enemy.root.position.set(startX, enemy.arrival.height, startZ);
+  enemy.root.rotation.y = Math.atan2(x - startX, z - startZ);
+  enemy.root.scale.setScalar(.76);
   scene.add(enemy.root);
   enemies.push(enemy);
   return enemy;
@@ -576,8 +588,54 @@ function spawnEnemies(around, count, level, { minPlayerDistance = 0, ringStart =
     const point = world.spawnPoint(around, i, count, ringStart);
     if (!point || Math.hypot(point.x - player.x, point.z - player.z) < minPlayerDistance) continue;
     if (enemies.every(enemy => Math.hypot(enemy.x - point.x, enemy.z - point.z) > 1.25)) {
-      makeEnemy(point.x, point.z, level);
+      makeEnemy(point.x, point.z, level, null, { arrivalDelay: i * .16 });
     }
+  }
+}
+
+function spawnKamppiGeese(level) {
+  const spawnAt = (candidates, options = {}) => {
+    for (const candidate of candidates) {
+      const post = world.pickupPoint(candidate, .68);
+      if (!post || enemies.some(enemy => Math.hypot(enemy.x - post.x, enemy.z - post.z) < 1.8)) continue;
+      return makeEnemy(post.x, post.z, level, post, options);
+    }
+    return null;
+  };
+
+  const eastLeader = spawnAt([{ x: 36, z: 6 }, { x: 35.8, z: 27 }, { x: 37, z: 10 }], {
+    berserk: true, guardRange: 52, arrivalDelay: .15, arrivalAngle: .3,
+  });
+  if (eastLeader) {
+    for (const [slot, candidates] of [
+      [{ x: 32, z: 0 }, { x: 33, z: -2 }, { x: 31, z: 4 }],
+      [{ x: 40, z: 1 }, { x: 40, z: 8 }, { x: 39, z: -2 }],
+    ].entries()) {
+      const follower = spawnAt(candidates, { arrivalDelay: .45 + slot * .2, arrivalAngle: .9 + slot * 1.1 });
+      if (follower) { follower.packLeader = eastLeader; follower.packSlot = slot; }
+    }
+  }
+
+  const southLeader = spawnAt([{ x: 0, z: -35 }, { x: -2, z: -37 }, { x: 2, z: -37 }], {
+    berserk: true, guardRange: 52, arrivalDelay: .3, arrivalAngle: Math.PI,
+  });
+  if (southLeader) {
+    for (const [slot, candidates] of [
+      [{ x: -6, z: -30 }, { x: -4, z: -31 }, { x: -7, z: -34 }],
+      [{ x: 6, z: -30 }, { x: 4, z: -31 }, { x: 7, z: -34 }],
+    ].entries()) {
+      const follower = spawnAt(candidates, { arrivalDelay: .6 + slot * .2, arrivalAngle: 0.2 + slot * 1.1 });
+      if (follower) { follower.packLeader = southLeader; follower.packSlot = slot; }
+    }
+  }
+
+  for (const [index, candidates] of [
+    [{ x: -32, z: 19 }, { x: -31, z: 22 }],
+    [{ x: -8, z: -8 }, { x: -10, z: -5 }],
+    [{ x: 12, z: 9 }, { x: 13, z: 12 }],
+    [{ x: 35.8, z: 27 }, { x: 34, z: 31 }],
+  ].entries()) {
+    spawnAt(candidates, { arrivalDelay: .75 + index * .18, arrivalAngle: -1.2 + index * .9 });
   }
 }
 
@@ -654,8 +712,9 @@ function enterDistrict({ index }) {
     if (!cache) throw new Error(`Missing reachable sleigh part in ${district.id}`);
     sleighCache.place(cache, index);
     const strength = itinerary.slice(0, index + 1).filter(map => map.mode !== 'runner').length;
+    const kamppiLevel = world.id === 'kamppi';
     const posts = sleighGuardPosts(world, cache);
-    for (const post of openingHarbor ? posts.slice(0, 6) : posts) makeEnemy(post.x, post.z, strength, post);
+    if (!kamppiLevel) for (const post of openingHarbor ? posts.slice(0, 6) : posts) makeEnemy(post.x, post.z, strength, post);
     if (openingHarbor) {
       const harborPosts = [
         [0, 4.5, 6], [6, 8, 6.5], [16, 11, 7], // Plaza and eastbound route
@@ -668,28 +727,24 @@ function enterDistrict({ index }) {
         [-25, -6, 13], [-20, 23, 14], [-12, -18, 13], [-2, -22, 13],
         [10, -19, 14], [25, -13, 14], [25, 22, 15], [4, 24, 13],
       ];
-      for (const [x, z, range] of harborPosts) {
+      for (const [postIndex, [x, z, range]] of harborPosts.entries()) {
         const post = world.pickupPoint({ x, z }, .65);
         if (!post) continue;
-        const goose = makeEnemy(post.x, post.z, strength, post);
-        goose.guardRange = Math.max(16, range);
+        const goose = makeEnemy(post.x, post.z, strength, post, { arrivalDelay: postIndex * .1 });
+        goose.guardRange = Math.max(24, range);
         if (x === 0) {
           goose.hp = 1;
           goose.speed *= .8;
         }
       }
     } else {
-      const openingArena = strength === 1;
-      const openingRing = openingArena ? 8.5 : 5.5;
-      const kamppiLevel = world.id === 'kamppi';
-      const openingKamppi = openingArena && kamppiLevel;
-      spawnEnemies(player, openingKamppi ? 8 : openingArena ? 6 : 5 + strength + (kamppiLevel ? 3 : 0), strength, { minPlayerDistance: openingRing, ringStart: openingRing });
-      spawnEnemies(cache, openingKamppi ? 5 : openingArena ? 4 : 6 + (kamppiLevel ? 1 : 0), strength, { minPlayerDistance: openingArena ? 11 : 8, ringStart: openingArena ? 11 : 7 });
       if (kamppiLevel) {
-        // Narinkkatori is wide, so keep a few patrols out by the eastern shops
-        // and upper promenade instead of packing the whole flock by the spawn.
-        spawnEnemies({ x: 33, z: 2 }, openingKamppi ? 5 : 4, strength, { minPlayerDistance: 12, ringStart: 5 });
-        spawnEnemies({ x: 32, z: 38 }, openingKamppi ? 4 : 3, strength, { minPlayerDistance: 12, ringStart: 5 });
+        spawnKamppiGeese(strength);
+      } else {
+        const openingArena = strength === 1;
+        const openingRing = openingArena ? 8.5 : 5.5;
+        spawnEnemies(player, openingArena ? 6 : 5 + strength, strength, { minPlayerDistance: openingRing, ringStart: openingRing });
+        spawnEnemies(cache, openingArena ? 4 : 6, strength, { minPlayerDistance: openingArena ? 11 : 8, ringStart: openingArena ? 11 : 7 });
       }
     }
   }
@@ -927,7 +982,7 @@ function update(dt) {
 }
 
 function enemyVisible(enemy) {
-  if (!enemy.alive || Math.hypot(enemy.x - player.x, enemy.z - player.z) > 18) return false;
+  if (!enemy.alive || enemy.arrival || (enemy.age ?? 1) < .24 || Math.hypot(enemy.x - player.x, enemy.z - player.z) > 24) return false;
   enemyPoint.set(enemy.x, enemy.hitHeight, enemy.z);
   enemyScreen.copy(enemyPoint).project(camera);
   return Math.abs(enemyScreen.x) < 1 && Math.abs(enemyScreen.y) < 1 && Math.abs(enemyScreen.z) < 1

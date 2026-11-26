@@ -92,11 +92,13 @@ export function gooseRig(model) {
 }
 
 export function animateGoose(enemy, dt, attacking, speed = enemy.speed) {
-  enemy.gait += dt * (attacking ? 9 : speed * 9);
+  enemy.gait += dt * (enemy.airborne ? 25 : attacking ? 9 : speed * 9);
   const phase = enemy.gait, stride = attacking ? .12 : .48 * Math.min(1, speed / .45);
   for (let i = 0; i < 2; i++) {
     enemy.goose.legs[i].rotation.x = Math.sin(phase + i * Math.PI) * stride;
-    enemy.goose.wings[i].rotation.z = (i ? 1 : -1) * (attacking ? .25 + Math.sin(phase) * .1 : Math.sin(phase) * .025);
+    const wingbeat = enemy.airborne ? .44 + Math.sin(phase) * .2
+      : attacking ? .25 + Math.sin(phase) * .1 : Math.sin(phase) * .025;
+    enemy.goose.wings[i].rotation.z = (i ? 1 : -1) * wingbeat;
   }
   const lunge = attacking ? .7 + Math.sin(phase) * .18 : Math.sin(phase * .5) * .045;
   enemy.goose.neck.rotation.x = THREE.MathUtils.damp(enemy.goose.neck.rotation.x, lunge, 15, dt);
