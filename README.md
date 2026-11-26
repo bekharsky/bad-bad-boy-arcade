@@ -27,7 +27,7 @@ The city is an affectionate arcade version of Helsinki: a ferry and cranes at th
 | Aim at seagulls | Hold E while spraying | Drag upward from the spray button |
 | Pause | Esc | Pause button |
 
-In the running districts, left and right change lanes while up and down accelerate or brake. Choose **Start Over** from the pause menu to restart the campaign.
+In the running districts, left and right change lanes while up and down accelerate or brake. Choose **Restart Game** from the pause menu to start again at Jätkäsaari.
 
 ## Credits
 

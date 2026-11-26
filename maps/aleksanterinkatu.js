@@ -28,7 +28,7 @@ export function aleksiRoadSpans(from, to) {
 }
 export const aleksanterinkatuMap = {
   id: 'aleksanterinkatu', name: 'Aleksanterinkatu', mode: 'runner',
-  runner: { length: ALEKSI_LENGTH, variety: true, busy: true, cameoShoulder: 6.12, riderKinds: ['bike', 'scooter', 'goose', ...CAMEO_KINDS], lanes: TRAM_LANES, tramChance: .72, tramStartDelay: 35, tramRoute: aleksiTramRoute, roadworkKinds: ['cone', 'barrier'], crossingPoints: ALEKSI_CROSSINGS, startSpeed: 10.5, speedLimit: 18, acceleration: .12 },
+  runner: { length: ALEKSI_LENGTH, variety: true, busy: true, cameoShoulder: 6.12, riderKinds: ['bike', 'scooter', 'goose', ...CAMEO_KINDS], lanes: TRAM_LANES, tramChance: .95, tramStartDelay: 35, tramRoute: aleksiTramRoute, roadworkKinds: ['cone', 'barrier'], crossingPoints: ALEKSI_CROSSINGS, startSpeed: 11, speedLimit: 19, acceleration: .14 },
   spawn: { x: TRAM_LANES[0], z: 0, heading: Math.PI },
   pickups: { medkit: [{ x: TRAM_LANES[0], z: -300 }] },
   bounds: { minX: -5.3, maxX: 5.3, minZ: -150, maxZ: 35 },
