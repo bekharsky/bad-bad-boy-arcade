@@ -6,6 +6,7 @@ import { createTram } from './tram.js';
 import { buildStationStreet, STATION_TRAM_Z } from './station-street.js';
 import { addTree } from './vegetation.js';
 import { centralStation, kiasma, kiasmaFront, kiasmaRoof, oodi, postitalo, sanomatalo } from './station-landmarks.js';
+import { addChristmasDecorations } from './christmas-decor.js';
 
 export const centralStationMap = {
   id: 'central-station', name: 'Central Station & Oodi',
@@ -168,7 +169,19 @@ function buildDistrict(root) {
     addTree(m, { x: -49 + i * 5.4, z: -54 - (i % 3) * 2.4, height: 5.5 + i % 4, radius: 2.1, variant: i });
   }
   root.add(m.finish({ vertexColors: true }));
-  const tram = createTram(root, { z: STATION_TRAM_Z, initialX: 1, extent: 68 });
+  addChristmasDecorations(root, {
+    wreaths: [[-11, 8.8], [21, 9.6], [-12, -15], [13, -13], [-22, -30], [7, -30]].map(([x, z]) => ({ x, y: 4.45, z })),
+    strands: [
+      { from: [-11, 6.5, 8.8], to: [21, 6.5, 9.6], sag: 1.1, spacing: 1.15, lanternSpacing: 3, figureSpacing: 8 },
+      { from: [-12, 6.5, -15], to: [13, 6.5, -13], sag: .9, spacing: 1.15, lanternSpacing: 2.8, figureSpacing: 8 },
+      { from: [-22, 6.5, -30], to: [7, 6.5, -30], sag: 1, spacing: 1.15, lanternSpacing: 2.8, figureSpacing: 8 },
+      { from: [-11, 6.5, 8.8], to: [-12, 6.5, -15], sag: 1.05, spacing: 1.15, lanternSpacing: 3, figureSpacing: 8 },
+      { from: [21, 6.5, 9.6], to: [13, 6.5, -13], sag: 1.05, spacing: 1.15, lanternSpacing: 3, figureSpacing: 8 },
+      { from: [-12, 6.5, -15], to: [-22, 6.5, -30], sag: .7, spacing: 1.15, lanternSpacing: 2.8, figureSpacing: 8 },
+      { from: [13, 6.5, -13], to: [7, 6.5, -30], sag: .7, spacing: 1.15, lanternSpacing: 2.8, figureSpacing: 8 },
+    ],
+  });
+  const tram = createTram(root, { z: STATION_TRAM_Z, extent: 68, initialWait: 10 });
   let previousCell = null;
   return {
     colliders, buildings,

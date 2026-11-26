@@ -4,18 +4,26 @@ const MODEL_URL = new URL('../assets/bad-bad-boy.glb', import.meta.url);
 
 export async function loadHero(onStatus) {
   const url = MODEL_URL;
-  const response = await fetch(url);
+  const [response, { MeshoptDecoder }] = await Promise.all([
+    fetch(url),
+    import('meshoptimizer/decoder'),
+  ]);
   if (!response.ok) throw new Error(`Hero download failed: HTTP ${response.status}`);
   let bytes;
   if (response.body) {
     const reader = response.body.getReader();
-    const chunks = [], header = new Uint8Array(12);
-    let loaded = 0, headerLength = 0, total = 0;
+    const pending = [], header = new Uint8Array(12);
+    let loaded = 0, headerLength = 0, total = 0, offset = 0;
     try {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        chunks.push(value); loaded += value.byteLength;
+        if (total && loaded + value.byteLength > total) throw new Error('Hero GLB exceeds its declared length');
+        if (bytes) {
+          bytes.set(value, offset);
+          offset += value.byteLength;
+        } else pending.push(value);
+        loaded += value.byteLength;
         if (headerLength < header.length) {
           const part = value.subarray(0, header.length - headerLength);
           header.set(part, headerLength); headerLength += part.length;
@@ -26,6 +34,13 @@ export async function loadHero(onStatus) {
             // compressed bytes, while fetch streams already decoded bytes.
             total = view.getUint32(8, true);
             if (total < 20) throw new Error('Invalid hero GLB length');
+            if (loaded > total) throw new Error('Hero GLB exceeds its declared length');
+            bytes = new Uint8Array(total);
+            for (const chunk of pending) {
+              bytes.set(chunk, offset);
+              offset += chunk.byteLength;
+            }
+            pending.length = 0;
           }
         }
         if (total) {
@@ -37,13 +52,12 @@ export async function loadHero(onStatus) {
     } finally {
       reader.releaseLock();
     }
-    if (!total || loaded !== total) throw new Error('Hero GLB download is incomplete');
-    bytes = new Uint8Array(loaded);
-    let offset = 0;
-    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+    if (!total || loaded !== total || offset !== total) throw new Error('Hero GLB download is incomplete');
   } else {
     bytes = new Uint8Array(await response.arrayBuffer());
   }
   onStatus('Preparing the models…');
-  return new GLTFLoader().parseAsync(bytes.buffer, new URL('.', url).href);
+  const loader = new GLTFLoader();
+  loader.setMeshoptDecoder(MeshoptDecoder);
+  return loader.parseAsync(bytes.buffer, new URL('.', url).href);
 }

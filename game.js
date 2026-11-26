@@ -13,7 +13,6 @@ import { createMapTransition } from './world/map-transition.js';
 import { createTransitionRenderer } from './world/transition-renderer.js';
 import { createSleighParts } from './models/sleigh.js';
 import { createSleighAssembly } from './sleigh-assembly.js';
-import { createSleighIntro } from './sleigh-intro.js';
 import { createSleighCache, sleighGuardPosts } from './sleigh-search.js';
 import { createArenaBoosts } from './arena-boosts.js';
 import { loadEnemyModels, createEnemy, animateEnemy, disposeEnemy } from './enemies.js';
@@ -299,10 +298,13 @@ const seagulls = createSeagulls(scene, world, {
 const POWER_TIME = 8;
 const SKATE_TIME = 8;
 const SKATE_SPEED_MULTIPLIER = 1.35;
+const RESTART_PENALTY = 100;
 let playing = false;
 let gameTime = 0;
 let score = 0;
 let bankedScore = 0;
+let restartPenalty = 0;
+let restartCurrentLevel = false;
 let searchTime = 0;
 let geeseDefeated = 0;
 let healthLost = 0;
@@ -310,6 +312,7 @@ let levelProgress = 0;
 let levelIndex = 0;
 let foundParts = 0;
 let intro = null;
+let introLoading = false;
 let introSeen = false;
 const FINISH_HOLD = .85;
 const CRASH_HOLD = .45;
@@ -1002,7 +1005,7 @@ function recordHealthLost(amount) {
 
 function updateScore() {
   const inProgress = playing && foundParts === levelIndex;
-  score = bankedScore + (inProgress ? currentDistrictScore().total : 0);
+  score = Math.max(0, bankedScore + (inProgress ? currentDistrictScore().total : 0) - restartPenalty);
   const text = String(score).padStart(4, '0');
   if (scoreLabel.textContent !== text) scoreLabel.textContent = text;
   const fontSize = `${Math.max(9, Math.min(18, 58 / (text.length * 0.5)))}px`;
@@ -1094,15 +1097,23 @@ function frameMenuPreview() {
   camera.lookAt(wide ? -20 : -2, portrait ? -6 : 7, -27);
 }
 
-function playFromMenu() {
-  if (!player.model || !renderingReady || intro || !missionScreen.hidden) return;
+async function playFromMenu() {
+  if (!player.model || !renderingReady || intro || introLoading || !missionScreen.hidden) return;
   if (introSeen || debugMaps || query.has('map')) {
     startGame();
     return;
   }
   introSeen = true;
+  introLoading = true;
   try {
-    intro = createSleighIntro(introOverlay, { reducedMotion: reducedMotion.matches, onImpact: () => blip(133, .32) });
+    const { createSleighIntro } = await import('./sleigh-intro.js');
+    introLoading = false;
+    intro = createSleighIntro(introOverlay, {
+      reducedMotion: reducedMotion.matches,
+      onImpact: () => blip(133, .32),
+      heroModel: player.model,
+      sleighParts,
+    });
     intro.resize(canvas.clientWidth, canvas.clientHeight);
     intro.update(0);
     startScreen.classList.add('hidden');
@@ -1111,6 +1122,7 @@ function playFromMenu() {
     skipIntro.focus({ preventScroll: true });
     frameClock.reset();
   } catch (error) {
+    introLoading = false;
     console.warn('Could not start the sleigh intro:', error);
     finishIntro();
   }
@@ -1135,6 +1147,7 @@ function startGame({ transition = false } = {}) {
   gameShell.classList.remove('sleigh-assembling');
   mapTransition.cancel(); finishMapTransition();
   bankedScore = 0;
+  restartPenalty = 0;
   updateScore();
   foundParts = 0;
   updateSleighProgress();
@@ -1147,6 +1160,25 @@ function startGame({ transition = false } = {}) {
   endScreen.classList.add('hidden');
   keys.clear();
   canvas.focus({ preventScroll: true });
+  syncMouseAim();
+}
+
+function restartDistrict() {
+  if (!player.model || !renderingReady) return;
+  restartPenalty += RESTART_PENALTY;
+  playing = false;
+  runnerArrival = 0;
+  runnerCrash = 0;
+  sleighAssembly.clear();
+  gameShell.classList.remove('sleigh-assembling');
+  mapTransition.cancel(); finishMapTransition();
+  enterDistrict({ index: levelIndex });
+  playing = true;
+  touchControls.setEnabled(true);
+  endScreen.classList.add('hidden');
+  keys.clear();
+  canvas.focus({ preventScroll: true });
+  updateScore();
   syncMouseAim();
 }
 
@@ -1187,7 +1219,8 @@ function endGame(won = false, { crashed = false } = {}) {
   endScreen.classList.remove('hidden');
   document.querySelector('#end-title').textContent = won ? 'SLEIGH COMPLETE' : crashed ? 'CRASHED' : 'WASTED';
   document.querySelector('#end-score').textContent = score.toLocaleString();
-  restartButton.textContent = 'PLAY AGAIN';
+  restartCurrentLevel = !won;
+  restartButton.textContent = won ? 'PLAY AGAIN' : `RESTART LEVEL (-${RESTART_PENALTY} PTS)`;
   leaderboard.submit(score, levelIndex + 1);
   player.model.material.opacity = 1;
   player.model.material.transparent = false;
@@ -1353,7 +1386,8 @@ startOver.addEventListener('click', () => {
   startGame({ transition: true });
 });
 restartButton.addEventListener('click', () => {
-  startGame();
+  if (restartCurrentLevel) restartDistrict();
+  else startGame();
 });
 function syncSound() {
   for (const button of soundButtons) {

@@ -6,6 +6,7 @@ import { createRunnerTraffic, createRunnerFinish } from '../runner/track-rendere
 import { BAANA_LENGTH } from '../runner/course.js';
 import { CAMEO_KINDS } from '../runner/cameo-roster.js';
 import { registerBuilding } from '../world/building-visibility.js';
+import { addChristmasDecorations } from './christmas-decor.js';
 
 export const baanaMap = {
   id: 'baana', name: 'Baana Run', mode: 'runner',
@@ -81,7 +82,21 @@ function buildBaana(root) {
       for (let z = -5.9; z < -3.1; z += .49) box('#17483e', -6.115, 2.79, z, .012, .2, .32);
       for (const z of [-8, -5.1, -2]) box('#80b8a9', -6.14, 1.39, z, .02, .12, 2.1);
     }
-    const group = scenery.finish({ vertexColors: true }); root.add(group); sections.push(group);
+    const group = scenery.finish({ vertexColors: true });
+    addChristmasDecorations(group, {
+      wreaths: [-5.92, 5.92].map(x => ({ x, y: 3.65, z: 0 })),
+      strands: [
+        ...[-12, 0, 12].map(z => ({
+          from: [-5.5, 8.25, z], to: [5.5, 8.25, z],
+          sag: .65, spacing: .9, lanternSpacing: 2.35, figureSpacing: 6.8,
+        })),
+        ...[-5.5, 5.5].map(x => ({
+          from: [x, 8.25, 12], to: [x, 8.25, -12],
+          sag: .8, spacing: 1, lanternSpacing: 2.65, figureSpacing: 7.2,
+        })),
+      ],
+    });
+    root.add(group); sections.push(group);
     if (section === 1 || section === 4) {
       const bridge = createSceneryModel('Baana road bridge');
       bridge.box('#c0c2b0', 0, 7.1, 0, 19, .85, 4.8);
