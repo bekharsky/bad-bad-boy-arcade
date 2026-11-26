@@ -161,7 +161,7 @@ test('air spray can repel moving birds in both arena and runner frames', () => {
       flight.update(1 / 60, player, { scroll: runner ? 15 : 0 });
       spray.update(1 / 60, true, emitter, aim(player, flight.birds, true), flight.birds);
     }
-    assert.equal(repelled.size, 3); assert.equal(impacts.length, 0);
+    assert.equal(repelled.size, 1, 'The rest of the flock stays in reserve'); assert.equal(impacts.length, 0);
   }
 });
 
