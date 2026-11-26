@@ -1,10 +1,9 @@
 import * as THREE from 'three';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { senateSquareMap } from './maps/senate-square.js';
-import { harborMap } from './maps/harbor.js';
-import { createSleighParts } from './models/sleigh.js';
 import { createJoulupukki } from './models/joulupukki.js';
 import { createSceneryModel } from './maps/scenery-model.js';
+import { addChristmasDecorations } from './maps/christmas-decor.js';
 import { createBurstEffects } from './burst-effects.js';
 import { disposeObject } from './world/dispose.js';
 
@@ -64,6 +63,91 @@ function createIntroDrone() {
     rotors.push(propeller);
   }
   return { root, rotors, materials: fadeMaterials(root) };
+}
+
+function createFadingPieces(sources, parent, centers) {
+  return sources.map(({ model }, index) => {
+    const ownedMaterials = new Map();
+    model.traverse(node => {
+      if (!node.isMesh) return;
+      if (!ownedMaterials.has(node.material)) ownedMaterials.set(node.material, node.material.clone());
+      node.material = ownedMaterials.get(node.material);
+    });
+    const center = centers?.[index] ?? new THREE.Box3().setFromObject(model).getCenter(new THREE.Vector3());
+    model.position.sub(center);
+    const pivot = new THREE.Group();
+    pivot.add(model);
+    parent.add(pivot);
+    return { pivot, center, velocity: debrisVelocity[index], materials: fadeMaterials(model) };
+  });
+}
+
+function disposeFadingPieces(pieces) {
+  for (const { pivot, materials } of pieces) {
+    pivot.removeFromParent();
+    for (const material of materials) material.dispose();
+  }
+}
+
+function createWitnessHarbor(scene) {
+  const quay = new THREE.Mesh(
+    new THREE.PlaneGeometry(104, 70),
+    new THREE.MeshStandardMaterial({ color: '#263348', roughness: .96 }),
+  );
+  quay.rotation.x = -Math.PI / 2;
+  quay.position.set(0, -.17, -13);
+  scene.add(quay);
+
+  const water = new THREE.Mesh(
+    new THREE.PlaneGeometry(118, 38),
+    new THREE.MeshStandardMaterial({ color: '#193248', roughness: .36, metalness: .22 }),
+  );
+  water.rotation.x = -Math.PI / 2;
+  water.position.set(0, -.19, -65);
+  scene.add(water);
+
+  const port = createSceneryModel('Harbor witness backdrop');
+  const warehouses = [
+    { x: -30, z: -39, w: 15, h: 9, d: 15 },
+    { x: -10, z: -47, w: 17, h: 12, d: 14 },
+    { x: 12, z: -43, w: 19, h: 10, d: 17 },
+    { x: 34, z: -38, w: 13, h: 8, d: 14 },
+  ];
+  const walls = ['#39445a', '#35465a', '#42465a', '#374255'];
+  warehouses.forEach(({ x, z, w, h, d }, index) => {
+    port.box(walls[index], x, h / 2, z, w, h, d);
+    port.box('#566071', x, h + .16, z, w + .5, .32, d + .5);
+    port.box('#2b394e', x, h + .42, z, w + .8, .2, d + .8);
+    for (let floor = 1.8; floor < h - 1; floor += 2.5) {
+      for (let column = -1; column <= 1; column++) {
+        if ((index + column + Math.round(floor)) % 3 === 0) continue;
+        port.box('#e6aa6e', x + column * w * .27, floor, z + d / 2 + .035, .72, 1.05, .06);
+      }
+    }
+  });
+
+  // A ferry silhouette and quay crane give the cutaway a clear harbour read.
+  port.box('#334458', -31, 1.05, -20, 16, 2.1, 12);
+  port.box('#bfbea8', -31, 2.45, -20, 11, .9, 7);
+  port.box('#a95249', -31, 3.05, -20, 7, .35, 5);
+  port.box('#667488', 31, 4.4, -19, .26, 8.8, .26);
+  port.box('#667488', 25.5, 8.7, -19, 11, .26, .26);
+  port.box('#667488', 25.5, 5.1, -19, .22, 7.2, .22);
+  port.box('#8c9aa4', 25.5, 1.45, -19, .14, 2.9, .14);
+  scene.add(port.finish({ vertexColors: true, roughness: .95 }));
+
+  for (const [x, z] of [[-24, -25], [18, -29], [34, -24]]) {
+    const lamp = new THREE.PointLight('#ffba72', 28, 12, 1.6);
+    lamp.position.set(x, 5.4, z);
+    scene.add(lamp);
+  }
+  addChristmasDecorations(scene, {
+    wreaths: [{ x: -31, y: 5.1, z: -20 }, { x: 31, y: 5.1, z: -19 }],
+    strands: [
+      { from: [-28, 10, -34], to: [-7, 10, -34], sag: .8, spacing: 1, lanternSpacing: 2.5, figureSpacing: 8 },
+      { from: [-8, 9.5, -32], to: [22, 9.5, -32], sag: .9, spacing: 1, lanternSpacing: 2.7, figureSpacing: 9 },
+    ],
+  });
 }
 
 function addSky(scene) {
@@ -164,7 +248,7 @@ function lightCity(scene) {
   scene.add(flood, flood.target);
 }
 
-export function createSleighIntro(overlay, { reducedMotion, onImpact, heroModel }) {
+export function createSleighIntro(overlay, { reducedMotion, onImpact, heroModel, sleighParts }) {
   const scene = new THREE.Scene();
   scene.fog = new THREE.FogExp2('#283956', .006);
   const camera = new THREE.PerspectiveCamera(52, 1, .2, 520);
@@ -180,18 +264,15 @@ export function createSleighIntro(overlay, { reducedMotion, onImpact, heroModel 
   const witnessScene = new THREE.Scene();
   witnessScene.background = new THREE.Color('#111d31');
   witnessScene.fog = new THREE.FogExp2('#253550', .012);
-  const witnessDistrict = harborMap.create();
-  witnessScene.add(witnessDistrict.root);
   addSky(witnessScene);
+  createWitnessHarbor(witnessScene);
   witnessScene.add(new THREE.HemisphereLight('#a9c4f5', '#352a35', .86));
   const witnessMoonlight = new THREE.DirectionalLight('#b7d0f4', .72);
   witnessMoonlight.position.set(-18, 36, -45);
   witnessScene.add(witnessMoonlight);
-  for (const [x, z] of [[-8, 1.1], [8, 1.1], [8, -24.7]]) {
-    const streetGlow = new THREE.PointLight('#ffc47e', 32, 15, 1.55);
-    streetGlow.position.set(x, 3.15, z);
-    witnessScene.add(streetGlow);
-  }
+  const witnessHeroLight = new THREE.PointLight('#ffc47e', 26, 13, 1.55);
+  witnessHeroLight.position.set(-8, 3.2, 6.5);
+  witnessScene.add(witnessHeroLight);
 
   const witnessHero = cloneSkinned(heroModel);
   witnessHero.name = 'Bad Bad Boy watching the sleigh';
@@ -212,36 +293,12 @@ export function createSleighIntro(overlay, { reducedMotion, onImpact, heroModel 
   droneFlight.add(drone.root);
   scene.add(droneFlight);
   const impactSparks = createBurstEffects(scene, 32);
-  const pieces = createSleighParts().map(({ model }, index) => {
-    // Pieces share source materials, but their fades need independent opacity.
-    const ownedMaterials = new Map();
-    model.traverse(node => {
-      if (!node.isMesh) return;
-      if (!ownedMaterials.has(node.material)) ownedMaterials.set(node.material, node.material.clone());
-      node.material = ownedMaterials.get(node.material);
-    });
-    const pivot = new THREE.Group();
-    const center = new THREE.Box3().setFromObject(model).getCenter(new THREE.Vector3());
-    model.position.sub(center);
-    pivot.add(model);
-    sleigh.add(pivot);
-    return { pivot, center, velocity: debrisVelocity[index], materials: fadeMaterials(model) };
-  });
-  const witnessPieces = createSleighParts().map(({ model }, index) => {
-    // The rendered street-level shot owns its fades without changing gameplay's sleigh materials.
-    const ownedMaterials = new Map();
-    model.traverse(node => {
-      if (!node.isMesh) return;
-      if (!ownedMaterials.has(node.material)) ownedMaterials.set(node.material, node.material.clone());
-      node.material = ownedMaterials.get(node.material);
-    });
-    const pivot = new THREE.Group();
-    const center = new THREE.Box3().setFromObject(model).getCenter(new THREE.Vector3());
-    model.position.sub(center);
-    pivot.add(model);
-    witnessScene.add(pivot);
-    return { pivot, center, velocity: debrisVelocity[index], materials: fadeMaterials(model) };
-  });
+  // Both cinematic views reuse gameplay geometry and own only their transforms
+  // and fade materials, avoiding another procedural sleigh build.
+  const introPartModels = sleighParts.map(({ model }) => ({ model: model.clone(true) }));
+  const witnessPartModels = introPartModels.map(({ model }) => ({ model: model.clone(true) }));
+  const pieces = createFadingPieces(introPartModels, sleigh);
+  const witnessPieces = createFadingPieces(witnessPartModels, witnessScene, pieces.map(piece => piece.center));
   const lantern = new THREE.PointLight('#ffcd9b', 94, 15, 1.4);
   sleigh.add(lantern);
   lantern.position.set(3.4, 5.2, 5.2);
@@ -271,6 +328,7 @@ export function createSleighIntro(overlay, { reducedMotion, onImpact, heroModel 
   const color = new THREE.Color('#ffbf73');
   const target = new THREE.Vector3();
   const railContact = new THREE.Vector3(1.22, 2.08, 1.85);
+  const flightState = { pullBack: 0, scatter: 0, turbulence: 0 };
   // The leading rotor strikes the outside rail. The drone's centre stays on the far side of it.
   const droneAtImpact = railContact.clone().add(new THREE.Vector3(
     ROTOR_OFFSET + BLADE_LENGTH / 2, -ROTOR_HEIGHT, -ROTOR_OFFSET,
@@ -295,7 +353,10 @@ export function createSleighIntro(overlay, { reducedMotion, onImpact, heroModel 
     sleigh.position.set(-18 + flight * 5.1, 22.3 + flight * .66 + Math.sin(time * 2.1) * .35 - 3.5 * jolt + 1.4 * rebound, -12 + flight * 1.6);
     sleigh.rotation.set(.028 * Math.sin(time * 3.2) + .26 * jolt - .38 * rebound,
       1.2 + .045 * Math.sin(time * 1.55) - .2 * turbulence, -.13 * Math.sin(time * 1.8) - .57 * jolt + .86 * rebound);
-    return { pullBack, scatter, turbulence };
+    flightState.pullBack = pullBack;
+    flightState.scatter = scatter;
+    flightState.turbulence = turbulence;
+    return flightState;
   }
 
   function pose(time) {
@@ -330,21 +391,25 @@ export function createSleighIntro(overlay, { reducedMotion, onImpact, heroModel 
     });
     fadeModel(rider.root, riderMaterials, 1 - smoothstep(scatter, 1.65, 3.08));
 
-    for (const [i, { pivot, center, velocity, materials }] of pieces.entries()) {
+    for (let i = 0; i < pieces.length; i++) {
+      const { pivot, center, velocity, materials } = pieces[i];
       pivot.position.set(center.x + velocity[0] * scatter, center.y + velocity[1] * scatter - 1.04 * scatter ** 2, center.z + velocity[2] * scatter);
       pivot.rotation.set((i % 2 ? 1 : -1) * scatter * (1.2 + i * .24), scatter * (1.7 - i * .58), scatter * (.9 - i * .35));
       fadeModel(pivot, materials, 1 - smoothstep(scatter, 2.03 + i * .12, 3.2 + i * .115));
     }
     sparks.visible = scatter > 0 && scatter < 3.6;
     if (sparks.visible) {
-      for (const [i, { center, velocity }] of pieces.entries()) for (let j = 0; j < 13; j++) {
-        const age = Math.max(0, scatter - j * .052);
-        const n = (i * 13 + j) * 3;
-        sparkPositions[n] = center.x + velocity[0] * age + Math.sin(i * 8 + j) * scatter * .31;
-        sparkPositions[n + 1] = center.y + velocity[1] * age - 1.04 * age ** 2 + Math.cos(j * 7.3) * scatter * .28;
-        sparkPositions[n + 2] = center.z + velocity[2] * age + Math.sin(j * 5.1) * scatter * .34;
-        const fade = (1 - j / 14) * (1 - smoothstep(scatter, 1.7, 3.6));
-        sparkColors[n] = color.r * fade; sparkColors[n + 1] = color.g * fade; sparkColors[n + 2] = color.b * fade;
+      for (let i = 0; i < pieces.length; i++) {
+        const { center, velocity } = pieces[i];
+        for (let j = 0; j < 13; j++) {
+          const age = Math.max(0, scatter - j * .052);
+          const n = (i * 13 + j) * 3;
+          sparkPositions[n] = center.x + velocity[0] * age + Math.sin(i * 8 + j) * scatter * .31;
+          sparkPositions[n + 1] = center.y + velocity[1] * age - 1.04 * age ** 2 + Math.cos(j * 7.3) * scatter * .28;
+          sparkPositions[n + 2] = center.z + velocity[2] * age + Math.sin(j * 5.1) * scatter * .34;
+          const fade = (1 - j / 14) * (1 - smoothstep(scatter, 1.7, 3.6));
+          sparkColors[n] = color.r * fade; sparkColors[n + 1] = color.g * fade; sparkColors[n + 2] = color.b * fade;
+        }
       }
       sparksGeometry.attributes.position.needsUpdate = sparksGeometry.attributes.color.needsUpdate = true;
     }
@@ -362,7 +427,8 @@ export function createSleighIntro(overlay, { reducedMotion, onImpact, heroModel 
 
   function poseWitness(time) {
     const scatter = .95 + time * 1.05;
-    for (const [i, { pivot, center, velocity, materials }] of witnessPieces.entries()) {
+    for (let i = 0; i < witnessPieces.length; i++) {
+      const { pivot, center, velocity, materials } = witnessPieces[i];
       pivot.position.set(
         6 + center.x + velocity[0] * scatter,
         12 + center.y + velocity[1] * scatter - 1.04 * scatter ** 2,
@@ -371,6 +437,9 @@ export function createSleighIntro(overlay, { reducedMotion, onImpact, heroModel 
       pivot.rotation.set((i % 2 ? 1 : -1) * scatter * (1.2 + i * .24), scatter * (1.7 - i * .58), scatter * (.9 - i * .35));
       fadeModel(pivot, materials, 1 - smoothstep(time, 2.18, 2.75));
     }
+  }
+
+  function frameWitnessCamera() {
     const portrait = witnessCamera.aspect < .8;
     witnessCamera.fov = portrait ? 58 : 48;
     witnessCamera.position.set(portrait ? -9 : -10, 3.35, 15);
@@ -379,14 +448,15 @@ export function createSleighIntro(overlay, { reducedMotion, onImpact, heroModel 
     witnessCamera.updateProjectionMatrix();
   }
 
+  frameWitnessCamera();
+
   return {
     resize(width, height) {
       camera.aspect = width / height;
       camera.fov = camera.aspect < .8 ? 57 : 52;
       camera.updateProjectionMatrix();
       witnessCamera.aspect = width / height;
-      witnessCamera.fov = witnessCamera.aspect < .8 ? 58 : 48;
-      witnessCamera.updateProjectionMatrix();
+      frameWitnessCamera();
     },
     update(dt) {
       const last = elapsed;
@@ -410,11 +480,12 @@ export function createSleighIntro(overlay, { reducedMotion, onImpact, heroModel 
       else renderer.render(scene, camera);
     },
     dispose() {
-      witnessDistrict.dispose();
       witnessHero.removeFromParent();
       witnessHero.skeleton?.dispose();
+      disposeFadingPieces(witnessPieces);
       disposeObject(witnessScene);
       district.dispose();
+      disposeFadingPieces(pieces);
       disposeObject(scene);
     },
   };

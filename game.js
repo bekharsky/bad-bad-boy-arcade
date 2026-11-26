@@ -13,7 +13,6 @@ import { createMapTransition } from './world/map-transition.js';
 import { createTransitionRenderer } from './world/transition-renderer.js';
 import { createSleighParts } from './models/sleigh.js';
 import { createSleighAssembly } from './sleigh-assembly.js';
-import { createSleighIntro } from './sleigh-intro.js';
 import { createSleighCache, sleighGuardPosts } from './sleigh-search.js';
 import { createArenaBoosts } from './arena-boosts.js';
 import { loadEnemyModels, createEnemy, animateEnemy, disposeEnemy } from './enemies.js';
@@ -313,6 +312,7 @@ let levelProgress = 0;
 let levelIndex = 0;
 let foundParts = 0;
 let intro = null;
+let introLoading = false;
 let introSeen = false;
 const FINISH_HOLD = .85;
 const CRASH_HOLD = .45;
@@ -1097,15 +1097,23 @@ function frameMenuPreview() {
   camera.lookAt(wide ? -20 : -2, portrait ? -6 : 7, -27);
 }
 
-function playFromMenu() {
-  if (!player.model || !renderingReady || intro || !missionScreen.hidden) return;
+async function playFromMenu() {
+  if (!player.model || !renderingReady || intro || introLoading || !missionScreen.hidden) return;
   if (introSeen || debugMaps || query.has('map')) {
     startGame();
     return;
   }
   introSeen = true;
+  introLoading = true;
   try {
-    intro = createSleighIntro(introOverlay, { reducedMotion: reducedMotion.matches, onImpact: () => blip(133, .32), heroModel: player.model });
+    const { createSleighIntro } = await import('./sleigh-intro.js');
+    introLoading = false;
+    intro = createSleighIntro(introOverlay, {
+      reducedMotion: reducedMotion.matches,
+      onImpact: () => blip(133, .32),
+      heroModel: player.model,
+      sleighParts,
+    });
     intro.resize(canvas.clientWidth, canvas.clientHeight);
     intro.update(0);
     startScreen.classList.add('hidden');
@@ -1114,6 +1122,7 @@ function playFromMenu() {
     skipIntro.focus({ preventScroll: true });
     frameClock.reset();
   } catch (error) {
+    introLoading = false;
     console.warn('Could not start the sleigh intro:', error);
     finishIntro();
   }
