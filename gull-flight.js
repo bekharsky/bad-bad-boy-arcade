@@ -24,7 +24,7 @@ export function createGullFlight({ random = Math.random, canStandAt = () => true
     runner = running;
     birds.splice(0, birds.length, ...flock.slice(0, runner ? runnerGullCount : GULL_COUNT));
     const quickerRunnerFlock = runner;
-    time = accumulator = nextBird = 0; nextAttack = (quickerRunnerFlock ? 5.5 : 8) + random() * (quickerRunnerFlock ? 1.5 : 2) + attackDelay;
+    time = accumulator = nextBird = 0; nextAttack = (quickerRunnerFlock ? 5.5 : 9) + random() * (quickerRunnerFlock ? 1.5 : 2) + attackDelay;
     attackGrace = attackDelay ? nextAttack : 0;
     previous.x = player.x; previous.z = player.z;
     for (const bird of birds) {
