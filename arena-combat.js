@@ -1,6 +1,6 @@
 // Arena owns enemy pursuit, separation and bite timing. Rendering and round
 // lifecycle stay with the coordinator; fatal damage stops the current step.
-const GOOSE_INTEREST_GRACE = 5;
+const GOOSE_INTEREST_GRACE = 14;
 const AGGRESSIVE_NOTICE_MULTIPLIER = 2;
 
 const FOLD_DURATION = .46;
@@ -53,7 +53,7 @@ export function createArenaCombat({ world, player, enemies, animateEnemy, onBite
         const distance = Math.hypot(vx, vz);
         const post = enemy.guardPost;
         const guardRange = enemy.guardRange ?? 24;
-        const noticeRange = guardRange * (enemy.berserk ? AGGRESSIVE_NOTICE_MULTIPLIER : 1);
+        const noticeRange = Math.max(58, guardRange * (enemy.berserk ? AGGRESSIVE_NOTICE_MULTIPLIER : 1));
         const canSeePlayer = distance <= noticeRange
           && world.lineClear(enemy.x, enemy.z, player.x, player.z, .6);
         const leader = enemy.packLeader?.alive ? enemy.packLeader : null;

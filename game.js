@@ -14,7 +14,7 @@ import { createMapTransition } from './world/map-transition.js';
 import { createTransitionRenderer } from './world/transition-renderer.js';
 import { createSleighParts } from './models/sleigh.js';
 import { createSleighAssembly } from './sleigh-assembly.js';
-import { createSleighCache, sleighGuardPosts } from './sleigh-search.js';
+import { createSleighCache, randomSleighCachePoint, sleighGuardPosts } from './sleigh-search.js';
 import { createArenaBoosts } from './arena-boosts.js';
 import { loadEnemyModels, createEnemy, animateEnemy, disposeEnemy } from './enemies.js';
 import { createSpraySystem } from './spray-system.js';
@@ -298,7 +298,7 @@ let bankedScore = 0;
 let restartPenalty = 0;
 let restartTargetIndex = null;
 let searchTime = 0;
-let nextGooseArrival = 16;
+let nextGooseArrival = 25;
 let gooseReinforcementWave = 0;
 let geeseDefeated = 0;
 let healthLost = 0;
@@ -646,14 +646,37 @@ function reinforceGeese() {
   gooseReinforcementWave++;
   const count = Math.min(2 + Math.floor(gooseReinforcementWave / 2), 5, 40 - alive);
   const strength = itinerary.slice(0, levelIndex + 1).filter(map => map.mode !== 'runner').length;
-  // Arrivals approach from farther away as the search drags on, so they enter
-  // the map as a visible threat instead of popping up beside the player.
-  world.routeTo(player.x, player.z);
-  spawnEnemies(player, count, strength, {
-    minPlayerDistance: 10,
-    ringStart: 13 + Math.min(7, gooseReinforcementWave * 1.1),
-  });
-  nextGooseArrival = searchTime + Math.max(8, 20 - gooseReinforcementWave * 2);
+  const defenders = enemies.filter(enemy => enemy.alive && enemy.guardPost && !enemy.arrival);
+  const leader = defenders.reduce((nearest, enemy) => {
+    const distance = Math.hypot(enemy.x - player.x, enemy.z - player.z);
+    return !nearest || distance < nearest.distance ? { enemy, distance } : nearest;
+  }, null)?.enemy;
+  if (leader) {
+    const arrivals = [];
+    for (let attempt = 0; attempt < count * 12 && arrivals.length < count; attempt++) {
+      const angle = Math.random() * Math.PI * 2;
+      const distance = 2.5 + Math.random() * 6;
+      const point = world.pickupPoint({
+        x: leader.x + Math.cos(angle) * distance,
+        z: leader.z + Math.sin(angle) * distance,
+      }, .68);
+      if (!point || enemies.some(enemy => Math.hypot(enemy.x - point.x, enemy.z - point.z) < 1.8)) continue;
+      arrivals.push(point);
+      const reinforcement = makeEnemy(point.x, point.z, strength, leader.guardPost, {
+        arrivalDelay: arrivals.length * .7,
+        arrivalDistance: 12,
+        arrivalAngle: Math.atan2(leader.x - point.x, leader.z - point.z) + (Math.random() - .5) * .9,
+      });
+      reinforcement.packLeader = leader;
+    }
+  } else {
+    world.routeTo(player.x, player.z);
+    spawnEnemies(player, count, strength, {
+      minPlayerDistance: 10,
+      ringStart: 13 + Math.min(7, gooseReinforcementWave * 1.1),
+    });
+  }
+  nextGooseArrival = searchTime + Math.max(10, 24 - gooseReinforcementWave * 2);
 }
 
 function collectSleighPart() {
@@ -686,7 +709,7 @@ function enterDistrict({ index }) {
   const changedMap = world.activate(district.id);
   levelIndex = index;
   searchTime = geeseDefeated = healthLost = 0;
-  nextGooseArrival = 16;
+  nextGooseArrival = 25;
   gooseReinforcementWave = 0;
   setLevelProgress(0);
   if (changedMap || !firstRound) setDistrictWeather();
@@ -708,24 +731,21 @@ function enterDistrict({ index }) {
     runnerSession.start(world.runner);
   } else {
     arenaBoosts.reset(player);
-    const [cache] = world.pickupPoints('sleigh', .85);
+    const cache = randomSleighCachePoint(world, player, .85);
     if (!cache) throw new Error(`Missing reachable sleigh part in ${district.id}`);
     sleighCache.place(cache, index);
     const strength = itinerary.slice(0, index + 1).filter(map => map.mode !== 'runner').length;
     const kamppiLevel = world.id === 'kamppi';
     const posts = sleighGuardPosts(world, cache);
-    if (!kamppiLevel) for (const post of openingHarbor ? posts.slice(0, 6) : posts) makeEnemy(post.x, post.z, strength, post);
+    if (!kamppiLevel && !openingHarbor) {
+      const guardCount = Math.min(posts.length, 10 + strength * 2);
+      for (const post of posts.slice(0, guardCount)) makeEnemy(post.x, post.z, strength, post);
+    }
     if (openingHarbor) {
       const harborPosts = [
-        [0, 4.5, 6], [6, 8, 6.5], [16, 11, 7], // Plaza and eastbound route
-        [-20, 10.3, 6.5], // Behind Verkkopaukka
-        [-5.5, 26.5, 6.5], // Behind the southern apartment building
-        [-22, -24, 6.5], // Behind the west warehouse
-        [18.5, 22.5, 6.5], // Behind Cafe Helmi
-        [6, 15, 6], // South of the plaza
-        [14.5, -24, 6.5], // By the terminal
-        [-25, -6, 13], [-20, 23, 14], [-12, -18, 13], [-2, -22, 13],
-        [10, -19, 14], [25, -13, 14], [25, 22, 15], [4, 24, 13],
+        [0, 4.5, 6], [6, 8, 6.5], [16, 11, 7],
+        [-20, 10.3, 6.5], [-5.5, 26.5, 6.5], [-22, -24, 6.5],
+        [18.5, 22.5, 6.5], [6, 15, 6],
       ];
       for (const [postIndex, [x, z, range]] of harborPosts.entries()) {
         const post = world.pickupPoint({ x, z }, .65);
@@ -740,6 +760,11 @@ function enterDistrict({ index }) {
     } else {
       if (kamppiLevel) {
         spawnKamppiGeese(strength);
+        for (const post of posts) {
+          if (enemies.length >= 14) break;
+          if (enemies.some(enemy => Math.hypot(enemy.x - post.x, enemy.z - post.z) < 1.8)) continue;
+          makeEnemy(post.x, post.z, strength, post, { arrivalDelay: enemies.length * .12 });
+        }
       } else {
         const openingArena = strength === 1;
         const openingRing = openingArena ? 8.5 : 5.5;

@@ -5,7 +5,7 @@ const CACHE_RADIUS = 1.55;
 
 export function sleighGuardPosts(world, point) {
   const posts = [];
-  for (const radius of [2.45, 4.3, 6]) {
+  for (const radius of [2.45, 4.3, 6, 8]) {
     const candidates = [];
     for (let i = 0; i < 16; i++) {
       const angle = (i + radius) * Math.PI / 8;
@@ -15,7 +15,7 @@ export function sleighGuardPosts(world, point) {
       }
     }
     // Spread the posts along the walkable sides, including narrow courtyards.
-    for (let i = 0; i < 3 && candidates.length; i++) {
+    for (let i = 0; i < 4 && candidates.length; i++) {
       let best = 0, spread = 0;
       for (let j = 0; j < candidates.length; j++) {
         const { x, z } = candidates[j];
@@ -27,6 +27,24 @@ export function sleighGuardPosts(world, point) {
     }
   }
   return posts;
+}
+
+export function randomSleighCachePoint(world, player, radius = .85) {
+  const [anchor] = world.pickupPoints('sleigh', radius);
+  if (!anchor) return null;
+  const candidates = [];
+  for (let attempt = 0; attempt < 48; attempt++) {
+    const angle = Math.random() * Math.PI * 2;
+    const distance = 3.5 + Math.random() * 7.5;
+    const point = world.pickupPoint({
+      x: anchor.x + Math.cos(angle) * distance,
+      z: anchor.z + Math.sin(angle) * distance,
+    }, radius);
+    if (!point || Math.hypot(point.x - player.x, point.z - player.z) < 8) continue;
+    if (sleighGuardPosts(world, point).length < 10) continue;
+    candidates.push(point);
+  }
+  return candidates.length ? candidates[Math.floor(Math.random() * candidates.length)] : anchor;
 }
 
 export function createSleighCache(scene, world, parts) {
