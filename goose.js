@@ -4,8 +4,17 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 // A barnacle goose: cream face/belly, black neck, breast, bill and feet,
 // silver-grey barred wings. One skinned draw call, shared by the whole flock.
 // +Z is forward, matching the ground enemy controller.
+const WING_HINGE_SHIFT = .12;
+const WING_HINGE_Z = -.1 + WING_HINGE_SHIFT;
+const WING_ROOT_X = .28;
+export const WING_FLAP_AMPLITUDE = 1.35;
+// The wing mesh points toward the neck along +Z. Open it to ±X, then flap
+// around the body's longitudinal Z axis.
+const WING_SPREAD_AXIS = new THREE.Vector3(0, 1, 0);
+const WING_FLAP_AXIS = new THREE.Vector3(0, 0, 1);
+
 export function createGooseModel() {
-  const pivots = [[0, 0, 0], [0, .76, .34], [-.15, .31, -.06], [.15, .31, -.06], [-.28, .71, -.1], [.28, .71, -.1]];
+  const pivots = [[0, 0, 0], [0, .76, .34], [-.15, .31, -.06], [.15, .31, -.06], [-WING_ROOT_X, .71, WING_HINGE_Z], [WING_ROOT_X, .71, WING_HINGE_Z]];
   const names = ['goose-body', 'goose-neck', 'goose-leg-left', 'goose-leg-right', 'goose-wing-left', 'goose-wing-right'];
   const bones = pivots.map((pivot, index) => {
     const bone = new THREE.Bone(); bone.name = names[index]; bone.position.set(...pivot); return bone;
@@ -47,15 +56,14 @@ export function createGooseModel() {
   oval('#171e22', [0, .475, .385], [.082, .066, .17], 1, -.12);
 
   for (const [side, bone] of [[-1, 4], [1, 5]]) {
-    // Folded along the goose's +Z body axis; flight animation swings the
-    // wings out to either side before each flap.
-    oval('#687671', [side * .02, -.055, -.05], [.095, .205, .48], bone, -.13);
+    // Wing starts at the shoulder and extends only outward when spread along X.
+    oval('#687671', [side * .02, -.055, .4 - WING_HINGE_SHIFT], [.09, .14, .4], bone, -.13);
     // Overlapping feather edges make the silver/black barring readable from
     // the elevated game camera without another texture or material batch.
-    for (let feather = 0; feather < 5; feather++) {
-      const z = .23 - feather * .145;
-      oval(feather % 2 ? '#b5beb5' : '#d0d3c7', [side * .07, .045 - feather * .027, z], [.043, .125, .075], bone, -.22, 6);
-      oval('#394642', [side * .08, .035 - feather * .027, z - .028], [.037, .11, .035], bone, -.22, 6);
+    for (let feather = 0; feather < 7; feather++) {
+      const z = .1 - WING_HINGE_SHIFT + feather * .1;
+      oval(feather % 2 ? '#b5beb5' : '#d0d3c7', [side * .07, .04 - feather * .009, z], [.04, .09, .14], bone, -.18, 6);
+      oval('#394642', [side * .08, .005 - feather * .009, z - .055], [.036, .07, .08], bone, -.22, 6);
     }
   }
   for (const bone of [2, 3]) {
@@ -85,25 +93,33 @@ export function createGooseModel() {
 }
 
 export function gooseRig(model) {
+  const wings = ['goose-wing-left', 'goose-wing-right'].map(name => model.getObjectByName(name));
   return {
     neck: model.getObjectByName('goose-neck'),
     beak: model.getObjectByName('goose-bill-tip'),
     legs: ['goose-leg-left', 'goose-leg-right'].map(name => model.getObjectByName(name)),
-    wings: ['goose-wing-left', 'goose-wing-right'].map(name => model.getObjectByName(name)),
+    wings,
+    wingSpread: [-1, 1].map(side => new THREE.Quaternion().setFromAxisAngle(WING_SPREAD_AXIS, side * Math.PI / 2)),
+    wingFold: new THREE.Quaternion(),
+    wingBase: new THREE.Quaternion(),
+    wingFlap: new THREE.Quaternion(),
   };
 }
 
 export function animateGoose(enemy, dt, attacking, speed = enemy.speed) {
   enemy.gait += dt * (enemy.airborne ? 25 : attacking ? 9 : speed * 9);
   const phase = enemy.gait, stride = attacking ? .12 : .48 * Math.min(1, speed / .45);
+  const wingOpen = THREE.MathUtils.clamp(enemy.wingOpen ?? (enemy.airborne ? 1 : 0), 0, 1);
+  const wingFlapAmount = THREE.MathUtils.clamp(enemy.wingFlapAmount ?? (enemy.airborne ? 1 : 0), 0, 1);
   for (let i = 0; i < 2; i++) {
     enemy.goose.legs[i].rotation.x = Math.sin(phase + i * Math.PI) * stride;
-    const wingbeat = enemy.airborne ? Math.sin(phase) * 1.35
+    const wingbeat = enemy.airborne ? Math.sin(phase) * WING_FLAP_AMPLITUDE * wingFlapAmount
       : attacking ? .25 + Math.sin(phase) * .1 : Math.sin(phase) * .025;
     const side = i ? 1 : -1;
-    enemy.goose.wings[i].rotation.x = 0;
-    enemy.goose.wings[i].rotation.y = enemy.airborne ? side * Math.PI / 2 : 0;
-    enemy.goose.wings[i].rotation.z = side * wingbeat;
+    const wing = enemy.goose.wings[i];
+    enemy.goose.wingBase.copy(enemy.goose.wingFold).slerp(enemy.goose.wingSpread[i], wingOpen);
+    enemy.goose.wingFlap.setFromAxisAngle(WING_FLAP_AXIS, side * wingbeat);
+    wing.quaternion.copy(enemy.goose.wingFlap).multiply(enemy.goose.wingBase);
   }
   const lunge = attacking ? .7 + Math.sin(phase) * .18 : Math.sin(phase * .5) * .045;
   enemy.goose.neck.rotation.x = THREE.MathUtils.damp(enemy.goose.neck.rotation.x, lunge, 15, dt);
