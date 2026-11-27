@@ -11,7 +11,7 @@ function pointer(surface, type, target = surface, properties = {}) {
   return event;
 }
 
-function setup({ aiming = false } = {}) {
+function setup({ aiming = false, clickMode = false } = {}) {
   globalThis.window = new EventTarget();
   globalThis.document = new EventTarget();
   const canvas = new EventTarget();
@@ -20,7 +20,7 @@ function setup({ aiming = false } = {}) {
   const movementZone = {};
   const sprayZone = {};
   const movementHandle = { getBoundingClientRect: () => ({ left: 24, right: 112, top: 680, bottom: 768 }) };
-  let interactive = true, firing = false, airborne = false, bursts = 0, shotAim, mouseShot, upwardTap;
+  let interactive = true, firing = false, airborne = false, bursts = 0, clickCommands = 0, shotAim, mouseShot, upwardTap;
   const mouseAim = createMouseAim({ canvas });
   mouseAim.setEnabled(aiming);
   const input = bindGameInput({
@@ -34,6 +34,8 @@ function setup({ aiming = false } = {}) {
       shotAim = mouseAim.aiming ? { ...mouseAim.position } : null;
     },
     pointMouseAim: mouseAim.point,
+    clickMoveEnabled: () => clickMode,
+    onClickCommand: () => { clickCommands++; },
   });
   return {
     canvas, movementZone, sprayZone,
@@ -41,6 +43,7 @@ function setup({ aiming = false } = {}) {
     setInteractive(value) { interactive = value; },
     firing: () => firing, airborne: () => airborne, upwardTap: () => upwardTap,
     bursts: () => bursts, shotAim: () => shotAim, mouseShot: () => mouseShot,
+    clickCommands: () => clickCommands,
   };
 }
 
@@ -149,4 +152,21 @@ test('right takes precedence while both buttons are held and releasing either ke
   pointer(window, 'pointermove', game.canvas, { buttons: 1 });
   assert.equal(game.firing(), false);
   assert.equal(game.bursts(), 2);
+});
+
+test('click movement routes left clicks as commands while right-click spray stays available', () => {
+  const game = setup({ aiming: true, clickMode: true });
+  const move = pointer(window, 'pointerdown', game.movementZone);
+  assert.equal(move.defaultPrevented, true);
+  assert.equal(move.cancelBubble, true);
+  assert.equal(game.clickCommands(), 1);
+  assert.equal(game.firing(), false);
+  assert.equal(game.bursts(), 0);
+  pointer(window, 'pointerup');
+
+  pointer(window, 'pointerdown', game.canvas, { button: 2, buttons: 2 });
+  assert.equal(game.firing(), true);
+  assert.equal(game.airborne(), true);
+  assert.equal(game.clickCommands(), 1);
+  pointer(window, 'pointerup');
 });

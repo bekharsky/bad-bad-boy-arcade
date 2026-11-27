@@ -3,10 +3,14 @@ export const aimingUp = (keys, touch, upwardTap = false) => keys.has('KeyE') || 
 
 export function createSprayAim() {
   const facing = { dx: 0, dz: 1, airborne: false, target: null };
-  return (player, birds, airborne) => {
+  return (player, birds, airborne, selectedTarget = null) => {
     facing.dx = player.dx; facing.dz = player.dz;
     facing.airborne = airborne; facing.target = null;
     if (!airborne) return facing;
+    if (selectedTarget?.alive && selectedTarget.airborne) {
+      facing.target = selectedTarget;
+      return facing;
+    }
     let nearest = Infinity;
     for (const bird of birds) {
       if (!bird.alive) continue;

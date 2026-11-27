@@ -19,10 +19,11 @@ export function createSprayTutorial(encounter) {
       elapsed = 0;
       show();
     },
-    update(dt, { touch, mouse, firing, airborne, gooseVisible, gullVisible }) {
+    update(dt, { touch, mouse, click = false, firing, airborne, gooseVisible, gullVisible }) {
       if (!stage) return;
       const mouseControls = mouse && !touch;
-      const hintControls = mouseControls || touch;
+      const clickControls = click && !touch;
+      const hintControls = mouseControls || clickControls || touch;
       elapsed += dt;
       if (stage === 'waiting' && hintControls && gooseVisible()) {
         stage = 'goose';
@@ -40,11 +41,13 @@ export function createSprayTutorial(encounter) {
         if (elapsed >= ENCOUNTER_HINT_TIME || (firing && airborne)) {
           stage = null;
           show();
-        } else if (mouseControls) show('Right click to spray up', 'right');
+        } else if (clickControls) show('Click a gull to target it', 'left');
+        else if (mouseControls) show('Right click to spray up', 'right');
         else if (touch) show('Swipe up to spray at birds', undefined, 'swipe');
         else show('E + Fire');
       } else if (stage === 'goose') {
-        if (touch) show('Tap to spray', undefined, 'tap');
+        if (clickControls) show('Click a goose to target it', 'left');
+        else if (touch) show('Tap to spray', undefined, 'tap');
         else show('Left click to spray', 'left');
       } else show();
     },

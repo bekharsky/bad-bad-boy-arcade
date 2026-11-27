@@ -21,6 +21,8 @@ import { createBiteEffects } from './bites.js';
 import { createBurstEffects } from './burst-effects.js';
 import { createMedkits } from './medkits.js';
 import { createTouchControls } from './touch-controls.js';
+import { createClickCommands } from './click-commands.js';
+import { pickClickTarget } from './click-targeting.js';
 import { movePlayer } from './movement.js';
 import { createMouseAim } from './mouse-aim.js';
 import { bindGameInput } from './game-input.js';
@@ -43,12 +45,17 @@ const TURN_KEYS = ['ArrowLeft', 'ArrowRight'];
 const RUNNER_DODGE_KEYS = [...TURN_KEYS, 'KeyA', 'KeyD'];
 const MOVE_KEYS = [...RUNNER_DODGE_KEYS, 'ArrowUp', 'ArrowDown', 'KeyW', 'KeyS'];
 const keys = new Set();
+const noGameKeys = new Set();
 const coarsePointer = window.matchMedia('(pointer: coarse)').matches;
 let usingTouchControls = coarsePointer;
 let soundEnabled = false;
 try {
   soundEnabled = localStorage.getItem('golden-blast-sound') === 'true';
 } catch { /* Settings still work when browser storage is unavailable. */ }
+let clickControlsEnabled = false;
+try {
+  clickControlsEnabled = localStorage.getItem('piss-deal-click-controls') === 'true';
+} catch { /* Click controls stay off when browser storage is unavailable. */ }
 
 const canvas = document.querySelector('#game');
 mountHolidayScreens(document);
@@ -109,6 +116,9 @@ const sprayZone = document.querySelector('#spray-zone');
 const pauseDialog = document.querySelector('#pause-dialog');
 const startOver = document.querySelector('#start-over');
 const soundButtons = document.querySelectorAll('[data-toggle-sound]');
+const clickControlButtons = document.querySelectorAll('[data-toggle-click-controls]');
+const clickControlHints = document.querySelectorAll('[data-click-controls-help]');
+const keyboardControlHints = document.querySelectorAll('[data-keyboard-controls]');
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const query = new URLSearchParams(window.location.search);
 const debugMaps = query.get('debug') === 'maps';
@@ -149,6 +159,7 @@ const touchControls = createTouchControls({
   },
   onFireStart: (airborne, heading, fresh) => beginSpray(false, airborne, heading, fresh),
   onInput() {
+    cancelClickCommand();
     canvas.focus({ preventScroll: true });
     if (!usingTouchControls) { usingTouchControls = true; syncMouseAim(); }
   }
@@ -248,10 +259,23 @@ const player = {
 player.root.add(player.body);
 player.root.position.set(player.x, 0, player.z);
 scene.add(player.root);
+const clickCommands = createClickCommands({ world, player });
+let lastTargetClick = null;
+const clickMarker = new THREE.Mesh(new THREE.RingGeometry(.42, .58, 28), new THREE.MeshBasicMaterial({
+  color: 0xffd34e, side: THREE.DoubleSide, transparent: true, opacity: .86, depthWrite: false,
+}));
+clickMarker.rotation.x = -Math.PI / 2;
+clickMarker.position.y = .035;
+clickMarker.visible = false;
+scene.add(clickMarker);
 
 function hitEnemy(enemy, direction, impact) {
   if (enemy.kind === 'gull') { seagulls.repel(enemy); return; }
-  if (enemy.civilian) { arenaCameos.splash(enemy, direction); return; }
+  if (enemy.civilian) {
+    arenaCameos.splash(enemy, direction);
+    if (clickCommands.target === enemy) cancelClickCommand();
+    return;
+  }
   if (isRunner()) {
     if (runnerSession.sprayHit(enemy.id, impact)) {
       burst(enemy.x, enemy.hitHeight, enemy.z, 0xffd34e, 20, null, 3);
@@ -325,6 +349,7 @@ let renderingReady = false;
 let preparedDistrict = null;
 const frameClock = createFrameClock();
 const isRunner = () => world.mode === 'runner';
+const clickModeActive = () => clickControlsEnabled && mouseSupported && !isRunner();
 const runnerSession = createRunnerSession({
   world, player, cameraRig, seagulls, medkits, touchControls, keys,
   heroHeight: HERO_HEIGHT, heroScale: HERO_SCALE,
@@ -694,7 +719,15 @@ function enterDistrict({ index }) {
 
 function removeEnemy(enemy, pop = false) {
   if (!enemy.alive) return;
+  const wasClickTarget = clickCommands.target === enemy;
   enemy.alive = false;
+  if (wasClickTarget) {
+    clickCommands.clear();
+    lastTargetClick = null;
+    player.tapTimer = 0;
+    player.mouseTap = false;
+    updateClickMarker();
+  }
   disposeEnemy(enemy);
   if (pop) {
     geeseDefeated++;
@@ -757,21 +790,32 @@ function blip(frequency, duration) {
 }
 
 function updateMovement(dt, firing) {
+  const clickMode = clickModeActive();
+  const target = clickMode ? clickCommands.target : null;
+  if (target) aimOffset.set(target.x - player.x, target.hitHeight, target.z - player.z);
   const mouseFiring = isMouseFiring();
-  const heading = mouseAim.aiming && (mouseFiring || mouseAim.following) ? Math.atan2(aimOffset.x, aimOffset.z) : null;
+  const heading = target
+    ? Math.atan2(aimOffset.x, aimOffset.z)
+    : clickMode
+      ? mouseAim.aiming && mouseFiring ? Math.atan2(aimOffset.x, aimOffset.z) : null
+      : mouseAim.aiming && (mouseFiring || mouseAim.following) ? Math.atan2(aimOffset.x, aimOffset.z) : null;
+  let command = null;
+  if (clickMode && clickCommands.active && !touchControls.input.x && !touchControls.input.z) {
+    command = clickCommands.movement();
+  }
   return movePlayer(player, world, {
-    keys, touch: touchControls.input, dt, firing, height: HERO_HEIGHT,
+    keys: clickMode ? noGameKeys : keys, touch: touchControls.input, command, dt, firing, height: HERO_HEIGHT,
     speedMultiplier: player.skateTimer > 0 ? SKATE_SPEED_MULTIPLIER : 1,
     cursorHeading: heading,
     shotHeading: mouseFiring ? heading : null,
     touchHeading: (usingTouchControls ? touchControls.aimHeading : null)
       ?? (player.tapTimer > 0 ? player.touchTapHeading : null),
-    steerWithMouse: mouseAim.following,
+    steerWithMouse: !clickMode && mouseAim.following,
   });
 }
 
 function isMouseFiring() {
-  return keys.has('Fire') || (player.mouseTap && player.tapTimer > 0);
+  return keys.has('Fire') || clickCommands.attacking || (player.mouseTap && player.tapTimer > 0);
 }
 
 function updateMouseAim({ x, y }) {
@@ -800,6 +844,100 @@ function updateMouseAim({ x, y }) {
   else aimOffset.set(player.dx * .1, 0, player.dz * .1);
 }
 
+function setAimRayFromPointer(event) {
+  const bounds = canvas.getBoundingClientRect();
+  if (!bounds.width || !bounds.height) return false;
+  camera.updateMatrixWorld();
+  aimScreen.set((event.clientX - bounds.left) / bounds.width * 2 - 1, 1 - (event.clientY - bounds.top) / bounds.height * 2);
+  aimRay.setFromCamera(aimScreen, camera);
+  return true;
+}
+
+function enemyAtPointer(event, cycleAfter = null) {
+  const bounds = canvas.getBoundingClientRect();
+  const pointerX = event.clientX - bounds.left, pointerY = event.clientY - bounds.top;
+  if (!bounds.width || !bounds.height) return null;
+  camera.updateMatrixWorld();
+  const candidates = [];
+  function addTarget(target, radius) {
+    if (!target.alive) return;
+    const size = target.size ?? .45;
+    // A goose's low collision centre can be hidden by a curb even while its
+    // head and back are visible. Let any visible part of its height select it.
+    const heights = target.airborne
+      ? [target.hitHeight]
+      : [target.hitHeight, target.hitHeight + size * .8, target.hitHeight + size * 1.5];
+    for (const height of heights) {
+      enemyPoint.set(target.x, height, target.z);
+      if (!world.lineClear3D(camera.position, enemyPoint, .04, { allowOutsideOrigin: true })) continue;
+      enemyScreen.copy(enemyPoint).project(camera);
+      if (enemyScreen.z < -1 || enemyScreen.z > 1 || Math.abs(enemyScreen.x) > 1.05 || Math.abs(enemyScreen.y) > 1.05) continue;
+      candidates.push({
+        target,
+        x: (enemyScreen.x * .5 + .5) * bounds.width,
+        y: (.5 - enemyScreen.y * .5) * bounds.height,
+        radius,
+        depth: camera.position.distanceToSquared(enemyPoint),
+      });
+    }
+  }
+
+  for (const enemy of enemies) addTarget(enemy, 44);
+  for (const bird of seagulls.birds) addTarget(bird, 54);
+  if (!isRunner()) for (const actor of arenaCameos.actors) {
+    if (actor.age >= .24) addTarget(actor, 44);
+  }
+  return pickClickTarget(candidates, pointerX, pointerY, cycleAfter);
+}
+
+function issueClickCommand(event) {
+  if (!playing || isRunner() || gameInterlude()) return;
+  if (usingTouchControls) { usingTouchControls = false; syncMouseAim(); }
+  if (!setAimRayFromPointer(event)) return;
+  const previousTarget = clickCommands.target;
+  const wasAttacking = !!previousTarget;
+  const bounds = canvas.getBoundingClientRect();
+  const pointerX = event.clientX - bounds.left, pointerY = event.clientY - bounds.top;
+  const now = performance.now();
+  const sameSpot = lastTargetClick && now - lastTargetClick.time < 800
+    && Math.hypot(pointerX - lastTargetClick.x, pointerY - lastTargetClick.y) < 16;
+  const cycleAfter = sameSpot ? lastTargetClick.target : null;
+  cancelClickCommand({ preserveTargetCycle: true });
+  const target = enemyAtPointer(event, cycleAfter);
+  if (target) {
+    const airborne = target.kind === 'gull' || target.airborne;
+    clickCommands.attack(target, { approach: !airborne, airborne });
+    beginSpray(true, airborne, null, !wasAttacking);
+    lastTargetClick = { x: pointerX, y: pointerY, time: now, target };
+  } else {
+    const ground = aimRay.ray.intersectPlane(aimGround, aimPoint);
+    if (ground && world.canStandAt(ground.x, ground.z, player.radius)) clickCommands.moveTo(ground);
+    lastTargetClick = null;
+  }
+  updateClickMarker();
+}
+
+function updateClickMarker() {
+  const target = clickCommands.target;
+  const point = target ?? clickCommands.destination;
+  clickMarker.visible = !!point && clickControlsEnabled && playing && !isRunner() && !gameInterlude();
+  if (!point) return;
+  clickMarker.position.set(point.x, .035, point.z);
+  clickMarker.scale.setScalar(target ? 1.25 : 1);
+  clickMarker.material.color.set(target ? 0xff8062 : 0xffd34e);
+}
+
+function cancelClickCommand({ preserveTargetCycle = false } = {}) {
+  const attacking = clickCommands.attacking;
+  clickCommands.clear();
+  if (!preserveTargetCycle) lastTargetClick = null;
+  if (attacking) {
+    player.tapTimer = 0;
+    player.mouseTap = false;
+  }
+  updateClickMarker();
+}
+
 function projectMouseAim() {
   camera.updateMatrixWorld();
   reticleOrigin.set(player.x, 0, player.z).project(camera);
@@ -817,7 +955,17 @@ function projectMouseAim() {
 }
 
 function drawMouseReticle() {
-  const point = mouseAim.aiming && (mouseAim.following || isMouseFiring()) ? projectMouseAim() : null;
+  let point = null;
+  const target = clickModeActive() ? clickCommands.target : null;
+  if (target) {
+    camera.updateMatrixWorld();
+    enemyPoint.set(target.x, target.hitHeight, target.z).project(camera);
+    if (enemyPoint.z >= -1 && enemyPoint.z <= 1) {
+      reticlePosition.x = enemyPoint.x * .5 + .5;
+      reticlePosition.y = .5 - enemyPoint.y * .5;
+      point = reticlePosition;
+    }
+  } else if (mouseAim.aiming && (clickModeActive() ? isMouseFiring() : mouseAim.following || isMouseFiring())) point = projectMouseAim();
   mouseReticle.toggleAttribute('hidden', !point);
   gameShell.classList.toggle('mouse-reticle-active', !!point);
   if (!point) return;
@@ -829,6 +977,30 @@ function syncMouseAim() {
   const enabled = mouseSupported && !usingTouchControls && playing && !pauseDialog.open && !isRunner() && !gameInterlude();
   mouseAim.setEnabled(enabled);
   drawMouseReticle();
+}
+
+function syncClickControlsUi() {
+  for (const button of clickControlButtons) {
+    button.hidden = !mouseSupported;
+    button.setAttribute('aria-pressed', String(clickControlsEnabled));
+    button.textContent = clickControlsEnabled ? 'CLICK CONTROLS: ON' : 'CLICK CONTROLS: OFF';
+  }
+  for (const hint of clickControlHints) hint.hidden = !clickModeActive() || !mouseSupported;
+  for (const hint of keyboardControlHints) hint.hidden = clickModeActive();
+  const mouseControlLabel = document.querySelector('#mouse-control-label');
+  if (mouseControlLabel) mouseControlLabel.textContent = clickControlsEnabled ? 'MOVE, ATTACK' : 'AIM, FIRE';
+}
+
+function setClickControlsEnabled(enabled) {
+  if (clickControlsEnabled === enabled) return;
+  clickControlsEnabled = enabled;
+  try {
+    localStorage.setItem('piss-deal-click-controls', String(enabled));
+  } catch { /* The in-memory setting still applies for this session. */ }
+  keys.clear();
+  cancelClickCommand();
+  syncClickControlsUi();
+  syncMouseAim();
 }
 
 function update(dt) {
@@ -863,7 +1035,9 @@ function update(dt) {
   searchTime += dt;
   world.update(dt, [player, ...enemies, ...arenaCameos.actors]);
 
-  const firing = keys.has('Space') || keys.has('Fire') || touchControls.input.firing || player.tapTimer > 0;
+  const clickMode = clickModeActive();
+  const firing = (!clickMode && keys.has('Space')) || keys.has('Fire') || (clickMode && clickCommands.attacking)
+    || touchControls.input.firing || player.tapTimer > 0;
   const oldX = player.x, oldZ = player.z;
   const moving = updateMovement(dt, firing);
 
@@ -891,7 +1065,7 @@ function update(dt) {
   seagulls.update(dt, player);
   if (!playing) return;
   sprayTutorial.update(dt, {
-    touch: usingTouchControls, mouse: mouseAim.enabled, firing, airborne: sprayAimingUp(),
+    touch: usingTouchControls, mouse: mouseAim.enabled, click: clickMode, firing, airborne: sprayAimingUp(),
     gooseVisible: nearbyGooseVisible, gullVisible: nearbyGullVisible,
   });
   const spray = updateSpray(dt, firing, enemies, player.powerTimer > 0);
@@ -930,7 +1104,8 @@ function nearbyGullVisible() { return seagulls.birds.some(enemyVisible); }
 
 function sprayAimingUp() {
   const upwardTap = player.tapTimer > 0 && player.upwardTap && (player.touchTapHeading === null || !touchControls.input.firing);
-  return aimingUp(keys, touchControls.input, upwardTap);
+  if (clickModeActive()) return keys.has('FireUp') || !!touchControls.input.airborne || upwardTap || clickCommands.airborne;
+  return aimingUp(keys, touchControls.input, upwardTap) || clickCommands.airborne;
 }
 
 function updateSpray(dt, firing, groundTargets, powered = false) {
@@ -940,7 +1115,8 @@ function updateSpray(dt, firing, groundTargets, powered = false) {
   if (!isRunner()) for (const actor of arenaCameos.actors) {
     if (actor.age >= .24) sprayTargets.push(actor);
   }
-  const direction = sprayAim(player, seagulls.birds, sprayAimingUp());
+  const selectedAirTarget = clickControlsEnabled && clickCommands.airborne ? clickCommands.target : null;
+  const direction = sprayAim(player, seagulls.birds, sprayAimingUp(), selectedAirTarget);
   const spray = stream.update(dt, firing, player.rig.emitter, direction, sprayTargets, powered);
   // The tap buffer only covers a press that starts and ends between ticks.
   if (touchControls.input.firing && player.touchTapHeading !== null) player.tapTimer = 0;
@@ -1232,6 +1408,7 @@ function endGame(won = false, { crashed = false } = {}) {
   player.model.material.transparent = false;
   blip(won ? 1046 : 80, 0.25);
   keys.clear();
+  cancelClickCommand();
 }
 
 let viewWidth = 0, viewHeight = 0;
@@ -1253,6 +1430,7 @@ function animate(now) {
     return !pauseDialog.open && renderingReady;
   });
   if (!renderingReady) return;
+  updateClickMarker();
   if (isRunner()) runnerSession.present();
   if (!pauseDialog.open && !gameInterlude()) weather.update(dt, isRunner() ? runnerSession.state.distance : 0);
   if (player.model && !sleighAssembly.active && !intro) world.updateVisibility(camera, player.root, HERO_HEIGHT, dt);
@@ -1282,6 +1460,9 @@ function resetInput() {
   runnerSession.resetInput();
   mouseAim.resetSteering();
   keys.clear();
+  clickCommands.clear();
+  lastTargetClick = null;
+  updateClickMarker();
   touchControls.reset();
   updateReticleCharge(0);
   player.tapTimer = 0;
@@ -1348,6 +1529,10 @@ window.addEventListener('keydown', (event) => {
   }
   if (event.target instanceof Element && event.target.closest('select, input')) return;
   if (!playing && event.target instanceof Element && event.target.closest('button, a')) return;
+  if (playing && clickModeActive()) {
+    if (MOVE_KEYS.includes(event.code) || event.code === 'Space' || event.code === 'KeyE') event.preventDefault();
+    return;
+  }
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code)) event.preventDefault();
   const movementKey = MOVE_KEYS.includes(event.code);
   if (TURN_KEYS.includes(event.code) && !event.repeat) mouseAim.yieldToKeyboard();
@@ -1380,7 +1565,11 @@ const mouseInput = bindGameInput({
   },
   beginSpray,
   pointMouseAim: mouseAim.point,
+  clickMoveEnabled: clickModeActive,
+  onClickCommand: issueClickCommand,
 });
+for (const button of clickControlButtons) button.addEventListener('click', () => setClickControlsEnabled(!clickControlsEnabled));
+syncClickControlsUi();
 startButton.addEventListener('click', playFromMenu);
 skipIntro.addEventListener('click', () => {
   if (intro) finishIntro();

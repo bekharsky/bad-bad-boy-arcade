@@ -163,6 +163,17 @@ test('direct joystick preserves analog speed and takes priority over keyboard in
   assert.ok(Math.abs(slow.player.z) < 1e-10);
 });
 
+test('click movement keeps its route while mouse aim remains independent', () => {
+  const { player, input, step } = setup({ heading: Math.PI });
+  input.command = { x: 0, z: -1 };
+  input.cursorHeading = Math.PI / 2;
+  input.steerWithMouse = true;
+  step(60);
+  assert.ok(player.z < -.8, 'The hero follows the click route north');
+  assert.equal(player.x, 0);
+  assert.equal(player.heading, Math.PI / 2, 'Mouse aim can still turn independently');
+});
+
 test('speed skates add 35 percent to screen-relative travel and expire without a jump', () => {
   const normal = setup({ touch: { x: 0, z: -1 } });
   const skates = setup({ touch: { x: 0, z: -1 } });

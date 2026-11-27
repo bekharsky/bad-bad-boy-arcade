@@ -2,7 +2,10 @@ const LEFT_BUTTON = 1;
 const RIGHT_BUTTON = 2;
 const FIRE_BUTTONS = LEFT_BUTTON | RIGHT_BUTTON;
 
-export function bindGameInput({ canvas, movementZone, movementHandle, sprayZone, canInteract, setFiring, beginSpray, pointMouseAim }) {
+export function bindGameInput({
+  canvas, movementZone, movementHandle, sprayZone, canInteract, setFiring, beginSpray, pointMouseAim,
+  clickMoveEnabled = () => false, onClickCommand = () => {},
+}) {
   let buttons = 0;
 
   function focusGame() {
@@ -41,6 +44,11 @@ export function bindGameInput({ canvas, movementZone, movementHandle, sprayZone,
     event.preventDefault();
     // The transparent joystick zone covers part of the playfield.
     if (event.target === movementZone) event.stopPropagation();
+    if (event.button === 0 && clickMoveEnabled()) {
+      reset();
+      onClickCommand(event);
+      return;
+    }
     updateButtons(event);
   }, true);
   window.addEventListener('focus', focusGame);

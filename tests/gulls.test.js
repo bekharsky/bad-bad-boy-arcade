@@ -118,6 +118,9 @@ test('E and the spray stick change height independently of Shift, movement, and 
   const aim = createSprayAim(), player = { x: 0, z: 0, dx: 0, dz: -1 };
   const front = { alive: true, x: 2, z: -5 }, back = { alive: true, x: 0, z: 3 };
   assert.equal(aim(player, [back, front], true).target, front);
+  const selected = { alive: true, airborne: true, x: -20, z: 8 };
+  assert.equal(aim(player, [front], true, selected).target, selected, 'a clicked bird overrides the automatic target');
+  selected.alive = false;
   front.alive = false; assert.equal(aim(player, [back, front], true).target, null);
   assert.equal(aim(player, [front], false).airborne, false);
   assert.deepEqual(player, { x: 0, z: 0, dx: 0, dz: -1 });

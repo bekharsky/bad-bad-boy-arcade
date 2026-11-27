@@ -82,18 +82,19 @@ export function createNavigation({ bounds, colliders = [], dynamicColliders = ()
   const width = Math.ceil(bounds.maxX) - originX, depth = Math.ceil(bounds.maxZ) - originZ;
   const cells = width * depth;
   const distances = new Int32Array(cells), queue = new Uint32Array(cells), open = new Uint8Array(cells);
-  const staticOpen = new Uint8Array(cells);
-  const routeRadius = .56;
+  const clickDistances = new Int32Array(cells), clickQueue = new Uint32Array(cells);
+  const staticOpen = new Uint8Array(cells), clickOpen = new Uint8Array(cells), clickStaticOpen = new Uint8Array(cells);
+  const routeRadius = .56, clickRouteRadius = .78;
   const cell = (x, z) => clamp(Math.floor(z - originZ), 0, depth - 1) * width + clamp(Math.floor(x - originX), 0, width - 1);
   const coords = i => ({ x: i % width + originX + .5, z: Math.floor(i / width) + originZ + .5 });
   const neighbours = i => [i % width > 0 ? i - 1 : -1, i % width < width - 1 ? i + 1 : -1, i >= width ? i - width : -1, i < cells - width ? i + width : -1].filter(n => n >= 0);
-  let lastCell = -1;
+  let lastCell = -1, lastClickCell = -1;
   // Use the same strict edges as overlaps() when rasterizing collider bounds.
-  function closeCells(grid, collider) {
-    const minX = Math.max(0, Math.floor(collider.minX - routeRadius - originX - .5) + 1);
-    const maxX = Math.min(width - 1, Math.ceil(collider.maxX + routeRadius - originX - .5) - 1);
-    const minZ = Math.max(0, Math.floor(collider.minZ - routeRadius - originZ - .5) + 1);
-    const maxZ = Math.min(depth - 1, Math.ceil(collider.maxZ + routeRadius - originZ - .5) - 1);
+  function closeCells(grid, collider, radius = routeRadius) {
+    const minX = Math.max(0, Math.floor(collider.minX - radius - originX - .5) + 1);
+    const maxX = Math.min(width - 1, Math.ceil(collider.maxX + radius - originX - .5) - 1);
+    const minZ = Math.max(0, Math.floor(collider.minZ - radius - originZ - .5) + 1);
+    const maxZ = Math.min(depth - 1, Math.ceil(collider.maxZ + radius - originZ - .5) - 1);
     if (minX > maxX) return;
     for (let z = minZ; z <= maxZ; z++) grid.fill(0, z * width + minX, z * width + maxX + 1);
   }
@@ -101,53 +102,81 @@ export function createNavigation({ bounds, colliders = [], dynamicColliders = ()
   for (let i = 0; i < cells; i++) {
     const { x, z } = coords(i);
     staticOpen[i] = Number(!outside(x, z, routeRadius));
+    clickStaticOpen[i] = Number(!outside(x, z, clickRouteRadius));
   }
-  for (const collider of colliders) closeCells(staticOpen, collider);
+  for (const collider of colliders) {
+    closeCells(staticOpen, collider);
+    closeCells(clickStaticOpen, collider, clickRouteRadius);
+  }
   function refresh() {
     open.set(staticOpen);
-    for (const collider of dynamicColliders()) closeCells(open, collider);
+    clickOpen.set(clickStaticOpen);
+    for (const collider of dynamicColliders()) {
+      closeCells(open, collider);
+      closeCells(clickOpen, collider, clickRouteRadius);
+    }
     lastCell = -1;
+    lastClickCell = -1;
     distances.fill(-1);
+    clickDistances.fill(-1);
   }
-  function routeTo(x, z) {
+  function targetCell(x, z, walkable = open) {
     let target = cell(x, z);
-    if (!open[target]) {
+    if (!walkable[target]) {
       let best = Infinity;
       target = -1;
-      for (let i = 0; i < cells; i++) if (open[i]) {
+      for (let i = 0; i < cells; i++) if (walkable[i]) {
         const p = coords(i), d = (p.x - x) ** 2 + (p.z - z) ** 2;
         if (d < best) { best = d; target = i; }
       }
     }
-    if (target === lastCell) return;
-    lastCell = target;
-    distances.fill(-1);
+    return target;
+  }
+  function fillDistances(target, field, routeQueue) {
+    field.fill(-1);
     if (target < 0) return;
     let head = 0, tail = 1;
-    queue[0] = target; distances[target] = 0;
+    routeQueue[0] = target; field[target] = 0;
     while (head < tail) {
-      const i = queue[head++];
+      const i = routeQueue[head++];
       // No temporary neighbour arrays per visited cell in the flood field.
       for (let side = 0; side < 4; side++) {
         const n = side === 0 ? (i % width > 0 ? i - 1 : -1)
           : side === 1 ? (i % width < width - 1 ? i + 1 : -1)
           : side === 2 ? (i >= width ? i - width : -1)
           : (i < cells - width ? i + width : -1);
-        if (n >= 0 && open[n] && distances[n] < 0) { distances[n] = distances[i] + 1; queue[tail++] = n; }
+        if (n >= 0 && open[n] && field[n] < 0) { field[n] = field[i] + 1; routeQueue[tail++] = n; }
       }
     }
   }
-  function chase(x, z, tx, tz) {
-    if (lineClear(x, z, tx, tz, .54)) return { x: tx - x, z: tz - z };
+  function routeTo(x, z) {
+    const target = targetCell(x, z);
+    if (target === lastCell) return;
+    lastCell = target;
+    fillDistances(target, distances, queue);
+  }
+  function chaseOn(x, z, tx, tz, field, walkable = open, clearance = .54) {
+    if (lineClear(x, z, tx, tz, clearance)) return { x: tx - x, z: tz - z };
     const here = cell(x, z);
     let next = -1, best = Infinity;
-    for (const i of [here, ...neighbours(here)]) if (open[i] && distances[i] >= 0) {
+    for (const i of [here, ...neighbours(here)]) if (walkable[i] && field[i] >= 0) {
       const p = coords(i);
-      const value = distances[i] + Math.hypot(p.x - x, p.z - z) * .2;
-      if (value < best && lineClear(x, z, p.x, p.z, .5)) { best = value; next = i; }
+      const value = field[i] + Math.hypot(p.x - x, p.z - z) * .2;
+      if (value < best && lineClear(x, z, p.x, p.z, clearance)) { best = value; next = i; }
     }
     const p = next < 0 ? { x, z } : coords(next);
     return { x: p.x - x, z: p.z - z };
+  }
+  function chase(x, z, tx, tz) {
+    return chaseOn(x, z, tx, tz, distances);
+  }
+  function routeTowards(x, z, tx, tz) {
+    const target = targetCell(tx, tz, clickOpen);
+    if (target !== lastClickCell) {
+      lastClickCell = target;
+      fillDistances(target, clickDistances, clickQueue);
+    }
+    return chaseOn(x, z, tx, tz, clickDistances, clickOpen, clickRouteRadius);
   }
   function flee(x, z, tx, tz, heading = 0) {
     const away = Math.atan2(x - tx, z - tz);
@@ -195,5 +224,5 @@ export function createNavigation({ bounds, colliders = [], dynamicColliders = ()
     return !blocked(x, z, radius) && distances[cell(x, z)] >= 0 ? { x, z } : null;
   }
   refresh();
-  return { move, lineClear, lineClear3D, routeTo, chase, flee, spawnPoint, pickupPoint, refresh, canStandAt: (x, z, radius) => !blocked(x, z, radius) };
+  return { move, lineClear, lineClear3D, routeTo, chase, routeTowards, flee, spawnPoint, pickupPoint, refresh, canStandAt: (x, z, radius) => !blocked(x, z, radius) };
 }

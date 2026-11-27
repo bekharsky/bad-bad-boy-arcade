@@ -32,10 +32,13 @@ export function smoothTouchHeading(heading, target, dt) {
   return smoothAimHeading(heading, target, dt, 10, 20);
 }
 
-export function movePlayer(player, city, { keys, touch, dt, firing, height, speedMultiplier = 1, cursorHeading = null, shotHeading = null, touchHeading = null, steerWithMouse = false }) {
+export function movePlayer(player, city, { keys, touch, dt, firing, height, speedMultiplier = 1, cursorHeading = null, shotHeading = null, touchHeading = null, steerWithMouse = false, command = null }) {
   const touchStrength = Math.hypot(touch.x, touch.z);
-  const x = touchStrength ? touch.x : Number(keys.has('KeyD')) - Number(keys.has('KeyA'));
-  const z = touchStrength ? touch.z : Number(keys.has('KeyS')) - Number(keys.has('KeyW'));
+  const keyboardX = Number(keys.has('KeyD')) - Number(keys.has('KeyA'));
+  const keyboardZ = Number(keys.has('KeyS')) - Number(keys.has('KeyW'));
+  const keyboardMoving = keyboardX !== 0 || keyboardZ !== 0;
+  const x = touchStrength ? touch.x : keyboardMoving ? keyboardX : command?.x ?? 0;
+  const z = touchStrength ? touch.z : keyboardMoving ? keyboardZ : command?.z ?? 0;
   const turn = touchStrength ? 0 : Number(keys.has('ArrowLeft')) - Number(keys.has('ArrowRight'));
   const throttle = touchStrength ? 0 : Number(keys.has('ArrowUp')) - Number(keys.has('ArrowDown'));
   const directStrength = Math.hypot(x, z);

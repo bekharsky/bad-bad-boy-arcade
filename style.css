@@ -128,6 +128,11 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 800 clamp(38px, 6vw, 58px
 .text-button:hover { background: #ffd34e23; }
 .text-button:focus-visible { outline: 2px solid var(--gold); }
 .text-button:disabled { opacity: .45; cursor: wait; }
+.click-controls-toggle { width: 100%; margin-top: 14px; }
+.click-controls-toggle[aria-pressed="true"] { color: var(--gold); background: #ffd34e23; }
+.click-controls-help { max-width: none; margin: 8px 0 0; color: #c5c2ce; font-size: 11px; line-height: 1.4; text-align: center; }
+.click-controls-help[hidden] { display: none; }
+.runner-mode .click-controls-toggle, .runner-mode .click-controls-help { display: none; }
 .reset-campaign-button { width: 100%; margin-top: 10px; }
 .pause-dialog::backdrop { background: #11131bd9; }
 .end-card { margin-right: 0; margin-left: 0; text-align: center; }

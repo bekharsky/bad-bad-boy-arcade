@@ -66,6 +66,21 @@ test('fast movement and knockback cannot tunnel through walls and still slide', 
   assert.ok(actor.x < 0, 'An embedded actor can escape');
 });
 
+test('click routes steer around walls without replacing the enemy route field', () => {
+  const nav = createNavigation({ bounds, colliders: [wall] });
+  const actor = { x: -2, z: 0 };
+  const radius = .74;
+  for (let step = 0; step < 900 && Math.hypot(actor.x - 2, actor.z) > .45; step++) {
+    nav.routeTo(-8, 8);
+    const direction = nav.routeTowards(actor.x, actor.z, 2, 0);
+    const length = Math.hypot(direction.x, direction.z);
+    assert.ok(length > 0, 'A reachable click target keeps producing a route');
+    nav.move(actor, direction.x / length * .04, direction.z / length * .04, radius);
+    assert.equal(nav.canStandAt(actor.x, actor.z, radius), true);
+  }
+  assert.ok(Math.hypot(actor.x - 2, actor.z) <= .45, 'The click route reaches the destination around the wall');
+});
+
 test('fleeing from a fixed impact turns along walls and map edges without a player route', () => {
   const nav = createNavigation({ bounds, colliders: [{ minX: 4, maxX: 5, minZ: -2, maxZ: 2, height: 3 }] });
   assert.ok(nav.flee(2, 0, 0, 0, Math.PI / 2).x > 0, 'The chosen direction leads away from the player');

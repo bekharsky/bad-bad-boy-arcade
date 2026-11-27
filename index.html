@@ -170,15 +170,17 @@
           <button id="retry-load" class="primary-button" type="button" hidden>RETRY LOADING</button>
           <section class="debug-maps" data-debug-maps aria-label="Maps" hidden></section>
           <div class="start-controls" role="group" aria-label="Quick controls">
-            <div class="start-control">
+            <div class="start-control" data-keyboard-controls>
               <kbd aria-label="WASD to move up, left, down and right">WASD</kbd>
               <span class="start-control-label">MOVE</span>
             </div>
             <div class="start-control">
               <kbd>Mouse</kbd>
-              <span class="start-control-label">AIM, FIRE</span>
+              <span id="mouse-control-label" class="start-control-label">AIM, FIRE</span>
             </div>
           </div>
+          <button class="text-button click-controls-toggle" data-toggle-click-controls type="button" aria-pressed="false">CLICK CONTROLS: OFF</button>
+          <p class="click-controls-help" data-click-controls-help hidden>Click empty ground to move; click a target to attack or switch targets.</p>
           <div class="runner-start-hint" role="group" aria-label="Runner controls">
             <div class="runner-control"><kbd aria-label="Left and right to dodge, up and down for speed">←→↑↓</kbd><span>DODGE / SPEED</span></div>
           </div>
@@ -210,6 +212,8 @@
             <svg aria-hidden="true" focusable="false"><use href="#speaker-off" /></svg>
           </button>
           <h2 id="pause-title">PAUSED</h2>
+          <button class="text-button click-controls-toggle" data-toggle-click-controls type="button" aria-pressed="false">CLICK CONTROLS: OFF</button>
+          <p class="click-controls-help" data-click-controls-help hidden>Click empty ground to move; click a target to attack or switch targets.</p>
           <form method="dialog" class="pause-actions">
             <button id="resume-game" class="primary-button" type="submit" autofocus>RESUME</button>
             <button id="start-over" class="text-button" type="button">RESTART GAME</button>

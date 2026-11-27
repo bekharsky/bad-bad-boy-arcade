@@ -56,7 +56,7 @@ export function createMapManager(scene, definitions, playerRadius = .4) {
       scene.background = defaultBackground; scene.fog = defaultFog;
     },
   };
-  for (const method of ['move', 'routeTo', 'chase', 'flee', 'spawnPoint', 'pickupPoint', 'pickupPoints', 'lineClear', 'lineClear3D', 'canStandAt', 'update', 'updateRunner', 'updateVisibility', 'reset']) {
+  for (const method of ['move', 'routeTo', 'chase', 'routeTowards', 'flee', 'spawnPoint', 'pickupPoint', 'pickupPoints', 'lineClear', 'lineClear3D', 'canStandAt', 'update', 'updateRunner', 'updateVisibility', 'reset']) {
     manager[method] = (...args) => active[method](...args);
   }
   return manager;
