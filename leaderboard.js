@@ -48,10 +48,11 @@ function renderRow(entry, rankValue, currentPlayer = false) {
   row.append(rank, nickname);
   if (currentPlayer) {
     const marker = document.createElement('span');
-    marker.className = 'leaderboard-you';
-    marker.textContent = 'YOU';
+    marker.className = 'leaderboard-badge';
+    marker.textContent = 'PB';
+    marker.title = 'Personal best';
     row.append(marker);
-    row.setAttribute('aria-label', `Your rank ${rankValue}, ${entry.nickname}, ${Number(entry.score).toLocaleString()} points`);
+    row.setAttribute('aria-label', `Your personal best, rank ${rankValue}, ${entry.nickname}, ${Number(entry.score).toLocaleString()} points`);
   }
   row.append(score);
   return row;

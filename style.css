@@ -174,8 +174,9 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 800 clamp(38px, 6vw, 58px
 .leaderboard-list { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; }
 .leaderboard-row { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 22px; color: #e5e0c9; font: 500 11px/1.2 Inter, sans-serif; }
 .leaderboard-row.is-current-player { grid-template-columns: 24px minmax(0, 1fr) auto auto; margin: 0 -7px; padding: 2px 7px; border-radius: 4px; color: #fff7d9; background: #ffd34e20; box-shadow: inset 2px 0 #ffd34e; }
-.leaderboard-you { color: var(--gold); font: 800 8px/1 Inter, sans-serif; letter-spacing: .08em; }
+.leaderboard-badge { color: var(--gold); font: 800 8px/1 Inter, sans-serif; letter-spacing: .08em; }
 .leaderboard-gap { min-height: 13px; color: #c4c5a1; font: 700 12px/1 Inter, sans-serif; letter-spacing: .22em; text-align: center; }
+.leaderboard-note { margin: 0 0 8px; color: #c4c5a1; font: 500 10px/1.4 Inter, sans-serif; }
 .leaderboard-rank { color: #b4b995; font: 700 10px/1.2 Inter, sans-serif; }
 .leaderboard-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .leaderboard-score { color: #ffd34e; font: 700 14px/1.2 Inter, sans-serif; font-variant-numeric: tabular-nums; }
