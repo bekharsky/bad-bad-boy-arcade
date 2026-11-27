@@ -4,7 +4,6 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 // A barnacle goose: cream face/belly, black neck, breast, bill and feet,
 // silver-grey barred wings. One skinned draw call, shared by the whole flock.
 // +Z is forward, matching the ground enemy controller.
-const WING_HINGE_SHIFT = .12;
 const WING_ROOT_X = .28;
 export const WING_FLAP_AMPLITUDE = 1.35;
 export const WING_FLAP_SPEED = 19;
@@ -39,7 +38,7 @@ export function createGooseModel() {
   bones.slice(4, 6).forEach((wing, i) => {
     const tip = new THREE.Bone();
     tip.name = i ? 'goose-tip-right' : 'goose-tip-left';
-    tip.position.z = .34;
+    tip.position.z = .48;
     wing.add(tip);
     bones.push(tip);
   });
@@ -49,19 +48,23 @@ export function createGooseModel() {
   function piece(geometry, color, bone = 0) {
     geometry.deleteAttribute('uv');
     geometry.translate(...pivots[bone]);
-    const count = geometry.attributes.position.count, shade = new THREE.Color(color);
-    const colors = new Float32Array(count * 3), weights = new Float32Array(count * 4), indices = new Uint16Array(count * 4);
-    for (let i = 0; i < count; i++) { shade.toArray(colors, i * 3); weights[i * 4] = 1; indices[i * 4] = bone; }
+    const count = geometry.attributes.position.count;
+    const weights = new Float32Array(count * 4), indices = new Uint16Array(count * 4);
+    for (let i = 0; i < count; i++) { weights[i * 4] = 1; indices[i * 4] = bone; }
     if (bone === 4 || bone === 5) {
       for (let i = 0; i < count; i++) {
         const span = geometry.attributes.position.getZ(i) - pivots[bone][2];
-        const tipWeight = THREE.MathUtils.smoothstep(span, .23, .45);
+        const tipWeight = THREE.MathUtils.smoothstep(span, .36, .65);
         indices[i * 4 + 1] = bone + 3;
         weights[i * 4] = 1 - tipWeight;
         weights[i * 4 + 1] = tipWeight;
       }
     }
-    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    if (!geometry.hasAttribute('color')) {
+      const colors = new Float32Array(count * 3), shade = new THREE.Color(color);
+      for (let i = 0; i < count; i++) shade.toArray(colors, i * 3);
+      geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    }
     geometry.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(indices, 4));
     geometry.setAttribute('skinWeight', new THREE.Float32BufferAttribute(weights, 4));
     pieces.push(geometry);
@@ -88,14 +91,61 @@ export function createGooseModel() {
   oval('#171e22', [0, -.055, .275], [.08, .062, .14], 6, -.12);
 
   for (const [side, bone] of [[-1, 4], [1, 5]]) {
-    oval('#687671', [side * .02, -.055, .4 - WING_HINGE_SHIFT], [.09, .14, .4], bone, -.13);
-    // Overlapping feather edges make the silver/black barring readable from
-    // the elevated game camera without another texture or material batch.
-    for (let feather = 0; feather < 7; feather++) {
-      const z = .1 - WING_HINGE_SHIFT + feather * .1;
-      oval(feather % 2 ? '#b5beb5' : '#d0d3c7', [side * .07, .04 - feather * .009, z], [.04, .09, .14], bone, -.18, 6);
-      oval('#394642', [side * .08, .005 - feather * .009, z - .055], [.036, .07, .08], bone, -.22, 6);
+    // Each section runs from the leading edge to the trailing edge. A curved
+    // upper surface and a shallow underside give the wing a continuous profile.
+    function panel(sections, height, color, barred = false) {
+      const vertices = [], triangles = [], colors = [];
+      // Colour the band on the surface so it reads as one patch of plumage.
+      const rim = barred
+        ? [[0, 0, color], [.25, .88, color], [.44, 1, color], [.49, 1, '#c5cac4'],
+           [.62, .91, '#c5cac4'], [.68, .84, '#637075'], [.79, .60, '#637075'],
+           [1, 0, color], [.52, -.60, '#606e72']]
+        : [[0, 0, color], [.34, 1, color], [.76, .55, color], [1, 0, color], [.52, -.60, color]];
+      const rowSize = rim.length;
+      for (const [span, front, back, depth] of sections) {
+        for (const [fraction, rise, tint] of rim) {
+          vertices.push(side * THREE.MathUtils.lerp(front, back, fraction), height + rise * depth, span);
+          colors.push(...new THREE.Color(tint).toArray());
+        }
+      }
+      function triangle(a, b, c) {
+        triangles.push(a, side > 0 ? b : c, side > 0 ? c : b);
+      }
+      const last = vertices.length / 3 - rowSize;
+      for (let row = 0; row < last; row += rowSize) {
+        for (let i = 0; i < rowSize; i++) {
+          const a = row + i, b = row + (i + 1) % rowSize;
+          triangle(a, a + rowSize, b);
+          triangle(b, a + rowSize, b + rowSize);
+        }
+      }
+      for (let i = 1; i < rowSize - 1; i++) {
+        triangle(0, i, i + 1);
+        triangle(last, last + i + 1, last + i);
+      }
+      const surface = new THREE.BufferGeometry();
+      surface.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+      surface.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+      surface.setIndex(triangles);
+      surface.computeVertexNormals();
+      surface.rotateZ(-side * Math.atan2(.06, .04));
+      piece(surface, color, bone);
     }
+    // Broad, overlapping primaries give the end a three-lobed outline.
+    for (let i = 0; i < 3; i++) {
+      const offset = i * .082, end = .84 + i * .084;
+      panel([[.36, -.015 - offset, .13 - offset, .026],
+        [.64, .015 - offset, .265 - offset, .042],
+        [end - .085, .08 - offset, .27 - offset, .035],
+        [end - .025, .13 - offset, .25 - offset, .022],
+        [end, .18 - offset, .215 - offset, .008]],
+      -.004 + i * .004, ['#526065', '#455259', '#39464c'][i]);
+    }
+    panel([[-.075, -.065, .045, .035], [.035, -.14, .15, .066],
+      [.20, -.17, .225, .083], [.43, -.165, .24, .078],
+      [.63, -.135, .205, .062], [.76, -.095, .16, .044],
+      [.83, -.042, .105, .025], [.85, .018, .063, .01]],
+    .018, '#899497', true);
   }
   for (const bone of [2, 3]) {
     piece(new THREE.CylinderGeometry(.034, .03, .27, 7).translate(0, -.125, 0), dark, bone);
@@ -160,7 +210,10 @@ export function animateGoose(enemy, dt, attacking, speed = enemy.speed) {
     enemy.goose.wingFlap.setFromAxisAngle(WING_FLAP_AXIS, side * (wingbeat + (enemy.landingLift ?? 0)));
     wing.quaternion.premultiply(enemy.goose.wingFlap);
     // Flex the outer primaries behind the shoulder on each stroke reversal.
-    enemy.goose.tips[i].rotation.x = Math.cos(stroke) * .28 * wingFlapAmount;
+    const wrist = enemy.goose.tips[i];
+    const recovery = .5 + .5 * Math.cos(stroke);
+    wrist.rotation.x = Math.cos(stroke) * .32 * wingFlapAmount;
+    wrist.rotation.y = side * (.22 * recovery * wingFlapAmount);
   }
   const watching = !enemy.airborne && !attacking && speed < .05;
   enemy.goose.watchPhase += dt * .95;

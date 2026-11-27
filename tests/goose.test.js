@@ -23,7 +23,7 @@ test('goose wings fold flat along the flanks and open with the barred faces up',
       side,
       span: new THREE.Vector3(0, 0, 1).applyQuaternion(wing.quaternion),
       flank: new THREE.Vector3(side, 1, 0).normalize().applyQuaternion(wing.quaternion),
-      // From the middle of the wing oval to the middle charcoal bar.
+      // Normal to the upper wing panel in its bind pose.
       bars: new THREE.Vector3(side * .06, .04, 0).normalize().applyQuaternion(wing.quaternion),
     };
   });
