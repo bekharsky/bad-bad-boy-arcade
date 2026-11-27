@@ -593,6 +593,22 @@ function spawnEnemies(around, count, level, { minPlayerDistance = 0, ringStart =
   }
 }
 
+function spawnScatteredGeese(count, level, bounds) {
+  world.routeTo(player.x, player.z);
+  let spawned = 0;
+  for (let attempt = 0; attempt < count * 18 && spawned < count; attempt++) {
+    const around = {
+      x: bounds.minX + 2 + Math.random() * (bounds.maxX - bounds.minX - 4),
+      z: bounds.minZ + 2 + Math.random() * (bounds.maxZ - bounds.minZ - 4),
+    };
+    const point = world.spawnPoint(around, 0, 1, 1.2);
+    if (!point || Math.hypot(point.x - player.x, point.z - player.z) < 8) continue;
+    if (enemies.some(enemy => Math.hypot(enemy.x - point.x, enemy.z - point.z) < 6.5)) continue;
+    makeEnemy(point.x, point.z, level, null, { arrivalDelay: spawned * .18 });
+    spawned++;
+  }
+}
+
 function spawnKamppiGeese(level) {
   const spawnAt = (candidates, options = {}) => {
     for (const candidate of candidates) {
@@ -772,6 +788,7 @@ function enterDistrict({ index }) {
         spawnEnemies(cache, openingArena ? 4 : 6, strength, { minPlayerDistance: openingArena ? 11 : 8, ringStart: openingArena ? 11 : 7 });
       }
     }
+    spawnScatteredGeese(openingHarbor ? 4 : 6 + Math.max(0, Math.min(3, strength - 1)), strength, district.bounds);
   }
   if (changedMap && world.root === preparedDistrict) preparedDistrict = null;
   else if (changedMap && renderingReady) {
