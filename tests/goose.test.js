@@ -22,27 +22,30 @@ test('goose wings fold flat along the flanks and open with the barred faces up',
     return {
       side,
       span: new THREE.Vector3(0, 0, 1).applyQuaternion(wing.quaternion),
-      face: new THREE.Vector3(side, 1, 0).normalize().applyQuaternion(wing.quaternion),
+      flank: new THREE.Vector3(side, 1, 0).normalize().applyQuaternion(wing.quaternion),
+      // From the middle of the wing oval to the middle charcoal bar.
+      bars: new THREE.Vector3(side * .06, .04, 0).normalize().applyQuaternion(wing.quaternion),
     };
   });
   const checkFolded = () => {
-    for (const { side, span, face } of directions()) {
+    for (const { side, span, flank } of directions()) {
       assert.ok(span.z < -.99 && side * span.x < 0, 'The tips point toward the tail');
-      assert.ok(side * face.x > .99 && Math.abs(face.y) < 1e-6, 'The feathers lie flat against both flanks');
+      assert.ok(side * flank.x > .99 && Math.abs(flank.y) < 1e-6, 'The feathers lie flat against both flanks');
     }
   };
 
   checkFolded();
   actor.wingOpen = .5;
   animateGoose(actor, 0, false);
-  for (const { side, span, face } of directions()) {
+  for (const { side, span, bars } of directions()) {
     assert.ok(side * span.x > .6 && span.z < -.6 && Math.abs(span.y) < 1e-6, 'The tips sweep out horizontally');
-    assert.ok(face.y > .7, 'The barred faces turn up as the wings open');
+    assert.ok(bars.y > .7, 'The barred faces turn up as the wings open');
   }
   actor.wingOpen = 1;
   animateGoose(actor, 0, false);
-  for (const { side, span, face } of directions()) {
-    assert.ok(side * span.x > .99 && face.y > .99);
+  for (const { side, span, bars } of directions()) {
+    assert.ok(side * span.x > .99);
+    assert.ok(bars.y > .99 && Math.abs(bars.z) < .08, 'The bars face up in the fully spread pose');
   }
   for (const stroke of [1, -1]) {
     actor.gait = stroke * Math.PI / 2;

@@ -11,12 +11,13 @@ export const WING_FLAP_SPEED = 25;
 const WING_SPREAD_AXIS = new THREE.Vector3(0, 1, 0);
 const WING_FLAP_AXIS = new THREE.Vector3(0, 0, 1);
 const WING_FOLDED_YAW = Math.PI + Math.PI / 36;
-// The original mesh spans +Z and its feather bars sit on its outer edge.
-const WING_FEATHER_ROLL = Math.PI / 4;
+const WING_FOLDED_ROLL = 3 * Math.PI / 4;
+// Offset the slant of the sculpted feather bars in the spread pose.
+const WING_SPREAD_ROLL = THREE.MathUtils.degToRad(55);
 
 function poseWing(wing, twist, side, open) {
   const yaw = THREE.MathUtils.lerp(WING_FOLDED_YAW, Math.PI / 2, open);
-  const roll = WING_FEATHER_ROLL + (1 - open) * Math.PI / 2;
+  const roll = THREE.MathUtils.lerp(WING_FOLDED_ROLL, WING_SPREAD_ROLL, open);
   // Twist along the wing span so the tips still sweep in the horizontal plane.
   twist.setFromAxisAngle(WING_FLAP_AXIS, side * roll);
   wing.quaternion.setFromAxisAngle(WING_SPREAD_AXIS, side * yaw).multiply(twist);
