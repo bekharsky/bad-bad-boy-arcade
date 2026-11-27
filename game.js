@@ -1403,11 +1403,6 @@ function endGame(won = false, { crashed = false } = {}) {
   player.moveSpeed = 0;
   player.turnSpeed = 0;
   leaderboardScreen.classList.add('hidden');
-  endScreen.classList.remove('hidden');
-  endScreen.classList.toggle('victory-screen', won);
-  continueLeaderboardButton.focus({ preventScroll: true });
-  document.querySelector('#end-title').textContent = won ? 'SLEIGH COMPLETE' : crashed ? 'CRASHED' : 'WASTED';
-  document.querySelector('#end-score').textContent = score.toLocaleString();
   restartTargetIndex = won ? null : levelIndex;
   restartButton.textContent = won ? 'RESTART GAME' : 'RESTART LEVEL';
   restartPenaltyLabel.textContent = `−${RESTART_PENALTY} SCORE`;
@@ -1415,10 +1410,23 @@ function endGame(won = false, { crashed = false } = {}) {
   resetCampaignButton.hidden = won;
   leaderboard.submit(score, levelIndex + 1);
   if (won) {
+    endScreen.classList.remove('hidden');
+    endScreen.classList.add('victory-screen');
+    continueLeaderboardButton.focus({ preventScroll: true });
+    document.querySelector('#end-title').textContent = 'SLEIGH COMPLETE';
+    document.querySelector('#end-score').textContent = score.toLocaleString();
     victoryConfetti.start(reducedMotion.matches);
     startVictoryFireworks();
+    leaderboardRevealTimer = setTimeout(showFinalLeaderboard, 4200);
+  } else {
+    endScreen.classList.add('hidden');
+    endScreen.classList.remove('victory-screen');
+    leaderboardScreen.classList.remove('hidden');
+    document.querySelector('#final-leaderboard-title').textContent = crashed ? 'CRASHED' : 'WASTED';
+    leaderboardScore.textContent = score.toLocaleString();
+    leaderboard.refresh();
+    document.querySelector('#final-leaderboard-title').focus({ preventScroll: true });
   }
-  leaderboardRevealTimer = setTimeout(showFinalLeaderboard, won ? 4200 : 2200);
   player.model.material.opacity = 1;
   player.model.material.transparent = false;
   blip(won ? 1046 : 80, 0.25);
