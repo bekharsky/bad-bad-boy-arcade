@@ -1,5 +1,8 @@
 // Arena owns enemy pursuit, separation and bite timing. Rendering and round
 // lifecycle stay with the coordinator; fatal damage stops the current step.
+const GOOSE_INTEREST_GRACE = 5;
+const AGGRESSIVE_NOTICE_MULTIPLIER = 2;
+
 export function createArenaCombat({ world, player, enemies, animateEnemy, onBite }) {
   return {
     update(dt, time, playerDeltaX = 0, playerDeltaZ = 0) {
@@ -34,17 +37,27 @@ export function createArenaCombat({ world, player, enemies, animateEnemy, onBite
         const vx = player.x - enemy.x, vz = player.z - enemy.z;
         const distance = Math.hypot(vx, vz);
         const post = enemy.guardPost;
+        const guardRange = enemy.guardRange ?? 24;
+        const noticeRange = guardRange * (enemy.berserk ? AGGRESSIVE_NOTICE_MULTIPLIER : 1);
+        const canSeePlayer = distance <= noticeRange
+          && world.lineClear(enemy.x, enemy.z, player.x, player.z, .6);
         const leader = enemy.packLeader?.alive ? enemy.packLeader : null;
         const packWaiting = !!leader && !leader.berserkActive;
         const packFollowing = !!leader && leader.berserkActive;
-        if (enemy.berserk && enemy.berserkActive === false && post
-          && distance <= (enemy.guardRange ?? 24) && world.lineClear(enemy.x, enemy.z, player.x, player.z, .6)) {
+        if (enemy.berserk && enemy.berserkActive === false && post && canSeePlayer) {
           enemy.berserkActive = true;
         }
         const activeBerserk = enemy.berserk && enemy.berserkActive !== false;
-        const outsideTerritory = post && (Math.hypot(player.x - post.x, player.z - post.z) > (enemy.guardRange ?? 24)
+        const postDistance = post ? Math.hypot(player.x - post.x, player.z - post.z) : Infinity;
+        const outsideTerritory = post && (postDistance > guardRange
           || !world.lineClear(post.x, post.z, player.x, player.z, .6));
-        const returning = packWaiting || (!packFollowing && post && !activeBerserk && outsideTerritory);
+        if (post && !enemy.berserk && postDistance <= guardRange && canSeePlayer) {
+          enemy.interest = GOOSE_INTEREST_GRACE;
+        } else {
+          enemy.interest = Math.max(0, (enemy.interest ?? 0) - dt);
+        }
+        const returning = packWaiting || (!packFollowing && post && !activeBerserk
+          && outsideTerritory && enemy.interest <= 0);
         let packTarget = null;
         if (packFollowing) {
           const angle = leader.root.rotation.y ?? Math.atan2(player.x - leader.x, player.z - leader.z);
