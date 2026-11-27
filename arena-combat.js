@@ -3,6 +3,13 @@
 const GOOSE_INTEREST_GRACE = 5;
 const AGGRESSIVE_NOTICE_MULTIPLIER = 2;
 
+const FOLD_DURATION = .46;
+
+function ease(value) {
+  const t = Math.max(0, Math.min(1, value));
+  return t * t * (3 - 2 * t);
+}
+
 export function createArenaCombat({ world, player, enemies, animateEnemy, onBite }) {
   return {
     update(dt, time, playerDeltaX = 0, playerDeltaZ = 0) {
@@ -14,16 +21,24 @@ export function createArenaCombat({ world, player, enemies, animateEnemy, onBite
         if (enemy.arrival) {
           const arrival = enemy.arrival;
           arrival.elapsed += dt;
+          if (arrival.elapsed < 0) continue;
+          enemy.root.visible = true;
           enemy.age = Math.min(.23, (enemy.age ?? 0) + dt);
           const progress = Math.max(0, Math.min(1, arrival.elapsed / arrival.duration));
-          const eased = progress * progress * (3 - 2 * progress);
+          const eased = ease(progress);
           enemy.x = arrival.startX + (arrival.targetX - arrival.startX) * eased;
           enemy.z = arrival.startZ + (arrival.targetZ - arrival.startZ) * eased;
           enemy.root.position.set(enemy.x, arrival.height * (1 - eased) + Math.sin(progress * Math.PI) * .18, enemy.z);
           enemy.root.scale.setScalar(.76 + eased * .24);
           enemy.airborne = progress < 1;
-          animateEnemy(enemy, dt, false, 2.1);
-          if (progress >= 1) {
+          const flare = ease((progress - .63) / .37);
+          const folded = ease((arrival.elapsed - arrival.duration) / FOLD_DURATION);
+          enemy.wingOpen = ease(progress / .18) * (1 - folded);
+          enemy.flightExtension = 1 - flare;
+          enemy.wingFlapAmount = enemy.wingOpen * (1 - flare);
+          enemy.landingLift = .38 * flare * enemy.wingOpen;
+          animateEnemy(enemy, dt, time, false, 0);
+          if (folded === 1) {
             enemy.x = arrival.targetX; enemy.z = arrival.targetZ;
             enemy.root.position.set(enemy.x, 0, enemy.z);
             enemy.root.scale.setScalar(1);
@@ -109,6 +124,8 @@ export function createArenaCombat({ world, player, enemies, animateEnemy, onBite
             if (step > 0) world.move(enemy, direction.x / length * step, direction.z / length * step, enemy.size);
             speed = Math.hypot(enemy.x - oldX, enemy.z - oldZ) / dt;
             heading = Math.atan2(direction.x, direction.z);
+          } else if (returning) {
+            heading = enemy.root.rotation.y ?? heading;
           }
           enemy.root.position.set(enemy.x, 0, enemy.z);
         } else if (enemy.attack <= 0 && player.invulnerable <= 0) {

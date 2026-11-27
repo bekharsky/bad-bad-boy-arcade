@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Белощёкая казарка · подлёт и посадка</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; overflow: hidden; background: #e8efec; color: #20312f; font: 15px/1.4 system-ui, sans-serif; }
+    canvas { display: block; width: 100vw; height: 100vh; }
+    .label { position: fixed; top: 24px; left: 28px; margin: 0; letter-spacing: .14em; font-size: 11px; font-weight: 700; color: #50635f; }
+    .readout { position: fixed; top: 48px; left: 28px; font-size: 14px; font-weight: 650; }
+    .hint { position: fixed; left: 28px; bottom: 24px; letter-spacing: .08em; font: 600 11px/1.4 ui-monospace, monospace; color: #50635f; pointer-events: none; }
+    @media (max-width: 600px) { .label, .readout, .hint { left: 16px; } }
+  </style>
+</head>
+<body>
+  <h1 class="label">БЕЛОЩЁКАЯ КАЗАРКА</h1>
+  <div class="readout" id="phase">Подлёт</div>
+  <div class="hint">Потяните для поворота · Колесо для масштаба</div>
+  <canvas id="preview"></canvas>
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { createArenaCombat } from '../arena-combat.js';
+    import { createEnemy, animateEnemy, loadEnemyModels, disposeEnemy } from '../enemies.js';
+    import { loadHero } from '../models/hero-loader.js';
+    import { createHero, animateHero, HERO_HEIGHT, HERO_BASE_HEIGHT } from '../hero.js';
+
+    const canvas = document.querySelector('#preview');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.1;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color('#e8efec');
+    const camera = new THREE.PerspectiveCamera(32, 1, .1, 100);
+    camera.position.set(-3.2, 2.25, 3.8);
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, .55, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = .08;
+    controls.enablePan = false;
+    controls.minDistance = 3;
+    controls.maxDistance = 14;
+    controls.minPolarAngle = .05;
+    controls.maxPolarAngle = Math.PI / 2 - .04;
+    controls.update();
+
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x74817b, 2.2));
+    const key = new THREE.DirectionalLight(0xfff8ed, 3.2);
+    key.position.set(-3, 5, 4);
+    key.castShadow = true;
+    key.shadow.mapSize.set(1024, 1024);
+    key.shadow.normalBias = .015;
+    scene.add(key);
+    const fill = new THREE.DirectionalLight(0xa9c8d2, 1.4);
+    fill.position.set(4, 1, -3);
+    scene.add(fill);
+
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshStandardMaterial({ color: '#b8c9bf' }));
+    floor.rotation.x = -Math.PI / 2;
+    floor.receiveShadow = true;
+    scene.add(floor);
+    const post = new THREE.Mesh(new THREE.RingGeometry(.68, .70, 64), new THREE.MeshBasicMaterial({ color: '#82998c' }));
+    post.rotation.x = -Math.PI / 2;
+    post.position.y = .005;
+    scene.add(post);
+
+    const phase = document.querySelector('#phase');
+    const hero = createHero((await loadHero(message => { phase.textContent = message; })).scene);
+    hero.mesh.scale.setScalar(HERO_HEIGHT / HERO_BASE_HEIGHT);
+    scene.add(hero.mesh);
+    loadEnemyModels();
+    const enemies = [];
+    const player = { x: 5, z: .95, radius: .35, speed: 1.6, invulnerable: 1, hp: 5 };
+    const world = {
+      routeTo() {}, lineClear: () => true,
+      chase: (x, z, tx, tz) => ({ x: tx - x, z: tz - z }),
+      move(actor, dx, dz) { actor.x += dx; actor.z += dz; },
+    };
+    const combat = createArenaCombat({ enemies, player, world, animateEnemy, onBite() {} });
+    function reset() {
+      if (enemies.length) disposeEnemy(enemies.pop());
+      const bird = createEnemy('goose', 1);
+      Object.assign(bird, { gait: 0, speed: 1.2, berserk: false, airborne: true, x: -2.4, z: -1.2,
+        guardPost: { x: 0, z: 0 }, guardRange: 2.2,
+        arrival: { startX: -2.4, startZ: -1.2, targetX: 0, targetZ: 0, height: 1.5, duration: 1.45, elapsed: 0 } });
+      bird.root.rotation.y = Math.atan2(2.4, 1.2);
+      scene.add(bird.root);
+      enemies.push(bird);
+      player.x = 5;
+    }
+    const focus = new THREE.Vector3();
+    let last, elapsed = 0;
+    reset();
+    function frame(now) {
+      const dt = Math.min((now - (last ?? now)) / 1000, .06) * .8;
+      last = now;
+      elapsed += dt;
+      if (elapsed >= 7) { reset(); elapsed = 0; }
+      const dx = elapsed > 1.9 ? -player.speed * dt : 0;
+      player.x += dx;
+      hero.mesh.position.set(player.x, 0, player.z);
+      hero.mesh.rotation.y = -Math.PI / 2;
+      animateHero(hero, elapsed * 10, dx ? 1 : 0);
+      combat.update(dt, elapsed, dx, 0);
+      const bird = enemies[0];
+      if (bird.arrival) {
+        phase.textContent = !bird.airborne ? 'Складывает крылья' : bird.landingLift > .04 ? 'Заходит на посадку'
+          : bird.wingOpen < .98 ? 'Раскрывает крылья' : 'Летит к посту';
+      } else phase.textContent = bird.interest > 0 ? 'Бежит за героем' : 'Охраняет пост';
+      const nearHero = 1 - THREE.MathUtils.smoothstep(Math.hypot(bird.x - player.x, bird.z - player.z), 2.2, 4.8);
+      focus.set(THREE.MathUtils.lerp(bird.x, player.x, .32 * nearHero),
+        bird.root.position.y * .85 + .6 + .9 * nearHero, THREE.MathUtils.lerp(bird.z, player.z, .32 * nearHero));
+      camera.zoom = 1 - .44 * nearHero;
+      camera.updateProjectionMatrix();
+      camera.position.add(focus).sub(controls.target);
+      controls.target.copy(focus);
+      controls.update();
+      renderer.render(scene, camera);
+      requestAnimationFrame(frame);
+    }
+    function resize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.fov = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(16)) / Math.min(1, camera.aspect)));
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+    window.addEventListener('resize', resize);
+    resize();
+    requestAnimationFrame(frame);
+  </script>
+</body>
+</html>
