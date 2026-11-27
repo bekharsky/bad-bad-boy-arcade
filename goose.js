@@ -47,15 +47,15 @@ export function createGooseModel() {
   oval('#171e22', [0, .475, .385], [.082, .066, .17], 1, -.12);
 
   for (const [side, bone] of [[-1, 4], [1, 5]]) {
-    // Wingspan runs across X, perpendicular to the goose's +Z body axis.
-    oval('#687671', [side * .19, -.045, -.06], [.25, .075, .22], bone);
+    // Folded along the goose's +Z body axis; flight animation swings the
+    // wings out to either side before each flap.
+    oval('#687671', [side * .02, -.055, -.05], [.095, .205, .48], bone, -.13);
     // Overlapping feather edges make the silver/black barring readable from
     // the elevated game camera without another texture or material batch.
     for (let feather = 0; feather < 5; feather++) {
-      const x = side * (.035 + feather * .08);
-      const z = -.16 + feather * .015;
-      oval(feather % 2 ? '#b5beb5' : '#d0d3c7', [x, .005, z], [.065, .052, .12], bone, -.18, 6);
-      oval('#394642', [x, -.025, z - .075], [.055, .045, .07], bone, -.18, 6);
+      const z = .23 - feather * .145;
+      oval(feather % 2 ? '#b5beb5' : '#d0d3c7', [side * .07, .045 - feather * .027, z], [.043, .125, .075], bone, -.22, 6);
+      oval('#394642', [side * .08, .035 - feather * .027, z - .028], [.037, .11, .035], bone, -.22, 6);
     }
   }
   for (const bone of [2, 3]) {
@@ -102,7 +102,7 @@ export function animateGoose(enemy, dt, attacking, speed = enemy.speed) {
       : attacking ? .25 + Math.sin(phase) * .1 : Math.sin(phase) * .025;
     const side = i ? 1 : -1;
     enemy.goose.wings[i].rotation.x = 0;
-    enemy.goose.wings[i].rotation.y = enemy.airborne ? 0 : side * Math.PI / 2;
+    enemy.goose.wings[i].rotation.y = enemy.airborne ? side * Math.PI / 2 : 0;
     enemy.goose.wings[i].rotation.z = side * wingbeat;
   }
   const lunge = attacking ? .7 + Math.sin(phase) * .18 : Math.sin(phase * .5) * .045;
