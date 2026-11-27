@@ -298,7 +298,7 @@ let bankedScore = 0;
 let restartPenalty = 0;
 let restartTargetIndex = null;
 let searchTime = 0;
-let nextGooseArrival = 25;
+let nextGooseArrival = 18;
 let gooseReinforcementWave = 0;
 let geeseDefeated = 0;
 let healthLost = 0;
@@ -658,7 +658,7 @@ function spawnKamppiGeese(level) {
 function reinforceGeese() {
   if (searchTime < nextGooseArrival) return;
   const alive = enemies.reduce((count, enemy) => count + Number(enemy.alive), 0);
-  if (alive >= 40) { nextGooseArrival = searchTime + 8; return; }
+  if (alive >= 40) { nextGooseArrival = searchTime + 7; return; }
   gooseReinforcementWave++;
   const count = Math.min(2 + Math.floor(gooseReinforcementWave / 2), 5, 40 - alive);
   const strength = itinerary.slice(0, levelIndex + 1).filter(map => map.mode !== 'runner').length;
@@ -692,7 +692,7 @@ function reinforceGeese() {
       ringStart: 13 + Math.min(7, gooseReinforcementWave * 1.1),
     });
   }
-  nextGooseArrival = searchTime + Math.max(10, 24 - gooseReinforcementWave * 2);
+  nextGooseArrival = searchTime + Math.max(7, 13 - gooseReinforcementWave);
 }
 
 function collectSleighPart() {
@@ -725,7 +725,7 @@ function enterDistrict({ index }) {
   const changedMap = world.activate(district.id);
   levelIndex = index;
   searchTime = geeseDefeated = healthLost = 0;
-  nextGooseArrival = 25;
+  nextGooseArrival = 18;
   gooseReinforcementWave = 0;
   setLevelProgress(0);
   if (changedMap || !firstRound) setDistrictWeather();
@@ -784,11 +784,13 @@ function enterDistrict({ index }) {
       } else {
         const openingArena = strength === 1;
         const openingRing = openingArena ? 8.5 : 5.5;
-        spawnEnemies(player, openingArena ? 6 : 5 + strength, strength, { minPlayerDistance: openingRing, ringStart: openingRing });
-        spawnEnemies(cache, openingArena ? 4 : 6, strength, { minPlayerDistance: openingArena ? 11 : 8, ringStart: openingArena ? 11 : 7 });
+        spawnEnemies(player, openingArena ? 6 : 2 + strength, strength, { minPlayerDistance: openingRing, ringStart: openingRing });
+        spawnEnemies(cache, openingArena ? 4 : 3, strength, { minPlayerDistance: openingArena ? 11 : 8, ringStart: openingArena ? 11 : 7 });
       }
     }
-    spawnScatteredGeese(openingHarbor ? 4 : 6 + Math.max(0, Math.min(3, strength - 1)), strength, district.bounds);
+    const area = (district.bounds.maxX - district.bounds.minX) * (district.bounds.maxZ - district.bounds.minZ);
+    const scatteredCount = openingHarbor ? 4 : Math.min(16, 10 + Math.round(area / 1200));
+    spawnScatteredGeese(scatteredCount, strength, district.bounds);
   }
   if (changedMap && world.root === preparedDistrict) preparedDistrict = null;
   else if (changedMap && renderingReady) {
