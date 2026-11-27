@@ -1,6 +1,6 @@
 import { bindShareButtons } from './share.js';
 import * as THREE from 'three';
-import { createHero, animateHero, animateSkating, HERO_BASE_HEIGHT } from './hero.js';
+import { createHero, animateHero, animateSkating, HERO_HEIGHT, HERO_BASE_HEIGHT } from './hero.js';
 import { loadHero } from './models/hero-loader.js';
 import { maps, mapOrder } from './maps/index.js';
 import { createArenaCombat } from './arena-combat.js';
@@ -38,7 +38,6 @@ import { calculateDistrictScore, districtPaceSeconds } from './campaign-score.js
 import { mountHolidayScreens } from './screen-ui.js';
 
 // World metres; the hero keeps the same physical size across every map.
-const HERO_HEIGHT = 3.45;
 const HERO_SCALE = HERO_HEIGHT / HERO_BASE_HEIGHT;
 const TURN_KEYS = ['ArrowLeft', 'ArrowRight'];
 const RUNNER_DODGE_KEYS = [...TURN_KEYS, 'KeyA', 'KeyD'];
@@ -571,6 +570,7 @@ function makeEnemy(x, z, level, guardPost = null, {
   const startZ = z + Math.sin(arrivalAngle) * arrivalDistance;
   enemy.arrival = { startX, startZ, targetX: x, targetZ: z, elapsed: -arrivalDelay, duration: 1.45, height: 2.65 };
   enemy.airborne = true;
+  enemy.root.visible = arrivalDelay <= 0;
   enemy.root.position.set(startX, enemy.arrival.height, startZ);
   enemy.root.rotation.y = Math.atan2(x - startX, z - startZ);
   enemy.root.scale.setScalar(.76);

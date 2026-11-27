@@ -94,3 +94,25 @@ test('geese can nip a retreating hero at close range and a head start allows esc
   }
   assert.equal(player.hp, 4);
 });
+
+test('arrival opens the wings, flares, then folds at the post before pursuit', () => {
+  const bird = enemy(-2);
+  bird.arrival = { startX: -2, startZ: 0, targetX: 0, targetZ: 0, height: 1, duration: 1, elapsed: 0 };
+  bird.root.scale = { setScalar() {} };
+  const f = fixture([bird]);
+  f.combat.update(.09, .09);
+  assert.ok(bird.airborne && bird.wingOpen > 0 && bird.wingOpen < 1);
+  f.combat.update(.41, .5);
+  assert.equal(bird.wingFlapAmount, 1);
+  f.combat.update(.4, .9);
+  assert.ok(bird.landingLift > 0 && bird.flightExtension < .3);
+  f.combat.update(.1, 1);
+  assert.equal(bird.airborne, false);
+  assert.equal(bird.wingOpen, 1);
+  f.combat.update(.23, 1.23);
+  assert.ok(Math.abs(bird.wingOpen - .5) < .001 && bird.x === 0);
+  f.combat.update(.24, 1.47);
+  assert.equal(bird.arrival, null);
+  assert.equal(bird.wingOpen, 0);
+  assert.equal(f.bites.length, 0);
+});

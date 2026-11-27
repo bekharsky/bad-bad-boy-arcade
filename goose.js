@@ -7,7 +7,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 const WING_HINGE_SHIFT = .12;
 const WING_ROOT_X = .28;
 export const WING_FLAP_AMPLITUDE = 1.35;
-export const WING_FLAP_SPEED = 25;
+export const WING_FLAP_SPEED = 19;
 const WING_SPREAD_AXIS = new THREE.Vector3(0, 1, 0);
 const WING_FLAP_AXIS = new THREE.Vector3(0, 0, 1);
 const WING_FOLDED_YAW = Math.PI + Math.PI / 36;
@@ -30,8 +30,21 @@ export function createGooseModel() {
     const bone = new THREE.Bone(); bone.name = names[index]; bone.position.set(...pivot); return bone;
   });
   for (const bone of bones.slice(1)) bones[0].add(bone);
+  const head = new THREE.Bone();
+  head.name = 'goose-head';
+  head.position.set(0, .53, .11);
+  bones[1].add(head);
+  bones.push(head);
+  pivots.push(head.position.clone().add(bones[1].position).toArray());
+  bones.slice(4, 6).forEach((wing, i) => {
+    const tip = new THREE.Bone();
+    tip.name = i ? 'goose-tip-right' : 'goose-tip-left';
+    tip.position.z = .34;
+    wing.add(tip);
+    bones.push(tip);
+  });
   const beak = new THREE.Object3D(); beak.name = 'goose-bill-tip';
-  beak.position.set(0, .475, .54); bones[1].add(beak);
+  beak.position.set(0, -.055, .40); head.add(beak);
   const pieces = [];
   function piece(geometry, color, bone = 0) {
     geometry.deleteAttribute('uv');
@@ -39,6 +52,15 @@ export function createGooseModel() {
     const count = geometry.attributes.position.count, shade = new THREE.Color(color);
     const colors = new Float32Array(count * 3), weights = new Float32Array(count * 4), indices = new Uint16Array(count * 4);
     for (let i = 0; i < count; i++) { shade.toArray(colors, i * 3); weights[i * 4] = 1; indices[i * 4] = bone; }
+    if (bone === 4 || bone === 5) {
+      for (let i = 0; i < count; i++) {
+        const span = geometry.attributes.position.getZ(i) - pivots[bone][2];
+        const tipWeight = THREE.MathUtils.smoothstep(span, .23, .45);
+        indices[i * 4 + 1] = bone + 3;
+        weights[i * 4] = 1 - tipWeight;
+        weights[i * 4 + 1] = tipWeight;
+      }
+    }
     geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
     geometry.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(indices, 4));
     geometry.setAttribute('skinWeight', new THREE.Float32BufferAttribute(weights, 4));
@@ -47,23 +69,23 @@ export function createGooseModel() {
   function oval(color, position, scale, bone = 0, rotation = 0, detail = 10) {
     piece(new THREE.SphereGeometry(1, detail, Math.floor(detail * .7)).scale(...scale).rotateX(rotation).translate(...position), color, bone);
   }
-  const dark = '#20282c', grey = '#87928e', cream = '#eeeadd';
+  const dark = '#20282c', grey = '#858e96', cream = '#eeeadd';
   oval(grey, [0, .59, -.06], [.34, .33, .57]);
   oval(cream, [0, .43, -.01], [.325, .235, .52]);
   oval(dark, [0, .68, .35], [.26, .30, .265], 0, -.15);
   oval(cream, [0, .54, -.54], [.27, .17, .27]);
   oval(dark, [0, .60, -.68], [.21, .075, .28], 0, -.2);
 
-  // The neck, head and beak articulate together for a forward, low nip.
+  // The head counter-rotates when the neck stretches forward in flight.
   oval(dark, [0, .22, .025], [.13, .36, .14], 1, .12);
-  oval(dark, [0, .53, .11], [.185, .195, .235], 1);
-  oval(cream, [0, .52, .265], [.155, .15, .105], 1);
+  oval(dark, [0, 0, 0], [.185, .195, .235], 6);
+  oval(cream, [0, -.01, .155], [.155, .15, .105], 6);
   for (const side of [-1, 1]) {
-    oval(cream, [side * .153, .51, .16], [.047, .135, .16], 1);
-    oval('#0b1115', [side * .18, .575, .205], [.025, .026, .028], 1, 0, 6);
-    oval('#b4bdb3', [side * .196, .583, .215], [.007, .008, .007], 1, 0, 6);
+    oval(cream, [side * .153, -.02, .05], [.047, .135, .16], 6);
+    oval('#0b1115', [side * .18, .045, .095], [.025, .026, .028], 6, 0, 6);
+    oval('#b4bdb3', [side * .196, .053, .105], [.007, .008, .007], 6, 0, 6);
   }
-  oval('#171e22', [0, .475, .385], [.082, .066, .17], 1, -.12);
+  oval('#171e22', [0, -.055, .275], [.08, .062, .14], 6, -.12);
 
   for (const [side, bone] of [[-1, 4], [1, 5]]) {
     oval('#687671', [side * .02, -.055, .4 - WING_HINGE_SHIFT], [.09, .14, .4], bone, -.13);
@@ -108,6 +130,9 @@ export function createGooseModel() {
 export function gooseRig(model) {
   return {
     neck: model.getObjectByName('goose-neck'),
+    head: model.getObjectByName('goose-head'),
+    tips: ['goose-tip-left', 'goose-tip-right'].map(name => model.getObjectByName(name)),
+    watchPhase: 0,
     beak: model.getObjectByName('goose-bill-tip'),
     legs: ['goose-leg-left', 'goose-leg-right'].map(name => model.getObjectByName(name)),
     wings: ['goose-wing-left', 'goose-wing-right'].map(name => model.getObjectByName(name)),
@@ -121,19 +146,31 @@ export function animateGoose(enemy, dt, attacking, speed = enemy.speed) {
   const phase = enemy.gait, stride = attacking ? .12 : .48 * Math.min(1, speed / .45);
   const wingOpen = THREE.MathUtils.clamp(enemy.wingOpen ?? (enemy.airborne ? 1 : 0), 0, 1);
   const wingFlapAmount = THREE.MathUtils.clamp(enemy.wingFlapAmount ?? (enemy.airborne ? 1 : 0), 0, 1);
+  const extension = enemy.flightExtension ?? (enemy.airborne ? 1 : 0);
+  const beat = Math.sin(phase);
+  // A quicker power stroke and a longer recovery between beats.
+  const stroke = phase - .18 * beat;
+  const wingbeat = enemy.airborne ? Math.sin(stroke) * WING_FLAP_AMPLITUDE * wingFlapAmount
+    : attacking ? .25 + beat * .1 : beat * .025 * stride;
   for (let i = 0; i < 2; i++) {
-    enemy.goose.legs[i].rotation.x = Math.sin(phase + i * Math.PI) * stride;
-    const wingbeat = enemy.airborne ? Math.sin(phase) * WING_FLAP_AMPLITUDE * wingFlapAmount
-      : attacking ? .25 + Math.sin(phase) * .1 : Math.sin(phase) * .025;
     const side = i ? 1 : -1;
+    enemy.goose.legs[i].rotation.x = 1.1 * extension - side * beat * stride * (1 - extension);
     const wing = enemy.goose.wings[i];
     poseWing(wing, enemy.goose.wingTwist, side, wingOpen);
-    enemy.goose.wingFlap.setFromAxisAngle(WING_FLAP_AXIS, side * wingbeat);
+    enemy.goose.wingFlap.setFromAxisAngle(WING_FLAP_AXIS, side * (wingbeat + (enemy.landingLift ?? 0)));
     wing.quaternion.premultiply(enemy.goose.wingFlap);
+    // Flex the outer primaries behind the shoulder on each stroke reversal.
+    enemy.goose.tips[i].rotation.x = Math.cos(stroke) * .28 * wingFlapAmount;
   }
-  const lunge = attacking ? .7 + Math.sin(phase) * .18 : Math.sin(phase * .5) * .045;
-  enemy.goose.neck.rotation.x = THREE.MathUtils.damp(enemy.goose.neck.rotation.x, lunge, 15, dt);
-  enemy.body.position.y = Math.abs(Math.sin(phase)) * (attacking ? .008 : .0375 * stride);
-  enemy.body.rotation.z = Math.sin(phase) * (attacking ? .015 : .094 * stride);
-  enemy.body.rotation.x = attacking ? .06 : 0;
+  const watching = !enemy.airborne && !attacking && speed < .05;
+  enemy.goose.watchPhase += dt * .95;
+  const scan = watching ? .27 * Math.sin(enemy.goose.watchPhase) : 0;
+  const lunge = attacking ? .7 + beat * .18 : .19 * stride + Math.sin(phase * .5) * .045;
+  const neck = enemy.goose.neck;
+  neck.rotation.x = THREE.MathUtils.damp(neck.rotation.x, THREE.MathUtils.lerp(lunge, 1.12, extension), 15, dt);
+  neck.rotation.y = THREE.MathUtils.damp(neck.rotation.y, scan, 5, dt);
+  enemy.goose.head.rotation.x = -.86 * neck.rotation.x * extension;
+  enemy.body.position.y = .033 * (1 - beat) * extension + Math.abs(beat) * .0375 * stride * (1 - extension);
+  enemy.body.rotation.z = beat * .094 * stride * (1 - extension);
+  enemy.body.rotation.x = attacking ? .06 : -.22 * (enemy.landingLift ?? 0);
 }
