@@ -45,7 +45,7 @@ test('goose wings fold flat along the flanks and open with the barred faces up',
   animateGoose(actor, 0, false);
   for (const { side, span, bars } of directions()) {
     assert.ok(side * span.x > .99);
-    assert.ok(bars.y > .99 && bars.z > 0 && bars.z < .08, 'The bars face up and slightly forward');
+    assert.ok(bars.y > .99 && bars.z > .08 && bars.z < .15, 'The bars face up and slightly forward');
   }
   for (const stroke of [1, -1]) {
     actor.gait = stroke * Math.PI / 2;

@@ -13,7 +13,7 @@ const WING_FLAP_AXIS = new THREE.Vector3(0, 0, 1);
 const WING_FOLDED_YAW = Math.PI + Math.PI / 36;
 const WING_FOLDED_ROLL = 3 * Math.PI / 4;
 // The sculpted feather bars face up and slightly toward the head when spread.
-const WING_SPREAD_ROLL = THREE.MathUtils.degToRad(60);
+const WING_SPREAD_ROLL = THREE.MathUtils.degToRad(64);
 
 function poseWing(wing, twist, side, open) {
   const yaw = THREE.MathUtils.lerp(WING_FOLDED_YAW, Math.PI / 2, open);
