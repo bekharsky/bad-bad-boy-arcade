@@ -10,8 +10,50 @@ registerHooks({ resolve(specifier, context, nextResolve) {
 const THREE = await import('three');
 const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
 const { loadEnemyModels, createEnemy, animateEnemy, disposeEnemy } = await import('../enemies.js');
+const { animateGoose, createGooseModel, gooseRig } = await import('../goose.js');
 const { createLiquidStream } = await import('../liquid.js');
 const { ENEMY_HEALTH } = await import('../waves.js');
+
+test('goose wings fold flat along the flanks and open with the barred faces up', () => {
+  const model = createGooseModel();
+  const actor = { body: model, goose: gooseRig(model), gait: 0, speed: 0, airborne: true };
+  const directions = () => actor.goose.wings.map((wing, index) => {
+    const side = index === 0 ? -1 : 1;
+    return {
+      side,
+      span: new THREE.Vector3(0, 0, 1).applyQuaternion(wing.quaternion),
+      face: new THREE.Vector3(side, 1, 0).normalize().applyQuaternion(wing.quaternion),
+    };
+  });
+  const checkFolded = () => {
+    for (const { side, span, face } of directions()) {
+      assert.ok(span.z < -.99 && side * span.x < 0, 'The tips point toward the tail');
+      assert.ok(side * face.x > .99 && Math.abs(face.y) < 1e-6, 'The feathers lie flat against both flanks');
+    }
+  };
+
+  checkFolded();
+  actor.wingOpen = .5;
+  animateGoose(actor, 0, false);
+  for (const { side, span, face } of directions()) {
+    assert.ok(side * span.x > .6 && span.z < -.6 && Math.abs(span.y) < 1e-6, 'The tips sweep out horizontally');
+    assert.ok(face.y > .7, 'The barred faces turn up as the wings open');
+  }
+  actor.wingOpen = 1;
+  animateGoose(actor, 0, false);
+  for (const { side, span, face } of directions()) {
+    assert.ok(side * span.x > .99 && face.y > .99);
+  }
+  for (const stroke of [1, -1]) {
+    actor.gait = stroke * Math.PI / 2;
+    animateGoose(actor, 0, false);
+    assert.ok(directions().every(({ span }) => stroke * span.y > .9), 'Both wings stroke in the same direction');
+  }
+  actor.wingOpen = 0;
+  actor.gait = 0;
+  animateGoose(actor, 0, false);
+  checkFolded();
+});
 
 test('geese load without model downloads and share geometry with independent animation and hit state', context => {
   context.mock.method(Math, 'random', () => .5);

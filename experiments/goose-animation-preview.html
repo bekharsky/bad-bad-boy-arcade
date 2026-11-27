@@ -8,7 +8,7 @@
     * { box-sizing: border-box; }
     body { margin: 0; overflow: hidden; background: #e8efec; color: #20312f; font: 15px/1.4 system-ui, sans-serif; }
     canvas { display: block; width: 100vw; height: 100vh; }
-    .label { position: fixed; top: 24px; left: 28px; letter-spacing: .14em; font-size: 11px; font-weight: 700; color: #50635f; }
+    .label { position: fixed; top: 24px; left: 28px; margin: 0; letter-spacing: .14em; font-size: 11px; font-weight: 700; color: #50635f; }
     .readout { position: fixed; top: 48px; left: 28px; font-size: 14px; font-weight: 650; }
     .angle { position: fixed; right: 28px; top: 26px; min-width: 150px; text-align: right; font: 600 12px/1.4 ui-monospace, monospace; color: #50635f; }
     .hint { position: fixed; left: 28px; bottom: 24px; letter-spacing: .08em; font: 600 11px/1.4 ui-monospace, monospace; color: #50635f; pointer-events: none; }
@@ -16,29 +16,27 @@
   </style>
 </head>
 <body>
-  <div class="label">ISOLATED FLIGHT ANIMATION</div>
-  <div class="readout" id="phase">Folded wings point toward neck · unfold 90° · flap · fold</div>
-  <div class="angle" id="angle">FLAP ANGLE 0°</div>
+  <h1 class="label">GOOSE FLIGHT</h1>
+  <div class="readout" id="phase">Wings folded</div>
+  <div class="angle" id="angle">Flap angle 0°</div>
   <div class="hint">DRAG TO ROTATE · SCROLL TO ZOOM</div>
   <canvas id="preview"></canvas>
   <script type="module">
     import * as THREE from 'three';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-    import { animateGoose, createGooseModel, gooseRig, WING_FLAP_AMPLITUDE } from '../goose.js';
+    import { animateGoose, createGooseModel, gooseRig, WING_FLAP_AMPLITUDE, WING_FLAP_SPEED } from '../goose.js';
 
     const canvas = document.querySelector('#preview');
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.1;
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color('#e8efec');
-    const camera = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, .1, 100);
-    camera.position.set(-3.2, 6.5, 7);
-    camera.lookAt(0, .55, 0);
+    const camera = new THREE.PerspectiveCamera(32, 1, .1, 100);
+    camera.position.set(-1.3, 3.9, 2.35);
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.target.set(0, .55, 0);
     controls.enableDamping = true;
@@ -58,7 +56,6 @@
     fill.position.set(4, 1, -3);
     scene.add(fill);
 
-    const root = new THREE.Group();
     const body = new THREE.Group();
     const model = createGooseModel();
     const modelBounds = new THREE.Box3().setFromObject(model);
@@ -68,65 +65,60 @@
     body.scale.setScalar(1.5 / Math.max(modelSize.x, modelSize.z));
     model.position.sub(modelCenter);
     const actor = {
-      root, body, model, goose: gooseRig(model), gait: 0, speed: 2.1, airborne: true,
+      body, goose: gooseRig(model), gait: 0, speed: 0, airborne: true,
       wingOpen: 0, wingFlapAmount: 0,
     };
     body.add(model);
-    root.add(body);
-    scene.add(root);
+    scene.add(body);
 
     const angleReadout = document.querySelector('#angle');
     const phaseReadout = document.querySelector('#phase');
-    const openDuration = .85;
-    const demoFlapAngularSpeed = 25 * .5;
+    const foldedDuration = .55;
+    const openDuration = .65;
+    const demoFlapAngularSpeed = WING_FLAP_SPEED * .5;
     const flapDuration = 4 * 2 * Math.PI / demoFlapAngularSpeed;
-    const closeDuration = .85;
-    const foldedDuration = .45;
-    const cycleDuration = openDuration + flapDuration + closeDuration + foldedDuration;
+    const closeDuration = .65;
+    const flapStart = foldedDuration + openDuration;
+    const closeStart = flapStart + flapDuration;
+    const cycleDuration = closeStart + closeDuration;
     const ease = value => value * value * (3 - 2 * value);
-    let last = performance.now();
+    let start;
     function frame(now) {
-      const dt = Math.min((now - last) / 1000, .05);
-      last = now;
-      const cycleTime = (now / 1000) % cycleDuration;
-      let stage;
-      if (cycleTime < openDuration) {
-        actor.wingOpen = ease(cycleTime / openDuration);
-        actor.wingFlapAmount = 0;
-        actor.gait = 0;
-        stage = 'OPENING';
-      } else if (cycleTime < openDuration + flapDuration) {
+      start ??= now;
+      const time = ((now - start) / 1000) % cycleDuration;
+      actor.wingOpen = 0;
+      actor.wingFlapAmount = 0;
+      actor.gait = 0;
+      let stage = 'Wings folded';
+      if (time >= closeStart) {
+        actor.wingOpen = 1 - ease((time - closeStart) / closeDuration);
+        stage = 'Folding wings';
+      } else if (time >= flapStart) {
         actor.wingOpen = 1;
         actor.wingFlapAmount = 1;
-        actor.gait = (cycleTime - openDuration) * demoFlapAngularSpeed;
-        stage = 'FLAPPING';
-      } else if (cycleTime < openDuration + flapDuration + closeDuration) {
-        const closing = (cycleTime - openDuration - flapDuration) / closeDuration;
-        actor.wingOpen = 1 - ease(closing);
-        actor.wingFlapAmount = 1 - ease(closing);
-        actor.gait = 0;
-        stage = 'CLOSING';
-      } else {
-        actor.wingOpen = 0;
-        actor.wingFlapAmount = 0;
-        actor.gait = 0;
-        stage = 'FOLDED';
+        actor.gait = (time - flapStart) * demoFlapAngularSpeed;
+        stage = 'Flapping';
+      } else if (time >= foldedDuration) {
+        actor.wingOpen = ease((time - foldedDuration) / openDuration);
+        stage = 'Opening wings';
       }
-      animateGoose(actor, dt * .5, false, actor.speed);
+      animateGoose(actor, 0, false);
       const degrees = Math.round(Math.sin(actor.gait) * actor.wingFlapAmount * THREE.MathUtils.radToDeg(WING_FLAP_AMPLITUDE));
-      phaseReadout.textContent = `FLIGHT PHASE · ${stage}`;
-      angleReadout.textContent = `FLAP ANGLE ${degrees > 0 ? '+' : ''}${degrees}°`;
+      phaseReadout.textContent = stage;
+      angleReadout.textContent = `Flap angle ${degrees > 0 ? '+' : ''}${degrees}°`;
       controls.update();
       renderer.render(scene, camera);
       requestAnimationFrame(frame);
     }
-    requestAnimationFrame(frame);
-
-    window.addEventListener('resize', () => {
+    function resize() {
       camera.aspect = window.innerWidth / window.innerHeight;
+      camera.fov = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(16)) / Math.min(1, camera.aspect)));
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
-    });
+    }
+    window.addEventListener('resize', resize);
+    resize();
+    requestAnimationFrame(frame);
   </script>
 </body>
 </html>
