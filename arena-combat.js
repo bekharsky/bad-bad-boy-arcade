@@ -53,7 +53,8 @@ export function createArenaCombat({ world, player, enemies, animateEnemy, onBite
         const distance = Math.hypot(vx, vz);
         const post = enemy.guardPost;
         const guardRange = enemy.guardRange ?? 24;
-        const noticeRange = Math.max(58, guardRange * (enemy.berserk ? AGGRESSIVE_NOTICE_MULTIPLIER : 1));
+        const aggression = enemy.aggression ?? 1;
+        const noticeRange = Math.max(58 * aggression, guardRange * (enemy.berserk ? AGGRESSIVE_NOTICE_MULTIPLIER : 1));
         const canSeePlayer = distance <= noticeRange
           && world.lineClear(enemy.x, enemy.z, player.x, player.z, .6);
         const leader = enemy.packLeader?.alive ? enemy.packLeader : null;
@@ -67,7 +68,7 @@ export function createArenaCombat({ world, player, enemies, animateEnemy, onBite
         const outsideTerritory = post && (postDistance > guardRange
           || !world.lineClear(post.x, post.z, player.x, player.z, .6));
         if (post && !enemy.berserk && postDistance <= guardRange && canSeePlayer) {
-          enemy.interest = GOOSE_INTEREST_GRACE;
+          enemy.interest = enemy.interestGrace ?? GOOSE_INTEREST_GRACE;
         } else {
           enemy.interest = Math.max(0, (enemy.interest ?? 0) - dt);
         }
@@ -89,7 +90,7 @@ export function createArenaCombat({ world, player, enemies, animateEnemy, onBite
         const target = away > .2 ? running : away < -.55 ? 0 : Math.min(previous, running) * .8;
         const pursuit = running ? target + (previous - target) * Math.exp(-(target > previous ? 11 : 7) * dt) : 0;
         enemy.pursuit = pursuit;
-        const chaseSpeed = enemy.speed * (activeBerserk ? 2.05 : packFollowing ? 1.25 : 1);
+        const chaseSpeed = enemy.speed * (activeBerserk ? 2.05 : packFollowing ? 1.25 : 1) * aggression;
         const biteReach = enemy.size + player.radius + .14;
         const attacking = !returning && distance <= biteReach && world.lineClear(enemy.x, enemy.z, player.x, player.z, .1);
         let heading = Math.atan2(vx, vz);
@@ -131,12 +132,12 @@ export function createArenaCombat({ world, player, enemies, animateEnemy, onBite
         } else if (enemy.attack <= 0 && player.invulnerable <= 0) {
           player.hp--;
           player.invulnerable = 1.3;
-          enemy.attack = 1.2;
+          enemy.attack = 1.2 / aggression;
           if (onBite(enemy) === false) return false;
         }
         const yaw = enemy.root.rotation.y ?? heading;
         const angle = Math.atan2(Math.sin(heading - yaw), Math.cos(heading - yaw));
-        const turn = ((activeBerserk ? 21 : 10) + 15 * pursuit) * dt;
+        const turn = ((activeBerserk ? 21 : 10) + 15 * pursuit) * aggression * dt;
         enemy.root.rotation.y = Math.abs(angle) <= turn ? heading : yaw + Math.sign(angle) * turn;
         animateEnemy(enemy, dt, time, attacking, speed);
       }

@@ -33,26 +33,51 @@ function readProfile() {
   return { id: newPlayerId(), nickname: generatedName() };
 }
 
-function renderEntries(list, entries) {
-  const rows = entries.map((entry, index) => {
-    const row = document.createElement('li');
-    const rank = document.createElement('span');
-    const nickname = document.createElement('span');
-    const score = document.createElement('strong');
-    row.className = 'leaderboard-row';
-    rank.className = 'leaderboard-rank';
-    nickname.className = 'leaderboard-name';
-    score.className = 'leaderboard-score';
-    rank.textContent = String(index + 1).padStart(2, '0');
-    nickname.textContent = entry.nickname;
-    score.textContent = Number(entry.score).toLocaleString();
-    row.append(rank, nickname, score);
-    return row;
-  });
+function renderRow(entry, rankValue, currentPlayer = false) {
+  const row = document.createElement('li');
+  const rank = document.createElement('span');
+  const nickname = document.createElement('span');
+  const score = document.createElement('strong');
+  row.className = `leaderboard-row${currentPlayer ? ' is-current-player' : ''}`;
+  rank.className = 'leaderboard-rank';
+  nickname.className = 'leaderboard-name';
+  score.className = 'leaderboard-score';
+  rank.textContent = String(rankValue).padStart(2, '0');
+  nickname.textContent = entry.nickname;
+  score.textContent = Number(entry.score).toLocaleString();
+  row.append(rank, nickname);
+  if (currentPlayer) {
+    const marker = document.createElement('span');
+    marker.className = 'leaderboard-you';
+    marker.textContent = 'YOU';
+    row.append(marker);
+    row.setAttribute('aria-label', `Your rank ${rankValue}, ${entry.nickname}, ${Number(entry.score).toLocaleString()} points`);
+  }
+  row.append(score);
+  return row;
+}
+
+function renderEntries(list, entries, player) {
+  const playerRank = Number(player?.rank) || 0;
+  const rows = entries.slice(0, 5).map((entry, index) => renderRow(entry, index + 1, playerRank === index + 1));
+  if (playerRank > 5) {
+    const gap = document.createElement('li');
+    gap.className = 'leaderboard-gap';
+    gap.textContent = '…';
+    gap.setAttribute('aria-hidden', 'true');
+    rows.push(gap, renderRow(player, playerRank, true));
+  }
   list.replaceChildren(...rows);
 }
 
-export function createLeaderboardView(list, status) {
+function storedPlayerId() {
+  try {
+    const profile = JSON.parse(localStorage.getItem(PROFILE_KEY) || 'null');
+    return typeof profile?.id === 'string' ? profile.id : null;
+  } catch { return null; }
+}
+
+export function createLeaderboardView(list, status, { getPlayerId = storedPlayerId } = {}) {
   let latestRequest = 0;
   async function refresh() {
     const request = ++latestRequest;
@@ -62,12 +87,14 @@ export function createLeaderboardView(list, status) {
     }
     status.textContent = 'Loading scores…';
     try {
-      const response = await fetch(`${API_URL}/leaderboard`, { headers: { Accept: 'application/json' } });
+      const playerId = getPlayerId();
+      const query = playerId ? `?playerId=${encodeURIComponent(playerId)}` : '';
+      const response = await fetch(`${API_URL}/leaderboard${query}`, { headers: { Accept: 'application/json' } });
       if (!response.ok) throw new Error(`Leaderboard request failed: ${response.status}`);
       const data = await response.json();
       if (request !== latestRequest) return;
       const entries = Array.isArray(data.entries) ? data.entries.slice(0, 5) : [];
-      renderEntries(list, entries);
+      renderEntries(list, entries, data.player ?? null);
       status.textContent = entries.length ? '' : 'No scores yet. Set the first record!';
     } catch {
       if (request === latestRequest) status.textContent = 'Online scores are temporarily unavailable.';
@@ -77,8 +104,8 @@ export function createLeaderboardView(list, status) {
 }
 
 export function createLeaderboard({ nameInput, list, listStatus, submitStatus, retryButton }) {
-  const { refresh } = createLeaderboardView(list, listStatus);
   const profile = readProfile();
+  const { refresh } = createLeaderboardView(list, listStatus, { getPlayerId: () => profile.id });
   let lastSubmission = null;
   nameInput.value = profile.nickname;
 
@@ -129,5 +156,5 @@ export function createLeaderboard({ nameInput, list, listStatus, submitStatus, r
     if (lastSubmission) send(lastSubmission);
   });
 
-  return { submit };
+  return { submit, refresh };
 }

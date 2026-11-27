@@ -202,23 +202,32 @@
         <p class="orientation-hint">For the best experience, turn your phone sideways.</p>
       </section>
 
-      <section id="end-screen" class="overlay hidden">
+      <section id="end-screen" class="overlay hidden" aria-labelledby="end-title">
+        <canvas id="victory-confetti" class="victory-confetti" aria-hidden="true"></canvas>
         <div class="card end-card holiday-card">
           <h2 id="end-title">WASTED</h2>
           <div class="end-result"><span>YOUR SCORE</span><strong id="end-score">0</strong></div>
+          <button id="continue-leaderboard" class="primary-button" type="button">VIEW LEADERBOARD</button>
+          <section class="debug-maps" data-debug-maps aria-label="Maps" hidden></section>
+        </div>
+      </section>
+
+      <section id="leaderboard-screen" class="overlay hidden" aria-labelledby="final-leaderboard-title">
+        <div class="card end-card holiday-card leaderboard-result-card">
+          <h2 id="final-leaderboard-title" tabindex="-1">HIGH SCORES</h2>
+          <div class="end-result"><span>YOUR SCORE</span><strong id="leaderboard-score">0</strong></div>
           <button id="share-score" class="secondary-button score-share-button" type="button">SHARE SCORE</button>
           <div id="share-score-status" class="share-status" role="status" aria-live="polite"></div>
           <div id="score-submit-status" class="score-submit-status" role="status"></div>
           <button id="retry-score" class="secondary-button" type="button" hidden>RETRY SCORE</button>
           <section class="leaderboard leaderboard-end" aria-labelledby="end-leaderboard-title">
-            <div class="leaderboard-heading"><h3 id="end-leaderboard-title">HIGH SCORES</h3><span>TOP 5</span></div>
+            <div class="leaderboard-heading"><h3 id="end-leaderboard-title">LEADERBOARD</h3><span>TOP 5</span></div>
             <ol id="end-leaderboard-list" class="leaderboard-list" aria-live="polite"></ol>
             <div id="end-leaderboard-status" class="leaderboard-status" role="status"></div>
           </section>
           <button id="restart" class="primary-button" type="button">RESTART LEVEL</button>
           <small id="restart-penalty" class="restart-penalty" hidden>−100 SCORE</small>
           <button id="reset-campaign" class="text-button reset-campaign-button" type="button" hidden>RESTART GAME</button>
-          <section class="debug-maps" data-debug-maps aria-label="Maps" hidden></section>
         </div>
       </section>
 

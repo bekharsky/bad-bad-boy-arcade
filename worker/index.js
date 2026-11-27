@@ -193,9 +193,18 @@ export default {
     if (request.method === 'GET' && pathname === '/leaderboard') {
       try {
         const result = await env.DB.prepare(
-          'SELECT nickname, score, wave, updated_at AS updatedAt FROM leaderboard ORDER BY score DESC, updated_at ASC LIMIT 5'
+          'SELECT nickname, score, wave, updated_at AS updatedAt FROM leaderboard ORDER BY score DESC, updated_at ASC, player_id ASC LIMIT 5'
         ).all();
-        return json({ entries: result.results ?? [] }, 200, origin);
+        const playerId = new URL(request.url).searchParams.get('playerId');
+        const player = isValidPlayerId(playerId) ? await env.DB.prepare(`
+          SELECT nickname, score, wave, rank FROM (
+            SELECT player_id, nickname, score, wave,
+              ROW_NUMBER() OVER (ORDER BY score DESC, updated_at ASC, player_id ASC) AS rank
+            FROM leaderboard
+          ) AS ranked
+          WHERE player_id = ?
+        `).bind(playerId).first() : null;
+        return json({ entries: result.results ?? [], player }, 200, origin);
       } catch {
         return json({ error: 'Leaderboard is temporarily unavailable' }, 503, origin);
       }

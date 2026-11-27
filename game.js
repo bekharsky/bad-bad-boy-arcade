@@ -34,6 +34,7 @@ import { createSeagulls } from './seagulls.js';
 import { aimingUp, createSprayAim } from './spray-aim.js';
 import { createSprayTutorial } from './spray-tutorial.js';
 import { createLeaderboard } from './leaderboard.js';
+import { createVictoryConfetti } from './victory-confetti.js';
 import { calculateDistrictScore, districtPaceSeconds } from './campaign-score.js';
 import { mountHolidayScreens } from './screen-ui.js';
 
@@ -57,6 +58,10 @@ preventGameZoom(document);
 const status = document.querySelector('#load-status');
 const startScreen = document.querySelector('#start-screen');
 const endScreen = document.querySelector('#end-screen');
+const leaderboardScreen = document.querySelector('#leaderboard-screen');
+const continueLeaderboardButton = document.querySelector('#continue-leaderboard');
+const leaderboardScore = document.querySelector('#leaderboard-score');
+const victoryConfetti = createVictoryConfetti(document.querySelector('#victory-confetti'));
 const startButton = document.querySelector('#start');
 const restartButton = document.querySelector('#restart');
 const restartPenaltyLabel = document.querySelector('#restart-penalty');
@@ -316,6 +321,8 @@ let restartTargetIndex = null;
 let searchTime = 0;
 let nextGooseArrival = 18;
 let gooseReinforcementWave = 0;
+let leaderboardRevealTimer = 0;
+const fireworkTimers = [];
 let geeseDefeated = 0;
 let healthLost = 0;
 let levelProgress = 0;
@@ -576,7 +583,10 @@ function makeEnemy(x, z, level, guardPost = null, {
   const enemy = createEnemy('goose', level);
   enemy.onTramHit = removeEnemyByTram;
   enemy.guardPost = guardPost;
-  enemy.guardRange = guardRange;
+  const campaignPressure = Math.max(0, level - 1);
+  enemy.guardRange = guardRange + campaignPressure * 3;
+  enemy.aggression = Math.min(1.65, 1 + campaignPressure * .11);
+  enemy.interestGrace = Math.min(28, 14 + campaignPressure * 2.8);
   enemy.berserk = berserk;
   enemy.berserkActive = false;
   enemy.age = 0;
@@ -681,11 +691,12 @@ function spawnKamppiGeese(level) {
 
 function reinforceGeese() {
   if (searchTime < nextGooseArrival) return;
-  const alive = enemies.reduce((count, enemy) => count + Number(enemy.alive), 0);
-  if (alive >= 40) { nextGooseArrival = searchTime + 7; return; }
-  gooseReinforcementWave++;
-  const count = Math.min(2 + Math.floor(gooseReinforcementWave / 2), 5, 40 - alive);
   const strength = itinerary.slice(0, levelIndex + 1).filter(map => map.mode !== 'runner').length;
+  const aliveLimit = Math.min(50, 40 + Math.max(0, strength - 1) * 2);
+  const alive = enemies.reduce((count, enemy) => count + Number(enemy.alive), 0);
+  if (alive >= aliveLimit) { nextGooseArrival = searchTime + Math.max(4, 8 - strength * .5); return; }
+  gooseReinforcementWave++;
+  const count = Math.min(2 + Math.floor(gooseReinforcementWave / 2) + Math.floor(Math.max(0, strength - 1) / 2), 6, aliveLimit - alive);
   const defenders = enemies.filter(enemy => enemy.alive && enemy.guardPost && !enemy.arrival);
   const leader = defenders.reduce((nearest, enemy) => {
     const distance = Math.hypot(enemy.x - player.x, enemy.z - player.z);
@@ -718,7 +729,7 @@ function reinforceGeese() {
       flyingArrival: true,
     });
   }
-  nextGooseArrival = searchTime + Math.max(7, 13 - gooseReinforcementWave);
+  nextGooseArrival = searchTime + Math.max(5, 12 - gooseReinforcementWave - Math.max(0, strength - 1) * .8);
 }
 
 function collectSleighPart() {
@@ -748,10 +759,11 @@ function finishSleighAssembly() {
 function enterDistrict({ index }) {
   const district = itinerary[index];
   const openingHarbor = index === 0 && district.id === 'harbor';
+  const strength = itinerary.slice(0, index + 1).filter(map => map.mode !== 'runner').length;
   const changedMap = world.activate(district.id);
   levelIndex = index;
   searchTime = geeseDefeated = healthLost = 0;
-  nextGooseArrival = 18;
+  nextGooseArrival = Math.max(9, 18 - Math.max(0, strength - 1) * 1.6);
   gooseReinforcementWave = 0;
   setLevelProgress(0);
   if (changedMap || !firstRound) setDistrictWeather();
@@ -776,7 +788,6 @@ function enterDistrict({ index }) {
     const cache = randomSleighCachePoint(world, player, .85);
     if (!cache) throw new Error(`Missing reachable sleigh part in ${district.id}`);
     sleighCache.place(cache, index);
-    const strength = itinerary.slice(0, index + 1).filter(map => map.mode !== 'runner').length;
     const kamppiLevel = world.id === 'kamppi';
     const posts = sleighGuardPosts(world, cache);
     if (openingHarbor) {
@@ -801,7 +812,7 @@ function enterDistrict({ index }) {
       }
     }
     const area = (district.bounds.maxX - district.bounds.minX) * (district.bounds.maxZ - district.bounds.minZ);
-    const scatteredCount = openingHarbor ? 4 : Math.min(16, 10 + Math.round(area / 1200));
+    const scatteredCount = openingHarbor ? 8 : Math.min(20, 8 + Math.round(area / 1200) + strength * 2);
     spawnScatteredGeese(scatteredCount, strength, district.bounds);
   }
   if (changedMap && world.root === preparedDistrict) preparedDistrict = null;
@@ -1276,6 +1287,7 @@ function finishIntro() {
 
 function startGame({ transition = false } = {}) {
   if (!player.model || !renderingReady) return;
+  stopVictoryCelebration();
   playing = false;
   runnerArrival = 0;
   runnerCrash = 0;
@@ -1295,6 +1307,7 @@ function startGame({ transition = false } = {}) {
   startScreen.classList.add('hidden');
   missionScreen.hidden = true;
   endScreen.classList.add('hidden');
+  leaderboardScreen.classList.add('hidden');
   keys.clear();
   canvas.focus({ preventScroll: true });
   syncMouseAim();
@@ -1302,6 +1315,7 @@ function startGame({ transition = false } = {}) {
 
 function restartDistrict(index = restartTargetIndex ?? levelIndex) {
   if (!player.model || !renderingReady) return;
+  stopVictoryCelebration();
   restartPenalty += RESTART_PENALTY;
   playing = false;
   runnerArrival = 0;
@@ -1313,6 +1327,7 @@ function restartDistrict(index = restartTargetIndex ?? levelIndex) {
   playing = true;
   touchControls.setEnabled(true);
   endScreen.classList.add('hidden');
+  leaderboardScreen.classList.add('hidden');
   keys.clear();
   canvas.focus({ preventScroll: true });
   updateScore();
@@ -1341,7 +1356,42 @@ function clearArena() {
   enemies.length = 0;
 }
 
+function stopVictoryCelebration() {
+  clearTimeout(leaderboardRevealTimer);
+  leaderboardRevealTimer = 0;
+  for (const timer of fireworkTimers) clearTimeout(timer);
+  fireworkTimers.length = 0;
+  victoryConfetti.clear();
+  endScreen.classList.remove('victory-screen');
+}
+
+function startVictoryFireworks() {
+  const bounds = itinerary[levelIndex].bounds;
+  const colors = ['#ffd34e', '#f26b57', '#76d6a7', '#8daeff', '#f8e9c8', '#e97ce0', '#ffd34e', '#72d6df'];
+  const amount = reducedMotion.matches ? 3 : 12;
+  for (let index = 0; index < amount; index++) {
+    const timer = setTimeout(() => {
+      const x = THREE.MathUtils.clamp(player.x + (Math.random() - .5) * 22, bounds.minX + 3, bounds.maxX - 3);
+      const z = THREE.MathUtils.clamp(player.z + (Math.random() - .5) * 22, bounds.minZ + 3, bounds.maxZ - 3);
+      burst(x, 7 + Math.random() * 5, z, colors[index % colors.length], reducedMotion.matches ? 18 : 30, null, 2.15);
+    }, index * (reducedMotion.matches ? 600 : 470));
+    fireworkTimers.push(timer);
+  }
+}
+
+function showFinalLeaderboard() {
+  clearTimeout(leaderboardRevealTimer);
+  leaderboardRevealTimer = 0;
+  victoryConfetti.clear();
+  endScreen.classList.add('hidden');
+  leaderboardScreen.classList.remove('hidden');
+  leaderboardScore.textContent = score.toLocaleString();
+  leaderboard.refresh();
+  document.querySelector('#final-leaderboard-title').focus({ preventScroll: true });
+}
+
 function endGame(won = false, { crashed = false } = {}) {
+  stopVictoryCelebration();
   sprayTutorial.reset();
   updateScore();
   playing = false;
@@ -1352,7 +1402,10 @@ function endGame(won = false, { crashed = false } = {}) {
   player.tapTimer = 0;
   player.moveSpeed = 0;
   player.turnSpeed = 0;
+  leaderboardScreen.classList.add('hidden');
   endScreen.classList.remove('hidden');
+  endScreen.classList.toggle('victory-screen', won);
+  continueLeaderboardButton.focus({ preventScroll: true });
   document.querySelector('#end-title').textContent = won ? 'SLEIGH COMPLETE' : crashed ? 'CRASHED' : 'WASTED';
   document.querySelector('#end-score').textContent = score.toLocaleString();
   restartTargetIndex = won ? null : levelIndex;
@@ -1361,6 +1414,11 @@ function endGame(won = false, { crashed = false } = {}) {
   restartPenaltyLabel.hidden = won;
   resetCampaignButton.hidden = won;
   leaderboard.submit(score, levelIndex + 1);
+  if (won) {
+    victoryConfetti.start(reducedMotion.matches);
+    startVictoryFireworks();
+  }
+  leaderboardRevealTimer = setTimeout(showFinalLeaderboard, won ? 4200 : 2200);
   player.model.material.opacity = 1;
   player.model.material.transparent = false;
   blip(won ? 1046 : 80, 0.25);
@@ -1524,6 +1582,7 @@ startOver.addEventListener('click', () => {
   pauseDialog.close();
   startGame({ transition: true });
 });
+continueLeaderboardButton.addEventListener('click', showFinalLeaderboard);
 restartButton.addEventListener('click', () => {
   if (restartTargetIndex !== null) restartDistrict(restartTargetIndex);
   else startGame();
