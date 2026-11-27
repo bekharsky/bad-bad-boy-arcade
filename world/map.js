@@ -26,6 +26,7 @@ export function createMap(definition, build) {
       spawn: definition.spawn,
       openingCameoRoute: definition.openingCameoRoute,
       pedestrianRoutes: definition.pedestrianRoutes ?? [],
+      targets: content.targets ?? [],
       root,
       pickupCapacity(kind) { return definition.pickups?.[kind]?.length ?? 0; },
       pickupPoints(kind, radius) {

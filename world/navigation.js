@@ -65,15 +65,16 @@ export function createNavigation({ bounds, colliders = [], dynamicColliders = ()
   function lineClear(x, z, tx, tz, r = .5) {
     return segmentClear(x, null, z, tx, null, tz, r);
   }
-  function lineClear3D(from, to, radius = 0, { allowOutsideOrigin = false } = {}) {
-    return segmentClear(from.x, from.y, from.z, to.x, to.y, to.z, radius, allowOutsideOrigin);
+  function lineClear3D(from, to, radius = 0, { allowOutsideOrigin = false, ignoreColliders = [] } = {}) {
+    return segmentClear(from.x, from.y, from.z, to.x, to.y, to.z, radius, allowOutsideOrigin, ignoreColliders);
   }
-  function segmentClear(x, y, z, tx, ty, tz, r, allowOutsideOrigin = false) {
+  function segmentClear(x, y, z, tx, ty, tz, r, allowOutsideOrigin = false, ignoreColliders = []) {
     // Gameplay stays inside the map. A camera can look in from beyond its edge.
     if ((!allowOutsideOrigin && outside(x, z, r)) || outside(tx, tz, r)) return false;
+    const ignored = ignoreColliders.length ? new Set(ignoreColliders) : null;
     const nearby = localColliders(Math.min(x, tx) - r, Math.min(z, tz) - r, Math.max(x, tx) + r, Math.max(z, tz) + r);
-    for (const c of nearby) if (crosses(c, x, y, z, tx, ty, tz, r)) return false;
-    for (const c of dynamicColliders()) if (crosses(c, x, y, z, tx, ty, tz, r)) return false;
+    for (const c of nearby) if (!ignored?.has(c) && crosses(c, x, y, z, tx, ty, tz, r)) return false;
+    for (const c of dynamicColliders()) if (!ignored?.has(c) && crosses(c, x, y, z, tx, ty, tz, r)) return false;
     return true;
   }
 

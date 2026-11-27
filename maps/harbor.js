@@ -6,6 +6,7 @@ import { addFacadeDetails, addPitchedRoof } from './facade-details.js';
 import { addTree } from './vegetation.js';
 import { createMap } from '../world/map.js';
 import { addChristmasDecorations } from './christmas-decor.js';
+import { createDaciaDuster } from '../models/dacia-duster.js';
 
 const STOREY_HEIGHT = 1.15;
 const BOULEVARD_Z = -5;
@@ -355,6 +356,7 @@ function buildHarbor(scene) {
   }
   const tram = createTram(scene, { z: BOULEVARD_Z, initialWait: 10 });
   const harbor = createHarbor(scene);
+  const duster = createDaciaDuster(scene, { x: 7, z: -14.5, rotation: Math.PI / 2 });
   for (const x of [-26, 9, 26]) obstacle(x, -26.6, 1.3, .62, 5.4);
 
   for (const batch of batches.values()) {
@@ -372,14 +374,20 @@ function buildHarbor(scene) {
   return {
     colliders,
     buildings,
-    dynamicColliders: () => tram.root.visible ? [tram.collider] : [],
+    targets: [duster],
+    dynamicColliders: () => [
+      ...(tram.root.visible ? [tram.collider] : []),
+      ...(duster.alive ? [duster.collider] : []),
+    ],
     reset() {
       tram.reset();
+      duster.reset();
       sceneryTime = 0;
       tramCell = null;
     },
     update(dt, entities, navigation) {
       sceneryTime += dt;
+      duster.update(dt);
       harbor.update(sceneryTime);
       tram.update(dt, entities, navigation);
       const occupiedCell = tram.root.visible ? Math.floor(tram.root.position.x) : null;

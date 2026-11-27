@@ -241,6 +241,22 @@ scene.add(player.root);
 
 function hitEnemy(enemy, direction, impact) {
   if (enemy.kind === 'gull') { seagulls.repel(enemy); return; }
+  if (enemy.kind === 'dacia-duster') {
+    enemy.hp = Math.max(0, enemy.hp - impact.damage);
+    enemy.hit = .18;
+    if (enemy.hp === 0 && enemy.alive) {
+      enemy.alive = false;
+      enemy.root.visible = false;
+      world.refresh();
+      bankedScore += 500;
+      updateScore();
+      burst(enemy.x, .92, enemy.z, 0xff7135, 32, null, 3.8);
+      burst(enemy.x, 1.05, enemy.z, 0xffd34e, 18, null, 2.7);
+      showToast('DUSTER DESTROYED +500');
+      blip(105, .28);
+    }
+    return;
+  }
   if (enemy.civilian) { arenaCameos.splash(enemy, direction); return; }
   if (isRunner()) {
     if (runnerSession.sprayHit(enemy.id, impact)) {
@@ -555,7 +571,7 @@ async function loadModels() {
 }
 
 function makeEnemy(x, z, level, guardPost = null, {
-  berserk = false, guardRange = 24, arrivalDelay = 0, arrivalDistance = 5.5, arrivalAngle = Math.random() * Math.PI * 2,
+  berserk = false, guardRange = 24, flyingArrival = false, arrivalDelay = 0, arrivalDistance = 5.5, arrivalAngle = Math.random() * Math.PI * 2,
 } = {}) {
   const enemy = createEnemy('goose', level);
   enemy.onTramHit = removeEnemyByTram;
@@ -566,14 +582,22 @@ function makeEnemy(x, z, level, guardPost = null, {
   enemy.age = 0;
   enemy.x = x;
   enemy.z = z;
-  const startX = x + Math.cos(arrivalAngle) * arrivalDistance;
-  const startZ = z + Math.sin(arrivalAngle) * arrivalDistance;
-  enemy.arrival = { startX, startZ, targetX: x, targetZ: z, elapsed: -arrivalDelay, duration: 1.45, height: 2.65 };
-  enemy.airborne = true;
-  enemy.root.visible = arrivalDelay <= 0;
-  enemy.root.position.set(startX, enemy.arrival.height, startZ);
-  enemy.root.rotation.y = Math.atan2(x - startX, z - startZ);
-  enemy.root.scale.setScalar(.76);
+  if (flyingArrival) {
+    const startX = x + Math.cos(arrivalAngle) * arrivalDistance;
+    const startZ = z + Math.sin(arrivalAngle) * arrivalDistance;
+    enemy.arrival = { startX, startZ, targetX: x, targetZ: z, elapsed: -arrivalDelay, duration: 1.45, height: 2.65 };
+    enemy.airborne = true;
+    enemy.root.visible = arrivalDelay <= 0;
+    enemy.root.position.set(startX, enemy.arrival.height, startZ);
+    enemy.root.rotation.y = Math.atan2(x - startX, z - startZ);
+    enemy.root.scale.setScalar(.76);
+  } else {
+    enemy.arrival = null;
+    enemy.airborne = false;
+    enemy.root.position.set(x, 0, z);
+    enemy.root.rotation.y = arrivalAngle;
+    enemy.root.scale.setScalar(1);
+  }
   scene.add(enemy.root);
   enemies.push(enemy);
   return enemy;
@@ -583,12 +607,12 @@ function removeEnemyByTram(enemy) {
   removeEnemy(enemy, true);
 }
 
-function spawnEnemies(around, count, level, { minPlayerDistance = 0, ringStart = 7 } = {}) {
+function spawnEnemies(around, count, level, { minPlayerDistance = 0, ringStart = 7, flyingArrival = false } = {}) {
   for (let i = 0; i < count; i++) {
     const point = world.spawnPoint(around, i, count, ringStart);
     if (!point || Math.hypot(point.x - player.x, point.z - player.z) < minPlayerDistance) continue;
     if (enemies.every(enemy => Math.hypot(enemy.x - point.x, enemy.z - point.z) > 1.25)) {
-      makeEnemy(point.x, point.z, level, null, { arrivalDelay: i * .16 });
+      makeEnemy(point.x, point.z, level, null, { flyingArrival });
     }
   }
 }
@@ -604,7 +628,7 @@ function spawnScatteredGeese(count, level, bounds) {
     const point = world.spawnPoint(around, 0, 1, 1.2);
     if (!point || Math.hypot(point.x - player.x, point.z - player.z) < 8) continue;
     if (enemies.some(enemy => Math.hypot(enemy.x - point.x, enemy.z - point.z) < 6.5)) continue;
-    makeEnemy(point.x, point.z, level, null, { arrivalDelay: spawned * .18 });
+    makeEnemy(point.x, point.z, level);
     spawned++;
   }
 }
@@ -620,27 +644,27 @@ function spawnKamppiGeese(level) {
   };
 
   const eastLeader = spawnAt([{ x: 36, z: 6 }, { x: 35.8, z: 27 }, { x: 37, z: 10 }], {
-    berserk: true, guardRange: 52, arrivalDelay: .15, arrivalAngle: .3,
+    berserk: true, guardRange: 52, arrivalAngle: .3,
   });
   if (eastLeader) {
     for (const [slot, candidates] of [
       [{ x: 32, z: 0 }, { x: 33, z: -2 }, { x: 31, z: 4 }],
       [{ x: 40, z: 1 }, { x: 40, z: 8 }, { x: 39, z: -2 }],
     ].entries()) {
-      const follower = spawnAt(candidates, { arrivalDelay: .45 + slot * .2, arrivalAngle: .9 + slot * 1.1 });
+      const follower = spawnAt(candidates, { arrivalAngle: .9 + slot * 1.1 });
       if (follower) { follower.packLeader = eastLeader; follower.packSlot = slot; }
     }
   }
 
   const southLeader = spawnAt([{ x: 0, z: -35 }, { x: -2, z: -37 }, { x: 2, z: -37 }], {
-    berserk: true, guardRange: 52, arrivalDelay: .3, arrivalAngle: Math.PI,
+    berserk: true, guardRange: 52, arrivalAngle: Math.PI,
   });
   if (southLeader) {
     for (const [slot, candidates] of [
       [{ x: -6, z: -30 }, { x: -4, z: -31 }, { x: -7, z: -34 }],
       [{ x: 6, z: -30 }, { x: 4, z: -31 }, { x: 7, z: -34 }],
     ].entries()) {
-      const follower = spawnAt(candidates, { arrivalDelay: .6 + slot * .2, arrivalAngle: 0.2 + slot * 1.1 });
+      const follower = spawnAt(candidates, { arrivalAngle: 0.2 + slot * 1.1 });
       if (follower) { follower.packLeader = southLeader; follower.packSlot = slot; }
     }
   }
@@ -651,7 +675,7 @@ function spawnKamppiGeese(level) {
     [{ x: 12, z: 9 }, { x: 13, z: 12 }],
     [{ x: 35.8, z: 27 }, { x: 34, z: 31 }],
   ].entries()) {
-    spawnAt(candidates, { arrivalDelay: .75 + index * .18, arrivalAngle: -1.2 + index * .9 });
+    spawnAt(candidates, { arrivalAngle: -1.2 + index * .9 });
   }
 }
 
@@ -679,6 +703,7 @@ function reinforceGeese() {
       if (!point || enemies.some(enemy => Math.hypot(enemy.x - point.x, enemy.z - point.z) < 1.8)) continue;
       arrivals.push(point);
       const reinforcement = makeEnemy(point.x, point.z, strength, leader.guardPost, {
+        flyingArrival: true,
         arrivalDelay: arrivals.length * .7,
         arrivalDistance: 12,
         arrivalAngle: Math.atan2(leader.x - point.x, leader.z - point.z) + (Math.random() - .5) * .9,
@@ -690,6 +715,7 @@ function reinforceGeese() {
     spawnEnemies(player, count, strength, {
       minPlayerDistance: 10,
       ringStart: 13 + Math.min(7, gooseReinforcementWave * 1.1),
+      flyingArrival: true,
     });
   }
   nextGooseArrival = searchTime + Math.max(7, 13 - gooseReinforcementWave);
@@ -753,33 +779,19 @@ function enterDistrict({ index }) {
     const strength = itinerary.slice(0, index + 1).filter(map => map.mode !== 'runner').length;
     const kamppiLevel = world.id === 'kamppi';
     const posts = sleighGuardPosts(world, cache);
-    if (!kamppiLevel && !openingHarbor) {
+    if (openingHarbor) {
+      for (const post of posts.slice(0, 8)) makeEnemy(post.x, post.z, strength, post);
+    } else if (!kamppiLevel) {
       const guardCount = Math.min(posts.length, 10 + strength * 2);
       for (const post of posts.slice(0, guardCount)) makeEnemy(post.x, post.z, strength, post);
     }
-    if (openingHarbor) {
-      const harborPosts = [
-        [0, 4.5, 6], [6, 8, 6.5], [16, 11, 7],
-        [-20, 10.3, 6.5], [-5.5, 26.5, 6.5], [-22, -24, 6.5],
-        [18.5, 22.5, 6.5], [6, 15, 6],
-      ];
-      for (const [postIndex, [x, z, range]] of harborPosts.entries()) {
-        const post = world.pickupPoint({ x, z }, .65);
-        if (!post) continue;
-        const goose = makeEnemy(post.x, post.z, strength, post, { arrivalDelay: postIndex * .1 });
-        goose.guardRange = Math.max(24, range);
-        if (x === 0) {
-          goose.hp = 1;
-          goose.speed *= .8;
-        }
-      }
-    } else {
+    if (!openingHarbor) {
       if (kamppiLevel) {
         spawnKamppiGeese(strength);
         for (const post of posts) {
           if (enemies.length >= 14) break;
           if (enemies.some(enemy => Math.hypot(enemy.x - post.x, enemy.z - post.z) < 1.8)) continue;
-          makeEnemy(post.x, post.z, strength, post, { arrivalDelay: enemies.length * .12 });
+          makeEnemy(post.x, post.z, strength, post);
         }
       } else {
         const openingArena = strength === 1;
@@ -901,6 +913,17 @@ function updateMouseAim({ x, y }) {
     if (!ray.intersectSphere(aimTargetBounds, aimTargetHit)) continue;
     const distance = ray.origin.distanceToSquared(aimTargetHit);
     if (distance >= closest || !world.lineClear3D(ray.origin, aimTargetHit, .04)) continue;
+    closest = distance;
+    aimPoint.copy(aimTargetHit);
+  }
+  for (const target of world.targets) {
+    if (!target.alive) continue;
+    aimTargetBounds.center.set(target.x, target.hitHeight, target.z);
+    aimTargetBounds.radius = target.size;
+    if (!ray.intersectSphere(aimTargetBounds, aimTargetHit)) continue;
+    const distance = ray.origin.distanceToSquared(aimTargetHit);
+    const targetOptions = target.collider ? { ignoreColliders: [target.collider] } : undefined;
+    if (distance >= closest || !world.lineClear3D(ray.origin, aimTargetHit, .04, targetOptions)) continue;
     closest = distance;
     aimPoint.copy(aimTargetHit);
   }
@@ -1045,6 +1068,7 @@ function updateSpray(dt, firing, groundTargets, powered = false) {
   sprayTargets.length = 0;
   for (const target of groundTargets) if ((target.age ?? 1) >= .24) sprayTargets.push(target);
   sprayTargets.push(...seagulls.birds);
+  if (!isRunner()) for (const target of world.targets) if (target.alive) sprayTargets.push(target);
   if (!isRunner()) for (const actor of arenaCameos.actors) {
     if (actor.age >= .24) sprayTargets.push(actor);
   }

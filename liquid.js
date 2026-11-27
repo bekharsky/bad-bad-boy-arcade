@@ -209,7 +209,8 @@ export function createLiquidStream(scene, city, onHit, { scale = 1, refraction =
       const reach = SPLASH_RADIUS + radius + enemy.size;
       if ((enemy.x - point.x) ** 2 + (enemy.z - point.z) ** 2 > reach * reach) continue;
       targetPosition.set(enemy.x, enemy.hitHeight, enemy.z);
-      if (!city.lineClear3D(point, targetPosition, 0.02)) continue;
+      const visibilityOptions = enemy.collider ? { ignoreColliders: [enemy.collider] } : undefined;
+      if (!city.lineClear3D(point, targetPosition, 0.02, visibilityOptions)) continue;
       damageEnemy(enemy, velocity, charge, true);
     }
   }
@@ -241,7 +242,14 @@ export function createLiquidStream(scene, city, onHit, { scale = 1, refraction =
       for (const enemy of enemies) {
         if (!enemy.alive) continue;
         const t = enemyContact(parcel.previous, parcel.position, enemy);
-        if (t < contact) { contact = t; target = enemy; ground = false; }
+        if (!Number.isFinite(t)) continue;
+        const blockedByTarget = t >= contact && enemy.collider && !ground && !target;
+        if (t >= contact && !blockedByTarget) continue;
+        if (enemy.collider) {
+          impact.lerpVectors(parcel.previous, parcel.position, t);
+          if (!city.lineClear3D(parcel.previous, impact, radius, { ignoreColliders: [enemy.collider] })) continue;
+        }
+        if (t < contact || blockedByTarget) { contact = t; target = enemy; ground = false; }
       }
       if (contact !== Infinity) {
         impact.lerpVectors(parcel.previous, parcel.position, contact);
