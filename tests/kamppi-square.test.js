@@ -44,6 +44,10 @@ test('Amos Rex courtyard has open combat lanes, solid landmarks and visible peri
   assert.equal(map.lineClear(-37.5, -23, -37.5, 20, .736), true, 'Seating and planting leave the chapel promenade clear');
   assert.ok(map.root.getObjectByName('Kamppi Square boundary'));
   assert.ok(map.root.getObjectByName('Narinkkatori winter market'));
+  assert.equal(map.root.getObjectByName('Kamppi pedestrian overpass and bus shelter'), undefined);
+  for (const [x, z] of [[32, 49], [36, 49]]) {
+    assert.equal(map.canStandAt(x, z, .736), false, `A replacement market stall occupies ${x}, ${z}`);
+  }
   assert.ok(map.root.getObjectByName('Amos Rex ice rink'));
   for (const [x, z] of [[43, 0], [-43, 0], [0, -43], [0, 68.5]]) assert.equal(map.canStandAt(x, z, .736), false);
   map.dispose();

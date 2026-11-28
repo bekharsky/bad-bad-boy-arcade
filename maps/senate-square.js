@@ -2,13 +2,14 @@ import * as THREE from 'three';
 import { registerBuilding } from '../world/building-visibility.js';
 import { createMap } from '../world/map.js';
 import { overlaps } from '../world/navigation.js';
-import { addFacadeDetails } from './facade-details.js';
+import { addFacadeDetails, addPitchedRoof } from './facade-details.js';
 import { createSceneryModel } from './scenery-model.js';
 import { createTram } from './tram.js';
 import { createCathedral, createCathedralSteps, createAlexanderMonument } from './senate-landmarks.js';
 import { addChristmasDecorations } from './christmas-decor.js';
 
 const TRAM_Z = 14.5;
+const TRAM_STREET_WIDTH = 126;
 const hidden = (x, z) => ({ x, z, jitter: .3 });
 
 export const senateSquareMap = {
@@ -65,16 +66,17 @@ function buildSenateSquare(root) {
   const texture = new THREE.CanvasTexture(paving);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(14, 13); texture.anisotropy = 4;
-  surface('Old town paving', 105, 100, 0, -5, '#c9c2ae', -.045, texture);
+  // Continue the paving behind the outer blocks at the same texel density.
+  texture.repeat.set(40, 39); texture.anisotropy = 4;
+  surface('Old town paving', 300, 300, 0, -5, '#c9c2ae', -.045, texture);
   const squareTexture = texture.clone(); squareTexture.repeat.set(10, 7);
   surface('Senate Square granite', 46, 29, 0, -2.5, '#c2b4a0', -.012, squareTexture);
   // Aleksanterinkatu borders the square, rather than cutting through the stalls.
-  surface('Aleksanterinkatu', 88, 6.2, 0, TRAM_Z, '#515b60', .002);
-  const trackTexture = texture.clone(); trackTexture.repeat.set(18, .9);
-  surface('Cobbled tram reservation', 88, 2.35, 0, TRAM_Z, '#b1aa99', .012, trackTexture);
-  for (const z of [11.3, 17.7]) street.box('#d9d5c7', 0, .035, z, 88, .07, .23);
-  for (const z of [TRAM_Z - .66, TRAM_Z + .66]) street.box('#899592', 0, .04, z, 88, .06, .07);
+  surface('Aleksanterinkatu', TRAM_STREET_WIDTH, 6.2, 0, TRAM_Z, '#515b60', .002);
+  const trackTexture = texture.clone(); trackTexture.repeat.set(18 * TRAM_STREET_WIDTH / 88, .9);
+  surface('Cobbled tram reservation', TRAM_STREET_WIDTH, 2.35, 0, TRAM_Z, '#b1aa99', .012, trackTexture);
+  for (const z of [11.3, 17.7]) street.box('#d9d5c7', 0, .035, z, TRAM_STREET_WIDTH, .07, .23);
+  for (const z of [TRAM_Z - .66, TRAM_Z + .66]) street.box('#899592', 0, .04, z, TRAM_STREET_WIDTH, .06, .07);
   for (const x of [-21.5, 21.5]) for (let n = -3; n <= 3; n++) {
     street.box('#e5dfc9', x, .024, TRAM_Z + n * .8, 2.3, .02, .43);
   }
@@ -93,7 +95,7 @@ function buildSenateSquare(root) {
   addBuilding(createCathedral());
   obstacle(0, -35, 22.8, 16.3, 18.9);
 
-  function facade(name, x, z, width, depth, height, color, turn = 0, grand = false) {
+  function facade(name, x, z, width, depth, height, color, turn = 0, { grand = false, backdrop = false } = {}) {
     const building = createSceneryModel(name);
     const { box } = building;
     const front = depth / 2;
@@ -102,18 +104,25 @@ function buildSenateSquare(root) {
     for (const y of [.55, 2.25, height - .2]) box('#e7dfc6', 0, y, 0, width + .17, .16, depth + .17);
     box('#5a6767', 0, height + .2, 0, width + .28, .35, depth + .28);
     // Both sides have windows, so rear courtyards remain a finished part of town.
-    const columns = Math.floor((width - .5) / 1.6);
-    for (const side of [-1, 1]) for (let row = 0; row < 3; row++) for (let i = 0; i < columns; i++) {
-      const wx = (i - (columns - 1) / 2) * 1.6, wy = 1.25 + row * 1.65;
+    const bay = backdrop ? 2.25 : 1.6;
+    const columns = Math.floor((width - .5) / bay);
+    const floors = backdrop ? Math.floor((height - .4) / 1.65) : 3;
+    for (const side of [-1, 1]) for (let row = 0; row < floors; row++) for (let i = 0; i < columns; i++) {
+      const wx = (i - (columns - 1) / 2) * bay, wy = 1.25 + row * 1.65;
       box('#eee4c9', wx, wy, side * (front + .035), .91, 1.26, .1);
       box('#526969', wx, wy, side * (front + .1), .65, 1.03, .04);
+      if (backdrop) continue;
       box('#e2d6b8', wx, wy, side * (front + .14), .045, 1.04, .03);
       box('#e2d6b8', wx, wy, side * (front + .14), .66, .045, .03);
       box('#ddd2b5', wx, wy - .68, side * (front + .12), 1.0, .12, .25);
     }
     box('#e9dcc0', 0, 1.25, front + .17, 1.55, 2.5, .22);
     box('#314b48', 0, 1.15, front + .3, 1.15, 2.3, .1);
-    if (grand) {
+    if (backdrop) {
+      const roofVariant = Math.abs(Math.round(x + z)) % 3;
+      addPitchedRoof(building, { width, depth, height: height + .34, rise: 1.05 + roofVariant * .34,
+        color: ['#626c65', '#536568', '#766d61'][roofVariant] });
+    } else if (grand) {
       for (let px = -width / 2 + .3; px < width / 2; px += 3.2) box('#e5d8b5', px, height / 2, front + .17, .2, height - .4, .26);
       for (const px of [-2.5, 0, 2.5]) {
         building.geometry('#f1e6c7', new THREE.CylinderGeometry(.21, .24, 4.9, 12).translate(px, 3.1, front + .65));
@@ -131,9 +140,13 @@ function buildSenateSquare(root) {
       }
       for (const px of [-width * .27, width * .27]) box('#7e6a58', px, height + .75, 0, .5, .9, .65);
     }
-    addFacadeDetails(building, { width, depth, height, storey: 1.65, flowers: !grand, balcony: !grand, variant: Math.round(x) });
+    if (!backdrop) addFacadeDetails(building, { width, depth, height, storey: 1.65, flowers: !grand, balcony: !grand, variant: Math.round(x) });
     const group = building.finish({ vertexColors: true, roughness: .85 });
     group.position.set(x, 0, z); group.rotation.y = turn;
+    if (backdrop) {
+      root.add(group);
+      return;
+    }
     addBuilding(group);
     const turned = Math.abs(Math.sin(turn)) > .5;
     obstacle(x, z, turned ? depth + .25 : width + .25, turned ? width + .25 : depth + .25, height + .5);
@@ -142,13 +155,31 @@ function buildSenateSquare(root) {
       obstacle(x + Math.sin(turn) * (front + .6), z + Math.cos(turn) * (front + .6), turned ? 1.8 : 6.7, turned ? 6.7 : 1.8, height);
     }
   }
-  facade('University of Helsinki', -27.5, -3, 27, 6, 6.3, '#d7c49a', Math.PI / 2, true);
-  facade('Government Palace', 27.5, -3, 27, 6, 6.3, '#d6b56d', -Math.PI / 2, true);
+  facade('University of Helsinki', -27.5, -3, 27, 6, 6.3, '#d7c49a', Math.PI / 2, { grand: true });
+  facade('Government Palace', 27.5, -3, 27, 6, 6.3, '#d6b56d', -Math.PI / 2, { grand: true });
   for (const [x, width, color] of [[-26, 8, '#cead78'], [-16, 8, '#d9bf86'], [-6, 8, '#be8b73'], [5, 9, '#c1b991'], [17, 9, '#dfc892'], [28, 8, '#c5b092']]) {
     facade(x === -6 ? 'Cafe Engel' : 'Torikorttelit merchant house', x, 25.5, width, 6, 5.5, color, Math.PI);
   }
-  // Rooftops beyond the map close the skyline without enclosing the courtyard paths.
+  // The outer streets line the courtyards and leave the tram portals open.
   for (const x of [-38, 38]) for (const z of [-19, 5, 29]) facade('Old Helsinki backdrop', x, z, 8, 9, 7, '#bcae91');
+  const plaster = ['#c8ad8a', '#b0b6a3', '#caab9b', '#d2c6a8', '#bdad96'];
+  const outerHouses = [
+    [-43, 14.5, 10.4, 10.2], [-28.4, 14.2, 10.8, 11.5], [-14.8, 12.7, 10, 9.15],
+    [1, 16.8, 11.2, 10.8], [25, 11.8, 10.4, 8.7], [38, 13.8, 11, 9.8],
+  ];
+  for (const side of [-1, 1]) for (const [i, [z, width, depth, height]] of outerHouses.entries()) {
+    const x = side * (51.8 + (i % 2) * .8);
+    const color = plaster[(i + (side > 0 ? 2 : 0)) % plaster.length];
+    facade('Old Helsinki side street house', x, z, width, depth, height, color, -side * Math.PI / 2, { backdrop: true });
+  }
+  const cathedralBackstreet = [
+    [-52, 12, 9.5], [-39.5, 12.7, 11.4], [-26, 13.8, 10.2], [-12.4, 12.9, 8.5],
+    [1.2, 13.8, 8.9], [15.1, 13.5, 9.8], [28.6, 13, 10.7], [42.7, 14.5, 11.3], [56.1, 11.9, 10.1],
+  ];
+  for (const [i, [x, width, height]] of cathedralBackstreet.entries()) {
+    facade('House behind Helsinki Cathedral', x, -55 + (i % 2) * 1.1, width, 9.8, height,
+      plaster[(i + 2) % plaster.length], 0, { backdrop: true });
+  }
 
   const monument = createAlexanderMonument(); addBuilding(monument);
   obstacle(0, -4.5, 3.7, 3.7, 5);
@@ -209,7 +240,7 @@ function buildSenateSquare(root) {
     obstacle(x, -14.8, 2.6, .8, 1.2);
   }
   // Contact wires, poles and stops belong to the street, leaving the square clear.
-  street.box('#536560', 0, 4.08, TRAM_Z, 88, .025, .025);
+  street.box('#536560', 0, 4.08, TRAM_Z, TRAM_STREET_WIDTH, .025, .025);
   for (const x of [-30, -15, 0, 15, 30]) {
     street.box('#536560', x, 4.25, TRAM_Z, .025, .025, 7.8);
     for (const z of [10.6, 18.4]) {
@@ -249,8 +280,13 @@ function buildSenateSquare(root) {
   addChristmasDecorations(root, {
     wreaths: [-22, 22].flatMap(x => [-14, -6, 4, 19.5].map(z => ({ x, y: 3.3, z }))),
     groundFigures: {
-      trees: [{ x: -21, z: 1, scale: .62 }],
-      deer: [{ x: 21, z: 1, scale: .54, rotationY: Math.PI / 2 }],
+      trees: [{ x: -21, z: -4.35, scale: .72 }, { x: 20.8, z: -8.2, scale: .82 }],
+      deer: [
+        { x: -20.7, z: 4.6, scale: .93, rotationY: Math.PI / 2 }, { x: -20.7, z: 1.8, scale: .86, rotationY: Math.PI / 2 },
+        { x: 21, z: 1, scale: .82, rotationY: Math.PI / 2 },
+      ],
+      sleighs: [{ x: -20.7, z: 7.9, scale: .99, rotationY: Math.PI / 2 }],
+      gifts: [{ x: -21.8, z: 8.1, scale: .68, rotationY: .35 }, { x: 21.5, z: -7.15, scale: .61 }, { x: 20, z: -7, scale: .53 }],
     },
     strands: [
       ...[-14, -9, -2, 8, 19.5].map(z => ({

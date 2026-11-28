@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { createSleighPartDisplay } from './models/sleigh.js';
 
 const CACHE_RADIUS = 1.55;
+const CACHE_VIEW_HEIGHT = 1.8;
 
 export function sleighGuardPosts(world, point) {
   const posts = [];
@@ -29,10 +30,29 @@ export function sleighGuardPosts(world, point) {
   return posts;
 }
 
-export function randomSleighCachePoint(world, player, radius = .85) {
+export function randomSleighCachePoint(world, player, radius = .85, camera = null) {
   const [anchor] = world.pickupPoints('sleigh', radius);
   if (!anchor) return null;
   const candidates = [];
+  let frustum = null;
+  const cacheBounds = new THREE.Sphere(new THREE.Vector3(), 1.9);
+  if (camera) {
+    camera.updateMatrixWorld(true);
+    frustum = new THREE.Frustum().setFromProjectionMatrix(
+      new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse),
+    );
+  }
+  const inStartingView = point => {
+    if (!frustum) return false;
+    cacheBounds.center.set(point.x, CACHE_VIEW_HEIGHT, point.z);
+    return frustum.intersectsSphere(cacheBounds);
+  };
+  const addCandidate = point => {
+    if (!point || Math.hypot(point.x - player.x, point.z - player.z) < 8 || inStartingView(point)) return;
+    if (sleighGuardPosts(world, point).length < 10) return;
+    if (candidates.every(other => Math.hypot(other.x - point.x, other.z - point.z) > 2.4)) candidates.push(point);
+  };
+
   for (let attempt = 0; attempt < 48; attempt++) {
     const angle = Math.random() * Math.PI * 2;
     const distance = 3.5 + Math.random() * 7.5;
@@ -40,11 +60,23 @@ export function randomSleighCachePoint(world, player, radius = .85) {
       x: anchor.x + Math.cos(angle) * distance,
       z: anchor.z + Math.sin(angle) * distance,
     }, radius);
-    if (!point || Math.hypot(point.x - player.x, point.z - player.z) < 8) continue;
-    if (sleighGuardPosts(world, point).length < 10) continue;
-    candidates.push(point);
+    addCandidate(point);
   }
-  return candidates.length ? candidates[Math.floor(Math.random() * candidates.length)] : anchor;
+
+  // Authored sleigh anchors keep the search in a sensible district, while this
+  // wider fallback lets a camera-facing anchor move to another reachable spot.
+  const bounds = world.bounds;
+  if (camera && bounds) for (let attempt = 0; attempt < 320; attempt++) {
+    const point = world.pickupPoint({
+      x: bounds.minX + 1.1 + Math.random() * (bounds.maxX - bounds.minX - 2.2),
+      z: bounds.minZ + 1.1 + Math.random() * (bounds.maxZ - bounds.minZ - 2.2),
+    }, radius);
+    if (!point || Math.hypot(point.x - player.x, point.z - player.z) < 16) continue;
+    addCandidate(point);
+  }
+
+  if (candidates.length) return candidates[Math.floor(Math.random() * candidates.length)];
+  return camera ? null : anchor;
 }
 
 export function createSleighCache(scene, world, parts) {

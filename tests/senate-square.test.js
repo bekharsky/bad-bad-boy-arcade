@@ -307,11 +307,11 @@ test('the cathedral fits the opening arena view and real map switches dispose th
     const openingFov = camera.fov;
     for (let i = 0; i < 120; i++) rig.frameArena(x, z, dt);
     assert.equal(camera.fov, openingFov);
-    assert.ok(Math.abs(THREE.MathUtils.radToDeg(camera.rotation.x) + 20) < .01);
+    assert.ok(Math.abs(THREE.MathUtils.radToDeg(camera.rotation.x) + 25) < .01);
     rig.frameArena(x + .05, z, dt, { dx: .05 });
     for (let i = 0; i < 30; i++) rig.frameArena(x + .05, z, dt);
     const midPitch = -THREE.MathUtils.radToDeg(camera.rotation.x);
-    assert.ok(midPitch > 20 && midPitch < 35);
+    assert.ok(midPitch > 25 && midPitch < 35);
     for (let i = 0; i < 120; i++) rig.frameArena(x + .05, z, dt);
     assert.ok(Math.abs(THREE.MathUtils.radToDeg(camera.rotation.x) + 35) < .01);
     assert.ok(camera.fov < openingFov);

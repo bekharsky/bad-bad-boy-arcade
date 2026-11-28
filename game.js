@@ -580,6 +580,7 @@ async function loadModels() {
 function makeEnemy(x, z, level, guardPost = null, {
   berserk = false, guardRange = 24, flyingArrival = false, arrivalDelay = 0, arrivalDistance = 5.5, arrivalAngle = Math.random() * Math.PI * 2,
 } = {}) {
+  if (!world.canStandAt(x, z, .75)) return null;
   const enemy = createEnemy('goose', level);
   enemy.onTramHit = removeEnemyByTram;
   enemy.guardPost = guardPost;
@@ -592,9 +593,20 @@ function makeEnemy(x, z, level, guardPost = null, {
   enemy.age = 0;
   enemy.x = x;
   enemy.z = z;
+  let arrivalStart = null;
   if (flyingArrival) {
-    const startX = x + Math.cos(arrivalAngle) * arrivalDistance;
-    const startZ = z + Math.sin(arrivalAngle) * arrivalDistance;
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const angle = arrivalAngle + attempt * Math.PI / 4;
+      const startX = x + Math.cos(angle) * arrivalDistance;
+      const startZ = z + Math.sin(angle) * arrivalDistance;
+      if (!world.canStandAt(startX, startZ, .75)) continue;
+      arrivalStart = { x: startX, z: startZ, angle };
+      break;
+    }
+  }
+  if (arrivalStart) {
+    const { x: startX, z: startZ, angle } = arrivalStart;
+    arrivalAngle = angle;
     enemy.arrival = { startX, startZ, targetX: x, targetZ: z, elapsed: -arrivalDelay, duration: 1.45, height: 2.65 };
     enemy.airborne = true;
     enemy.root.visible = arrivalDelay <= 0;
@@ -638,7 +650,8 @@ function spawnScatteredGeese(count, level, bounds) {
     const point = world.spawnPoint(around, 0, 1, 1.2);
     if (!point || Math.hypot(point.x - player.x, point.z - player.z) < 8) continue;
     if (enemies.some(enemy => Math.hypot(enemy.x - point.x, enemy.z - point.z) < 6.5)) continue;
-    makeEnemy(point.x, point.z, level);
+    const enemy = makeEnemy(point.x, point.z, level);
+    if (!enemy) continue;
     spawned++;
   }
 }
@@ -785,34 +798,34 @@ function enterDistrict({ index }) {
     runnerSession.start(world.runner);
   } else {
     arenaBoosts.reset(player);
-    const cache = randomSleighCachePoint(world, player, .85);
+    const cache = randomSleighCachePoint(world, player, .85, camera);
     if (!cache) throw new Error(`Missing reachable sleigh part in ${district.id}`);
     sleighCache.place(cache, index);
     const kamppiLevel = world.id === 'kamppi';
     const posts = sleighGuardPosts(world, cache);
     if (openingHarbor) {
-      for (const post of posts.slice(0, 8)) makeEnemy(post.x, post.z, strength, post);
+      for (const post of posts.slice(0, 6)) makeEnemy(post.x, post.z, strength, post);
     } else if (!kamppiLevel) {
-      const guardCount = Math.min(posts.length, 10 + strength * 2);
+      const guardCount = Math.min(posts.length, 8 + strength * 2);
       for (const post of posts.slice(0, guardCount)) makeEnemy(post.x, post.z, strength, post);
     }
     if (!openingHarbor) {
       if (kamppiLevel) {
         spawnKamppiGeese(strength);
         for (const post of posts) {
-          if (enemies.length >= 14) break;
+          if (enemies.length >= 12) break;
           if (enemies.some(enemy => Math.hypot(enemy.x - post.x, enemy.z - post.z) < 1.8)) continue;
           makeEnemy(post.x, post.z, strength, post);
         }
       } else {
         const openingArena = strength === 1;
         const openingRing = openingArena ? 8.5 : 5.5;
-        spawnEnemies(player, openingArena ? 6 : 2 + strength, strength, { minPlayerDistance: openingRing, ringStart: openingRing });
-        spawnEnemies(cache, openingArena ? 4 : 3, strength, { minPlayerDistance: openingArena ? 11 : 8, ringStart: openingArena ? 11 : 7 });
+        spawnEnemies(player, openingArena ? 5 : 2 + strength, strength, { minPlayerDistance: openingRing, ringStart: openingRing });
+        spawnEnemies(cache, 3, strength, { minPlayerDistance: openingArena ? 11 : 8, ringStart: openingArena ? 11 : 7 });
       }
     }
     const area = (district.bounds.maxX - district.bounds.minX) * (district.bounds.maxZ - district.bounds.minZ);
-    const scatteredCount = openingHarbor ? 8 : Math.min(20, 8 + Math.round(area / 1200) + strength * 2);
+    const scatteredCount = openingHarbor ? 6 : Math.min(17, 7 + Math.round(area / 1400) + strength * 2);
     spawnScatteredGeese(scatteredCount, strength, district.bounds);
   }
   if (changedMap && world.root === preparedDistrict) preparedDistrict = null;

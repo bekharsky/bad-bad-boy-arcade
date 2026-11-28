@@ -91,34 +91,27 @@ function disposeFadingPieces(pieces) {
 
 function addWitnessHeadBone(model) {
   const originalSkeleton = model.skeleton;
-  const bodyBone = originalSkeleton?.bones.find(bone => bone.name === 'body');
-  if (!originalSkeleton || !bodyBone) return null;
+  const bodyIndex = originalSkeleton?.bones.findIndex(bone => bone.name === 'body') ?? -1;
+  if (bodyIndex < 0) return null;
 
-  const bindMatrix = model.bindMatrix.clone();
-  const position = model.position.clone();
-  const rotation = model.quaternion.clone();
-  const scale = model.scale.clone();
   const headBone = new THREE.Bone();
   headBone.name = 'witness-head';
   headBone.position.y = 1.02;
-  bodyBone.add(headBone);
+  originalSkeleton.bones[bodyIndex].add(headBone);
 
-  // Build the extra joint at unit scale so its inverse bind pose matches the
-  // geometry's local coordinates, then restore the rendered hero transform.
-  model.position.set(0, 0, 0);
-  model.quaternion.identity();
-  model.scale.setScalar(1);
-  model.updateMatrixWorld(true);
-  const bones = [...originalSkeleton.bones, headBone];
-  const skeleton = new THREE.Skeleton(bones);
-  model.bind(skeleton, bindMatrix);
+  // Extend the original bind pose. Skinning uses it for both vertices and normals.
+  headBone.updateMatrix();
+  const headInverse = headBone.matrix.clone().invert().multiply(originalSkeleton.boneInverses[bodyIndex]);
+  const headIndex = originalSkeleton.bones.length;
+  model.bind(new THREE.Skeleton(
+    [...originalSkeleton.bones, headBone],
+    [...originalSkeleton.boneInverses, headInverse],
+  ), model.bindMatrix);
   originalSkeleton.dispose();
 
   const positions = model.geometry.getAttribute('position');
   const skinIndices = model.geometry.getAttribute('skinIndex');
   const skinWeights = model.geometry.getAttribute('skinWeight');
-  const bodyIndex = bones.indexOf(bodyBone);
-  const headIndex = bones.indexOf(headBone);
   for (let i = 0; i < positions.count; i++) {
     const offset = i * 4;
     if (skinIndices.array[offset] !== bodyIndex) continue;
@@ -132,26 +125,7 @@ function addWitnessHeadBone(model) {
   skinIndices.needsUpdate = true;
   skinWeights.needsUpdate = true;
 
-  model.position.copy(position);
-  model.quaternion.copy(rotation);
-  model.scale.copy(scale);
-  model.updateMatrixWorld(true);
   return headBone;
-}
-
-function softenWitnessMaterial(material) {
-  material.map = null;
-  material.color.set('#a36555');
-  const originalOnBeforeCompile = material.onBeforeCompile;
-  material.onBeforeCompile = shader => {
-    originalOnBeforeCompile(shader);
-    shader.fragmentShader = shader.fragmentShader
-      .replace(
-        'vec3 clay = mix(vec3(.16,.046,.036), vec3(.82,.45,.32), smoothstep(.08,.89,value));',
-        'vec3 clay = vec3(.48,.22,.18);',
-      )
-      .replace('diffuseColor.rgb = mix(clay, diffuseColor.rgb, .34);', 'diffuseColor.rgb = mix(clay, diffuseColor.rgb, .035);');
-  };
 }
 
 function addSky(scene) {
@@ -208,7 +182,7 @@ function lightCity(scene) {
   const masonry = ['#2c354d', '#354256', '#29354b', '#48424e'];
   for (let row = 0; row < 16; row++) for (let i = 0; i < 24; i++) {
     const x = (i - 11.5) * 10.8 + (row % 2) * 4.8, z = -168 + row * 15;
-    if (Math.abs(x) < 54 && z > -58 && z < 62) continue;
+    if (Math.abs(x) < 66 && z > -67 && z < 62) continue;
     const h = 4.4 + ((row * 17 + i * 13) % 21) * .32;
     const width = 7.8 + (row + i) % 3 * .48, depth = 9.1 + i % 3 * .46;
     skyline.box(masonry[(row * 3 + i) % masonry.length], x, h / 2, z, width, h, depth);
@@ -288,16 +262,26 @@ export function createSleighIntro(overlay, { reducedMotion, onImpact, heroModel,
   const witnessHero = cloneSkinned(heroModel);
   witnessHero.name = 'Bad Bad Boy watching the sleigh';
   witnessHero.geometry = heroModel.geometry.clone();
+  // The standard material clone keeps the scan's color atlas and uses Three's skinning shader.
   const witnessHeroMaterials = (Array.isArray(heroModel.material) ? heroModel.material : [heroModel.material])
     .map(material => material.clone());
   witnessHero.material = Array.isArray(heroModel.material) ? witnessHeroMaterials : witnessHeroMaterials[0];
-  witnessHeroMaterials.forEach(softenWitnessMaterial);
   witnessHero.position.set(-5, 0, 7);
   witnessHero.rotation.y = Math.atan2(1.5, -26.2);
   witnessHero.scale.copy(heroModel.scale);
   const witnessHeadBone = addWitnessHeadBone(witnessHero);
   witnessScene.add(witnessHero);
-  const witnessCamera = new THREE.PerspectiveCamera(48, 1, .2, 520);
+  const witnessHeroKey = new THREE.SpotLight('#ffe8d7', 110, 16, .48, .75);
+  witnessHeroKey.position.set(witnessHero.position.x + 4.5, witnessHero.position.y + 6.6, witnessHero.position.z + 2.8);
+  witnessHeroKey.target.position.copy(witnessHero.position);
+  witnessHeroKey.target.position.y += 1.55;
+  witnessHeroKey.castShadow = true;
+  witnessHeroKey.shadow.mapSize.set(512, 512);
+  witnessHeroKey.shadow.camera.near = .5;
+  witnessHeroKey.shadow.normalBias = .02;
+  witnessScene.add(witnessHeroKey, witnessHeroKey.target);
+  const witnessCamera = new THREE.PerspectiveCamera(68, 1, .2, 520);
+  let narrowFrame = 0;
   const witnessTarget = new THREE.Vector3();
   const witnessLookTarget = new THREE.Vector3();
   const witnessHeadPosition = new THREE.Vector3();
@@ -344,8 +328,9 @@ export function createSleighIntro(overlay, { reducedMotion, onImpact, heroModel,
   sleigh.add(wind);
 
   let elapsed = 0;
-  const witnessStart = reducedMotion ? 3.65 : (BREAK + 1.95) / FLIGHT_RATE;
-  const duration = witnessStart + (reducedMotion ? 1.8 : 2.7);
+  const witnessStart = reducedMotion ? 3.65 : (BREAK + 1.6) / FLIGHT_RATE;
+  const witnessDuration = reducedMotion ? 3.6 : 4.8;
+  const duration = witnessStart + witnessDuration;
   const color = new THREE.Color('#ffbf73');
   const target = new THREE.Vector3();
   const railContact = new THREE.Vector3(1.22, 2.08, 1.85);
@@ -369,9 +354,8 @@ export function createSleighIntro(overlay, { reducedMotion, onImpact, heroModel,
     const pullBack = smoothstep(time, 4.73, 8.25);
     const jolt = smoothstep(time, IMPACT, 4.49), rebound = smoothstep(time, 4.49, 4.77);
     const scatter = Math.max(0, time - BREAK);
-    const flight = time - scatter * .57;
     const turbulence = jolt * (1 - pullBack);
-    sleigh.position.set(-18 + flight * 5.1, 22.3 + flight * .66 + Math.sin(time * 2.1) * .35 - 3.5 * jolt + 1.4 * rebound, -12 + flight * 1.6);
+    sleigh.position.set(-18 + time * 5.1, 22.3 + time * .66 + Math.sin(time * 2.1) * .35 - 3.5 * jolt + 1.4 * rebound, -12 + time * 1.6);
     sleigh.rotation.set(.028 * Math.sin(time * 3.2) + .26 * jolt - .38 * rebound,
       1.2 + .045 * Math.sin(time * 1.55) - .2 * turbulence, -.13 * Math.sin(time * 1.8) - .57 * jolt + .86 * rebound);
     flightState.pullBack = pullBack;
@@ -447,18 +431,19 @@ export function createSleighIntro(overlay, { reducedMotion, onImpact, heroModel,
   }
 
   function poseWitness(time, dt) {
-    const scatter = .95 + time * 1.05;
+    const scatter = .95 + time * .58;
+    const opacity = 1 - smoothstep(time, witnessDuration - 1.1, witnessDuration - .32);
     witnessLookTarget.set(0, 0, 0);
     for (let i = 0; i < witnessPieces.length; i++) {
       const { pivot, center, velocity, materials } = witnessPieces[i];
       const verticalVelocity = THREE.MathUtils.clamp(velocity[1], -.8, 1.2);
       pivot.position.set(
         -3.5 + center.x + velocity[0] * scatter,
-        Math.max(12.4, 20.5 + center.y + verticalVelocity * scatter - scatter ** 2),
+        20.5 + center.y + verticalVelocity * scatter - scatter ** 2,
         -12 + center.z + velocity[2] * scatter,
       );
       pivot.rotation.set((i % 2 ? 1 : -1) * scatter * (1.2 + i * .24), scatter * (1.7 - i * .58), scatter * (.9 - i * .35));
-      fadeModel(pivot, materials, 1 - smoothstep(time, 2.18, 2.75));
+      fadeModel(pivot, materials, opacity);
       witnessLookTarget.add(pivot.position);
     }
     witnessLookTarget.multiplyScalar(1 / witnessPieces.length);
@@ -480,16 +465,16 @@ export function createSleighIntro(overlay, { reducedMotion, onImpact, heroModel,
     }
   }
 
-  function frameWitnessCamera() {
-    const portrait = witnessCamera.aspect < .8;
-    witnessCamera.fov = portrait ? 92 : 68;
-    witnessCamera.position.set(portrait ? -2 : 4, 1.65, portrait ? 13.5 : 15);
-    witnessTarget.set(portrait ? -5.2 : -3.5, 8, -14.5);
+  function frameWitnessCamera(time) {
+    const slide = reducedMotion ? 0 : smoothstep(time, 0, witnessDuration);
+    const cameraX = lerp(4, -2, narrowFrame) - slide * lerp(4.2, 1.6, narrowFrame);
+    const targetX = lerp(-3.5, -5.2, narrowFrame) - slide * lerp(1.6, .7, narrowFrame);
+    witnessCamera.position.set(cameraX, 1.65, lerp(15, 13.5, narrowFrame));
+    witnessTarget.set(targetX, 8, -14.5);
     witnessCamera.lookAt(witnessTarget);
-    witnessCamera.updateProjectionMatrix();
   }
 
-  frameWitnessCamera();
+  frameWitnessCamera(0);
 
   return {
     resize(width, height) {
@@ -497,22 +482,31 @@ export function createSleighIntro(overlay, { reducedMotion, onImpact, heroModel,
       camera.fov = camera.aspect < .8 ? 57 : 52;
       camera.updateProjectionMatrix();
       witnessCamera.aspect = width / height;
-      frameWitnessCamera();
+      narrowFrame = 1 - smoothstep(witnessCamera.aspect, .75, 1.4);
+      witnessCamera.fov = lerp(68, 92, narrowFrame);
+      witnessCamera.updateProjectionMatrix();
+      frameWitnessCamera(elapsed - witnessStart);
     },
     update(dt) {
       const last = elapsed;
       elapsed += dt;
+      const witnessTime = elapsed - witnessStart;
       const time = reducedMotion ? (elapsed < 2.35 ? 3.68 : 5.87) : elapsed * FLIGHT_RATE;
-      if (elapsed < witnessStart) pose(time);
-      else poseWitness(elapsed - witnessStart, dt);
+      if (witnessTime < 0) pose(time);
+      else {
+        poseWitness(witnessTime, dt);
+        frameWitnessCamera(witnessTime);
+      }
       if (!reducedMotion && last * FLIGHT_RATE < IMPACT && time >= IMPACT) {
         impactSparks.burst(droneContact.x, droneContact.y, droneContact.z, '#ffb963', 24, null, 1.75);
         onImpact();
       }
       if (!reducedMotion && time >= IMPACT && time < IMPACT + 1) impactSparks.update(dt);
-      const fade = Math.max(1 - smoothstep(elapsed, 0, .75), smoothstep(elapsed, duration - .45, duration));
+      const fadeIn = 1 - smoothstep(elapsed, 0, .75);
+      const fadeBetweenShots = smoothstep(witnessTime, -.72, 0) * (1 - smoothstep(witnessTime, 0, .66));
+      const fadeOut = smoothstep(elapsed, duration - .65, duration);
       const cut = reducedMotion ? Math.max(0, 1 - Math.abs(elapsed - 2.35) / .19) : 0;
-      overlay.style.setProperty('--intro-shade', Math.max(fade, cut).toFixed(3));
+      overlay.style.setProperty('--intro-shade', Math.max(fadeIn, fadeBetweenShots, fadeOut, cut).toFixed(3));
       overlay.style.setProperty('--intro-caption', (smoothstep(elapsed, .6, 1.12) * (1 - smoothstep(elapsed, 2.4, 3.28))).toFixed(3));
       return elapsed >= duration;
     },
@@ -525,6 +519,7 @@ export function createSleighIntro(overlay, { reducedMotion, onImpact, heroModel,
       witnessHero.skeleton?.dispose();
       witnessHero.geometry.dispose();
       for (const material of witnessHeroMaterials) material.dispose();
+      witnessHeroKey.dispose();
       witnessDistrict.dispose();
       disposeFadingPieces(witnessPieces);
       disposeObject(witnessScene);

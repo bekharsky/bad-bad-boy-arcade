@@ -28,7 +28,7 @@ button { font: inherit; }
 .mouse-reticle-charge { stroke-dasharray: var(--reticle-charge, 0) 100; stroke-linecap: butt; }
 .cameo-speech { position: absolute; top: 0; left: 0; z-index: 3; width: max-content; max-width: min(182px, calc(100% - 24px)); --speech-padding: 5px 8px; --speech-background: #fff3d8d4; padding: var(--speech-padding); border-radius: 6px; background: var(--speech-background); color: #231c25; box-shadow: 0 2px 5px #1216224d; font: 650 12px/1.24 Inter, sans-serif; text-align: left; overflow-wrap: anywhere; pointer-events: none; }
 @media (min-width: 1024px) and (pointer: fine) {
-  .cameo-speech { max-width: min(300px, calc(100% - 40px)); --speech-padding: 9px 12px; font-size: 16px; line-height: 1.35; }
+  .cameo-speech { max-width: min(280px, calc(100% - 40px)); --speech-padding: 8px 11px; font-size: 15px; line-height: 1.32; }
 }
 .cameo-speech[hidden] { display: none; }
 .cameo-speech::after { content: ''; position: absolute; left: clamp(7px, calc(50% + var(--speech-tail-x, 0px)), calc(100% - 7px)); top: 100%; transform: translateX(-50%); border: 5px solid transparent; border-top-color: var(--speech-background); }
@@ -151,7 +151,7 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 800 clamp(38px, 6vw, 58px
 .menu-header { display: flex; align-items: center; justify-content: space-between; height: 44px; margin: calc(15px - var(--card-padding)) -16px 16px calc(16px - var(--card-padding)); }
 .menu-sleigh { display: block; flex: none; width: 165px; height: 84px; margin-left: -48px; overflow: visible; color: #f3cd8f; transform: rotate(-10deg); filter: drop-shadow(0 4px 10px #0e111ad9); }
 .mission-card { width: min(430px, 100%); margin: 0; text-align: center; }
-.mission-card h2 { margin: 0 0 26px; font-size: clamp(35px, 8vw, 50px); line-height: 1.1; text-wrap: balance; }
+.mission-card h2 { margin: 0 0 24px; font-size: clamp(1.25rem, 7vw, 2.125rem); line-height: 1.18; text-wrap: balance; }
 .scores-card { border: 1px solid #e3cfa2; border-radius: 5px; background: #173d35; box-shadow: inset 0 0 0 4px #173d35, inset 0 0 0 5px #e3cfa257, 0 14px 44px #071b1890; backdrop-filter: none; }
 #start-screen .card { --card-padding: 32px; position: relative; width: min(360px, 100%); margin: 0; }
 @media (min-width: 900px) {
@@ -199,6 +199,7 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 800 clamp(38px, 6vw, 58px
 .score-submit-status:empty { min-height: 0; margin: 0; }
 .secondary-button { width: 100%; margin: -6px 0 16px; padding: 9px 12px; border: 1px solid #e3cfa258; border-radius: 2px; color: #fff2d3; background: #ffffff0b; font: 700 12px/1.2 Inter, sans-serif; letter-spacing: .02em; cursor: pointer; }
 .secondary-button:hover { border-color: #ffd34e; background: #ffd34e12; }
+.secondary-button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 .secondary-button[hidden] { display: none; }
 .game-share-button { margin: 10px 0 0; }
 .share-status { min-height: 0; margin: 0; color: #d8d5c4; font: 500 11px/1.4 Inter, sans-serif; }

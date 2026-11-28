@@ -7,7 +7,7 @@ const ARENA_VIEW = {
   heroAnchorY: .55, mobileHeroAnchorY: .5,
 };
 const ARENA_OPENING_VIEW = {
-  ...ARENA_VIEW, pitch: THREE.MathUtils.degToRad(20), lensScale: 1.35,
+  ...ARENA_VIEW, pitch: THREE.MathUtils.degToRad(25), lensScale: 1.35,
   heroAnchorY: .68, mobileHeroAnchorY: .6,
 };
 const MOBILE_FOV = 65, MOBILE_FOOT_Y = .72;

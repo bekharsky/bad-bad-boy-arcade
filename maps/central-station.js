@@ -42,8 +42,8 @@ function plazaFloor() {
   }
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
-  texture.wrapS = texture.wrapT = THREE.RepeatWrapping; texture.repeat.set(23, 28); texture.anisotropy = 4;
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(132, 158), new THREE.MeshStandardMaterial({ map: texture, color: '#ddd8c9', roughness: .94 }));
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping; texture.repeat.set(51, 52); texture.anisotropy = 4;
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(132 * 51 / 23, 158 * 52 / 28), new THREE.MeshStandardMaterial({ map: texture, color: '#ddd8c9', roughness: .94 }));
   mesh.name = 'Station district granite paving'; mesh.rotation.x = -Math.PI / 2;
   mesh.position.set(0, -.045, -14); mesh.receiveShadow = true;
   return mesh;
@@ -133,14 +133,14 @@ function buildDistrict(root) {
   }
   // The platforms extend north behind the station and visually close the
   // eastern edge of the square. Their granite retaining wall is solid.
-  box('#807e70', 33.9, .45, -28.4, 20, .9, 47);
+  box('#807e70', 33.9, .45, -42.4, 20, .9, 75);
   obstacle(33.9, -28.4, 20, 47, .9);
   for (let z = -49; z <= -6; z += 2.75) box('#576c62', 24.06, 1.42, z, .1, 1.04, .1);
   for (const y of [1.35, 1.9]) box('#62776b', 24.06, y, -28.4, .09, .08, 46.8);
   obstacle(24.06, -28.4, .13, 46.8, 1.95);
   for (const x of [27, 34, 41]) {
-    for (const dx of [-.72, .72]) box('#495856', x + dx, .93, -28, .095, .12, 46);
-    for (let z = -50; z < -5; z += 1.25) box('#7d7061', x, .91, z, 1.94, .07, .19);
+    for (const dx of [-.72, .72]) box('#495856', x + dx, .93, -42.5, .095, .12, 75);
+    for (let z = -80; z < -5; z += 1.25) box('#7d7061', x, .91, z, 1.94, .07, .19);
     for (let z = -49; z < -7; z += 7) {
       box('#688478', x + 2.45, 2.65, z, .18, 3.5, .18);
       obstacle(x + 2.45, z, .18, .18, 4.4);
@@ -163,17 +163,31 @@ function buildDistrict(root) {
   for (let z = -31; z <= -11; z += 1.84) for (const dx of [-1.345, 1.345]) {
     box('#526f73', 27 + dx, 2.88, z, .09, .89, 1.56);
   }
-  // A planted edge behind the square keeps the skyline continuous in the
-  // same sightline as Oodi without covering the silhouette of its white roof.
-  for (let i = 0; i < 18; i++) {
-    addTree(m, { x: -49 + i * 5.4, z: -54 - (i % 3) * 2.4, height: 5.5 + i % 4, radius: 2.1, variant: i });
+  // Trees line the back of the library plaza, west of the railway approaches.
+  for (let i = 0; i < 12; i++) {
+    addTree(m, { x: -40 + i * 5.4, z: -54 - (i % 3) * 2.4, height: 5.5 + i % 4, radius: 2.1, variant: i });
   }
   root.add(m.finish({ vertexColors: true }));
   addChristmasDecorations(root, {
     wreaths: [[-11, 8.8], [21, 9.6], [-12, -15], [13, -13], [-22, -30], [7, -30]].map(([x, z]) => ({ x, y: 4.45, z })),
     groundFigures: {
-      trees: [{ x: -32, z: 14, scale: .62 }],
-      deer: [{ x: 30, z: 14, scale: .54, rotationY: Math.PI / 2 }],
+      trees: [
+        { x: -32, z: 10.3, scale: .78 }, { x: 26.5, z: 8, scale: .85 },
+        { x: -19.2, z: -31.2, scale: .85 }, { x: 11.7, z: -31.8, scale: .73 },
+      ],
+      deer: [
+        ...[-5.15, -1.8, 1.3].map((x, i) => ({ x, z: 25.5, scale: 1.08 - i * .06 })),
+        { x: 29.7, z: 19, scale: .86, rotationY: Math.PI / 2 },
+        { x: 14.2, z: -31.5, scale: .79, rotationY: -.5 },
+      ],
+      sleighs: [{ x: -9, z: 25.5, scale: 1.15 }],
+      gifts: [
+        { x: -9.6, y: .62, z: 25.5, scale: .6, rotationY: -.12 },
+        { x: -11.15, z: 26.25, scale: .76, rotationY: .27 },
+        { x: 27.6, z: 8.25, scale: .65, rotationY: .4 },
+        { x: -17.9, z: -31, scale: .68, rotationY: -.27 },
+        { x: 12.2, z: -30.7, scale: .55 },
+      ],
     },
     strands: [
       { from: [-11, 6.5, 8.8], to: [21, 6.5, 9.6], sag: 1.1, spacing: 1.15, lanternSpacing: 3, figureSpacing: 8 },

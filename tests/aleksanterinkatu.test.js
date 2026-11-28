@@ -50,6 +50,14 @@ test('the tram course has exactly two bounded lanes while Baana retains three', 
   assert.throws(() => createRunnerRun({ lanes: [2, -2] }), /lanes/);
 });
 
+test('a tram can join the opening block while leaving a lane free', () => {
+  const run = createRunnerRun({ ...aleksanterinkatuMap.runner, random: () => .2 });
+  run.update(1.8);
+  const trams = run.state.traffic.filter(agent => agent.kind === 'tram');
+  assert.ok(trams.length > 0);
+  for (const tram of trams) assert.notEqual(tram.lane, tram.safeLane);
+});
+
 // Use only the information a player can see: longitudinal traffic and the
 // marked lanes of each warned side-street approach. No invulnerability or kills.
 function steer(run) {
@@ -75,6 +83,7 @@ test('two-lane tram and cross-scooter traffic leaves a complete safe route acros
     while (!run.state.finished) {
       steer(run);
       const result = run.update(1 / fps); hits += result.hits;
+      assert.equal(result.crash, null, `${fps} FPS, seed ${seed}`);
       if (result.warning) { warnings++; sideWarnings.add(result.warning.includes('LEFT') ? 'left' : 'right'); }
       for (const agent of run.state.traffic) {
         if (!isCameo(agent.kind)) courseKinds.add(agent.kind);
@@ -98,21 +107,32 @@ test('both runners leave a safe path at full brake, boost and changing pace betw
     while (!run.state.finished) {
       const committedCrossing = run.state.crossings.some(c => c.phase === 'warning' || c.phase === 'crossing');
       if (mode !== 'vary' || !committedCrossing) run.setThrottle(mode === 'vary' ? Math.sin(run.state.elapsed * 1.7) : mode);
-      steer(run); hits += run.update(1 / fps).hits;
+      steer(run);
+      const result = run.update(1 / fps); hits += result.hits;
+      assert.equal(result.crash, null, `${definition.id}, ${fps} FPS, seed ${seed}, throttle ${mode}`);
     }
     assert.equal(hits, 0, `${definition.id}, ${fps} FPS, seed ${seed}, throttle ${mode}`);
     assert.equal(run.state.distance, definition.runner.length);
   }
 });
 
-test('trams collide along their full length and cannot be destroyed by spray', () => {
+test('the front of an intact tram ends the run even during invulnerability', () => {
   const run = createRunnerRun({ ...aleksanterinkatuMap.runner, riderKinds: ['bike'], tramChance: 1, tramStartDelay: 0, crossingPoints: [], random: () => .2 });
   run.update(.01);
   const tram = run.state.traffic[0]; assert.equal(tram.kind, 'tram');
   Object.assign(tram, { lane: run.state.lane, x: run.state.x, progress: run.state.distance + 8.1 });
   for (let i = 0; i < 100; i++) assert.equal(run.sprayHit(tram.id, { damage: 100 }), false);
+  run.state.invulnerable = 1;
+  const before = run.state.elapsed;
+  const result = run.update(.25);
+  assert.equal(result.crash?.kind, 'tram');
+  assert.deepEqual(result.impacts, [result.crash]);
+  assert.equal(result.hits, 0);
+  assert.equal(result.finished, false);
+  assert.ok(run.state.elapsed - before < .02, 'Stop at the front, before the tram centre reaches the hero');
+  assert.ok(run.state.traffic.includes(tram));
   assert.equal(tram.alive, true);
-  assert.equal(run.update(.02).hits, 1, 'The front contacts before the tram centre reaches the hero');
+  assert.ok(!tram.recoiling && !tram.cleared);
   assert.equal(run.state.bonus, 0);
 });
 
@@ -210,6 +230,8 @@ test('the complete tram body blocks liquid and map switches release every owned 
   world.updateRunner(state);
   assert.equal(world.lineClear3D({ x: -2.2, y: 1.4, z: 0 }, { x: -2.2, y: 1.4, z: -4 }), false);
   assert.equal(world.lineClear3D({ x: 2.2, y: 1.4, z: 0 }, { x: 2.2, y: 1.4, z: -14 }), true);
+  state.elapsed++; state.traffic[0].hit = true;
+  assert.equal(world.lineClear3D({ x: -2.2, y: 1.4, z: 0 }, { x: -2.2, y: 1.4, z: -4 }), false);
   // The live state moves before its next draw call; collision must follow it.
   state.elapsed++; state.traffic[0].z = -30; state.traffic[0].progress = 30;
   assert.equal(world.lineClear3D({ x: -2.2, y: 1.4, z: 0 }, { x: -2.2, y: 1.4, z: -4 }), true);

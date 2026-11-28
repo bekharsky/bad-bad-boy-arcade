@@ -174,6 +174,21 @@ function buildKamppi(root) {
     }
     propObstacle(x, z, width + .4, depth + .4, tree ? 5.5 : .85);
   }
+  function marketStall(x, z, canopy, trim) {
+    for (const dx of [-1.15, 1.15]) for (const dz of [-.72, .72]) {
+      street.geometry('#604b39', new THREE.CylinderGeometry(.045, .06, 1.95, 6).translate(x + dx, 1.02, z + dz));
+    }
+    street.box('#8a6444', x, .88, z + .7, 2.55, .95, .18);
+    street.box('#d7c7a4', x, 1.38, z + .72, 2.7, .12, .32);
+    street.geometry(canopy, new THREE.ConeGeometry(1.7, .72, 4).rotateY(Math.PI / 4).translate(x, 2.23, z));
+    for (const [index, dx] of [-.9, -.3, .3, .9].entries()) {
+      street.box(index % 2 ? trim : canopy, x + dx, 1.92, z + .72, .58, .27, .08);
+    }
+    for (const [index, dx] of [-.74, 0, .74].entries()) {
+      street.box(index % 2 ? '#d8bd72' : '#b76d46', x + dx, 1.13, z + .82, .38, .28, .1);
+    }
+    propObstacle(x, z, 3.1, 2.35, 2.6);
+  }
   // Seating stays at the sides so the larger Narinkkatori centre remains open.
   for (const z of [-14, -2, 9]) {
     planter(30, z, 1.5, 2.5, true);
@@ -307,45 +322,9 @@ function buildKamppi(root) {
   }
   root.add(bikeParking.finish({ vertexColors: true }));
 
-  // A raised crossing over Mannerheimintie gives the eastern edge a readable
-  // landmark. The stairs and bridge sit above street level and leave the path below open.
-  const overpass = createSceneryModel('Kamppi pedestrian overpass and bus shelter');
-  const deckY = 5.2, southZ = 54.8, northZ = 67.1, steps = 13;
-  const rise = deckY / steps, run = 6.25 / steps;
-  function rail(from, to, radius = .045) {
-    const a = new THREE.Vector3(...from), b = new THREE.Vector3(...to), direction = b.clone().sub(a);
-    const geometry = new THREE.CylinderGeometry(radius, radius, direction.length(), 6);
-    geometry.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.clone().normalize()));
-    geometry.translate(...a.addScaledVector(direction, .5).toArray());
-    overpass.geometry('#556962', geometry);
-  }
-  for (let i = 0; i < steps; i++) {
-    const y = (i + .5) * rise;
-    overpass.box('#83918a', 29.9 + (i + .5) * run, y, southZ, run + .08, .14, 2.5);
-    overpass.box('#83918a', 36.25 + (i + .5) * run, deckY - y, northZ, run + .08, .14, 2.5);
-  }
-  overpass.box('#687a72', 36.2, deckY - .08, 61.1, 2.55, .18, 14.2);
-  for (const x of [34.95, 37.45]) {
-    rail([x, deckY + .65, 54], [x, deckY + .65, 68.2], .05);
-    for (const z of [54.3, 68.1]) overpass.box('#586b64', x, deckY / 2, z, .24, deckY, .24);
-    for (let z = 54.5; z <= 68; z += 1.6) overpass.box('#64776f', x, deckY + .32, z, .07, .65, .07);
-  }
-  for (const z of [southZ - 1.25, southZ + 1.25]) {
-    rail([29.5, .65, z], [36.2, deckY + .4, z]);
-    for (let i = 0; i <= steps; i += 2) overpass.box('#64776f', 29.7 + i * run, i * rise + .5, z, .07, .8, .07);
-  }
-  for (const z of [northZ - 1.25, northZ + 1.25]) {
-    rail([36.25, deckY + .4, z], [42.95, .65, z]);
-    for (let i = 0; i <= steps; i += 2) overpass.box('#64776f', 36.4 + i * run, deckY - i * rise + .5, z, .07, .8, .07);
-  }
-  // A glass-sided stop and route board make the bridge land in a lived-in street.
-  overpass.box('#5a7068', 33, 1.42, 49.1, 4.2, 2.84, .16);
-  overpass.box('#9bb7ad', 33, 1.42, 49.2, 3.85, 2.38, .05);
-  overpass.box('#667c72', 33, 2.92, 49.05, 4.55, .16, .58);
-  overpass.box('#7a5b40', 33, .6, 49.85, 2.8, .14, .42);
-  overpass.box('#c8b66f', 31.05, 2.1, 48.94, .44, 1.18, .16);
-  root.add(overpass.finish({ vertexColors: true, roughness: .78 }));
-  propObstacle(33, 49.8, 2.8, .42, .75);
+  // Two small market stalls take the eastern square corner where the overpass stood.
+  marketStall(32, 49, '#9b5744', '#e4d2aa');
+  marketStall(36, 49, '#477a73', '#e0c981');
 
   // Simple modern light poles match the plaza, with taller contact wires at its edge.
   for (const x of [-11, 11]) for (const z of [-15, 6]) {

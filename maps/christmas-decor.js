@@ -331,7 +331,7 @@ function addTreeFigure(segments, bulbs, figure) {
   for (let index = 0; index < star.length; index++) addLitSegment(segments, bulbs, star[index], star[(index + 1) % star.length], .018, .26);
 }
 
-function addDeerFigure(segments, bulbs, figure) {
+function addDeerFigure(segments, bulbs, noses, figure) {
   const scale = figure.scale ?? .66, rotation = figure.rotationY ?? 0;
   const point = (x, y, z) => figurePoint(figure, [x, y, z], scale, rotation);
   const ribs = [-.72, -.36, 0, .36, .72].map(x => Array.from({ length: 8 }, (_, index) => {
@@ -371,13 +371,70 @@ function addDeerFigure(segments, bulbs, figure) {
     addLitSegment(segments, bulbs, point(knee - .08, .08, z * 1.15), point(knee + .16, .08, z * 1.15), .022, .25);
   }
   addLitSegment(segments, bulbs, point(-.68, 1.48, 0), point(-1.03, 1.72, 0), .02, .28);
+  noses.push({ position: point(1.46, 2.08, 0), radius: .105 * scale });
+}
+
+function addSleighFigure(segments, bulbs, figure) {
+  const scale = figure.scale ?? .8, rotation = figure.rotationY ?? 0;
+  const point = (x, y, z) => figurePoint(figure, [x, y, z], scale, rotation);
+  const runner = [[-1.2, .06], [1.15, .06], [1.43, .14], [1.62, .32], [1.64, .5], [1.54, .61]];
+  const upper = [[-1.14, 1.44], [-.85, 1.2], [-.45, .97], [.44, .96], [.96, 1.08], [1.17, 1.32]];
+  for (const z of [-.55, .55]) {
+    for (const rail of [runner, upper]) for (let i = 1; i < rail.length; i++) {
+      const [x0, y0] = rail[i - 1], [x1, y1] = rail[i];
+      addLitSegment(segments, bulbs, point(x0, y0, z), point(x1, y1, z), .03, .22);
+    }
+    addLitSegment(segments, bulbs, point(-1.14, 1.44, z), point(-.93, .52, z), .026, .24);
+    addLitSegment(segments, bulbs, point(-.93, .52, z), point(.86, .52, z), .03, .22);
+    addLitSegment(segments, bulbs, point(.86, .52, z), point(1.17, 1.32, z), .026, .24);
+    for (const x of [-.7, .7]) addLitSegment(segments, bulbs, point(x, .06, z), point(x, .52, z), .025, .25);
+    for (const [x, y] of upper.slice(1, -1)) {
+      addLitSegment(segments, bulbs, point(x, y, z), point(x * .86, .52, z), .017, .25);
+    }
+  }
+  for (const [x, y] of [[-1.14, 1.44], [-.94, .52], [-.55, .52], [-.15, .52], [.24, .52], [.85, .52], [1.17, 1.32]]) {
+    addLitSegment(segments, bulbs, point(x, y, -.55), point(x, y, .55), .023, .23);
+  }
+}
+
+function addGiftFigure(segments, bulbs, figure) {
+  const scale = figure.scale ?? .7, rotation = figure.rotationY ?? 0;
+  const point = (x, y, z) => figurePoint(figure, [x, y, z], scale, rotation);
+  const corners = [[-.55, -.44], [.55, -.44], [.55, .44], [-.55, .44]];
+  for (const [i, [x, z]] of corners.entries()) {
+    const [nextX, nextZ] = corners[(i + 1) % corners.length];
+    addLitSegment(segments, bulbs, point(x, .03, z), point(x, .94, z), .023, .24);
+    for (const y of [.03, .94]) addLitSegment(segments, bulbs, point(x, y, z), point(nextX, y, nextZ), .023, .24);
+    addLitSegment(segments, bulbs, point((x + nextX) / 2, .03, (z + nextZ) / 2),
+      point((x + nextX) / 2, .94, (z + nextZ) / 2), .018, .25);
+  }
+  addLitSegment(segments, bulbs, point(-.55, .94, 0), point(.55, .94, 0), .022, .23);
+  addLitSegment(segments, bulbs, point(0, .94, -.44), point(0, .94, .44), .022, .23);
+  for (const side of [-1, 1]) {
+    const bow = [[0, .95], [side * .22, 1.28], [side * .47, 1.28], [side * .48, 1.09], [0, .95]];
+    for (let i = 1; i < bow.length; i++) {
+      const [x0, y0] = bow[i - 1], [x1, y1] = bow[i];
+      addLitSegment(segments, bulbs, point(x0, y0, 0), point(x1, y1, 0), .022, .19);
+    }
+  }
 }
 
 function addGroundFigures(root, groundFigures) {
-  const segments = [], bulbs = [];
+  const segments = [], bulbs = [], noses = [];
   for (const tree of groundFigures.trees ?? []) addTreeFigure(segments, bulbs, tree);
-  for (const deer of groundFigures.deer ?? []) addDeerFigure(segments, bulbs, deer);
+  for (const deer of groundFigures.deer ?? []) addDeerFigure(segments, bulbs, noses, deer);
+  for (const sleigh of groundFigures.sleighs ?? []) addSleighFigure(segments, bulbs, sleigh);
+  for (const gift of groundFigures.gifts ?? []) addGiftFigure(segments, bulbs, gift);
   addLitWirework(root, segments, bulbs, 'Ground holiday sculpture', .047);
+  if (noses.length) {
+    const lights = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 6, 4),
+      new THREE.MeshBasicMaterial({ color: '#ff5741', toneMapped: false }), noses.length);
+    lights.name = 'Reindeer nose lamps';
+    const rotation = new THREE.Quaternion();
+    noses.forEach(({ position, radius }, index) => setInstance(lights, index, position, rotation, new THREE.Vector3().setScalar(radius)));
+    lights.instanceMatrix.needsUpdate = true;
+    root.add(lights);
+  }
 }
 
 export function addChristmasDecorations(root, { strands = [], wreaths = [], letters = [], groundFigures = {} } = {}) {

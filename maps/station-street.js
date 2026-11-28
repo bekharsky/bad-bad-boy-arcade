@@ -85,25 +85,35 @@ export function buildStationStreet(root, bounds, obstacle, place) {
   }
   root.add(edge.finish({ vertexColors: true }));
 
-  // The rails continue between the corner blocks beyond the playable area.
-  // Set the upper floors back so the street stays open in the side view.
+  // Outer blocks wrap the side streets and library plaza beyond the railings.
+  // Set the upper floors back and leave both tram portals open.
   const blocks = createSceneryModel('Kaivokatu street fronts');
-  for (const [x, z, width, floors, render] of [
+  for (const [x, z, width, floors, color, depth = 9] of [
     [minX - 11, 1, 16, 5, '#bfae96'], [maxX + 13, 2, 18, 4, '#bdab97'],
     [minX - 12, 27, 18, 4, '#b3a99b'], [maxX + 12, 27, 17, 5, '#b7ae92'],
+    [-52, 43, 16, 5, '#c6b293', 15], [50, 43, 19, 4, '#baafa2', 15],
+    [-52, -12, 17, 5, '#b5b7a4', 15], [-52.5, -29, 18, 6, '#c5ab93', 17],
+    [-53, -46, 17, 5, '#b7ac99', 16], [-52, -62, 18, 5, '#b2b7a9', 15],
+    [53, -12, 15, 5, '#c6b59c', 16], [53.5, -29, 16, 6, '#b7bba9', 17],
+    [54, -47, 17, 5, '#c2ac9a', 17], [54, -64, 17, 5, '#b7ab98', 16],
+    // The row behind Oodi leaves the northbound train tracks open to the east.
+    [-34, -69, 17, 6, '#bdb4a0', 13], [-16, -70, 18, 5, '#bac1ae', 12],
+    [1.5, -69, 16.5, 6, '#c4b6a4', 13], [16.75, -70, 13, 5, '#b6b9a7', 12],
+    [31, -91, 18, 5, '#b7b29c', 13], [50, -92, 19, 6, '#bdad97', 14],
   ]) {
-    const front = Math.sign(track - z), h = 2.9 + floors * 1.55;
-    blocks.box(render, x, h / 2, z, width, h, 9);
-    blocks.box('#78817a', x, h + .13, z, width + .4, .26, 9.25);
-    blocks.box('#adb1a1', x, h + .72, z - front * .8, width - 2, 1.25, 6.6);
+    const front = Math.sign(track - z), h = 2.9 + floors * 1.55, facadeZ = z + front * (depth / 2 + .04);
+    blocks.box(color, x, h / 2, z, width, h, depth);
+    blocks.box('#78817a', x, h + .13, z, width + .4, .26, depth + .25);
+    blocks.box('#adb1a1', x, h + .72, z - front * .8, width - 2, 1.25, depth - 2.4);
     for (let dx = -width / 2 + 1; dx < width / 2; dx += 1.8) {
-      blocks.box('#536b68', x + dx, 1.22, z + front * 4.54, 1.5, 2.36, .1);
+      blocks.box('#536b68', x + dx, 1.22, facadeZ, 1.5, 2.36, .1);
       for (let row = 0; row < floors; row++) {
-        blocks.box('#698184', x + dx, 3.46 + row * 1.55, z + front * 4.54, .98, .96, .1);
+        blocks.box('#698184', x + dx, 3.46 + row * 1.55, facadeZ, .98, .96, .1);
       }
     }
-    blocks.box('#ddd1ae', x, 2.62, z + front * 4.77, width + .1, .17, .73);
-    for (const side of [-1, 1]) for (let dz = -3; dz <= 3; dz += 2) {
+    blocks.box('#ddd1ae', x, 2.62, facadeZ + front * .23, width + .1, .17, .73);
+    const endWindow = Math.floor((depth - 1) / 2) - 1;
+    for (const side of [-1, 1]) for (let dz = -endWindow; dz <= endWindow; dz += 2) {
       for (let row = 0; row < floors; row++) {
         blocks.box('#6f8581', x + side * (width / 2 + .03), 3.46 + row * 1.55, z + dz, .1, .96, 1.15);
       }

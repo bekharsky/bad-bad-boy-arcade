@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { createSpeedSkates } from './models/speed-skate.js';
 import { disposeObject } from './world/dispose.js';
 
+export const SKATE_SPEED_MULTIPLIER = 2;
+
 export function createArenaBoosts(scene, world) {
   const root = new THREE.Group();
   root.name = 'Arena boost pickups';

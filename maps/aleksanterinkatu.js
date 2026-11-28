@@ -28,7 +28,7 @@ export function aleksiRoadSpans(from, to) {
 }
 export const aleksanterinkatuMap = {
   id: 'aleksanterinkatu', name: 'Aleksanterinkatu', mode: 'runner',
-  runner: { length: ALEKSI_LENGTH, variety: true, busy: true, cameoShoulder: 6.12, riderKinds: ['bike', 'scooter', 'goose', ...CAMEO_KINDS], lanes: TRAM_LANES, tramChance: .95, tramStartDelay: 35, tramRoute: aleksiTramRoute, roadworkKinds: ['cone', 'barrier'], crossingPoints: ALEKSI_CROSSINGS, startSpeed: 11, speedLimit: 19, acceleration: .14 },
+  runner: { length: ALEKSI_LENGTH, variety: true, busy: true, roadworkDensity: 1.3, tramRushFactor: .6, cameoShoulder: 6.12, riderKinds: ['bike', 'scooter', 'goose', ...CAMEO_KINDS], lanes: TRAM_LANES, tramChance: .98, tramStartDelay: 8, tramRoute: aleksiTramRoute, roadworkKinds: ['cone', 'barrier'], crossingPoints: ALEKSI_CROSSINGS, startSpeed: 11, speedLimit: 19, acceleration: .14 },
   spawn: { x: TRAM_LANES[0], z: 0, heading: Math.PI },
   pickups: { medkit: [{ x: TRAM_LANES[0], z: -300 }] },
   bounds: { minX: -5.3, maxX: 5.3, minZ: -150, maxZ: 35 },
@@ -163,21 +163,37 @@ function buildAleksi(root) {
   }
   const aleksiLights = [], aleksiLetters = [];
   for (let z = 12; z > -642; z -= 24) {
-    const apex = [0, 9.45, z];
     aleksiLights.push(
-      { from: [-9, 10.5, z], to: [0, 7.7, z], sag: .05, spacing: .95, lanternSpacing: 4.2, wire: false, wireFigures: false },
-      { from: [0, 7.7, z], to: [9, 10.5, z], sag: .05, spacing: .95, lanternSpacing: 4.2, wire: false, wireFigures: false },
+      { from: [-9, 10.5, z], to: [0, 7.7, z], sag: .05, spacing: .8, lanternSpacing: 3.5, wire: false, wireFigures: false },
+      { from: [0, 7.7, z], to: [9, 10.5, z], sag: .05, spacing: .8, lanternSpacing: 3.5, wire: false, wireFigures: false },
     );
     aleksiLetters.push({ x: 0, y: 7.7, z: z + 1.2, scale: .72 });
   }
-  addChristmasDecorations(city, {
-    strands: aleksiLights,
-    letters: aleksiLetters,
-    groundFigures: {
-      trees: [{ x: -7.2, z: -100, scale: .62 }, { x: 7.2, z: -380, scale: .62 }],
-      deer: [{ x: 7.2, z: -250, scale: .56, rotationY: Math.PI / 2 }, { x: -7.2, z: -530, scale: .56, rotationY: Math.PI / 2 }],
-    },
-  });
+  addChristmasDecorations(city, { strands: aleksiLights, letters: aleksiLetters });
+  // Batch by street block so the rest of the route can be culled.
+  const displaysByBlock = [[[1, 25], [-1, 61], [1, 105]], [[1, 168], [-1, 239]], [[1, 323], [-1, 398]],
+    [[1, 476], [-1, 549]], [[1, 610]]];
+  for (const [block, displays] of displaysByBlock.entries()) {
+    const groundFigures = { trees: [], deer: [], sleighs: [], gifts: [] };
+    for (const [side, progress] of displays) {
+      const x = side * 7.17, y = .125;
+      groundFigures.sleighs.push({ x, y, z: -progress, scale: .82, rotationY: Math.PI / 2 });
+      for (const [i, offset] of [2.85, 5.5, 8.15].entries()) {
+        groundFigures.deer.push({ x, y, z: -progress - offset, scale: .87 - i * .04, rotationY: Math.PI / 2 });
+      }
+      groundFigures.trees.push({ x: -x, y, z: -progress - 2.1, scale: .73 });
+      groundFigures.gifts.push({ x: -x, y, z: -progress - 3.9, scale: .65, rotationY: .28 * side },
+        { x: -x, y, z: -progress - 5.05, scale: .48, rotationY: -.19 * side });
+    }
+    const intersection = ALEKSI_CROSSINGS[block];
+    if (intersection !== undefined) {
+      const side = block % 2 ? 1 : -1;
+      groundFigures.trees.push({ x: side * 9.2, z: -intersection + 10, scale: .88 });
+      groundFigures.deer.push({ x: -side * 9.8, z: -intersection - 9.7, scale: .95, rotationY: side * .35 });
+      groundFigures.gifts.push({ x: side * 10.35, z: -intersection + 9.4, scale: .78, rotationY: .37 });
+    }
+    addChristmasDecorations(city, { groundFigures });
+  }
   lampTemplate.material.dispose();
   city.add(ground.finish({ vertexColors: true }));
   const squares = ALEKSI_CROSSINGS.map((progress, index) => junction(progress, index, paving));
@@ -205,7 +221,7 @@ function buildAleksi(root) {
   function dynamicColliders() {
     if (colliderTime !== currentState.elapsed) {
       colliderTime = currentState.elapsed; tramColliders.length = 0;
-      for (const agent of currentState.traffic) if (agent.kind === 'tram' && !agent.cleared && !agent.hit) {
+      for (const agent of currentState.traffic) if (agent.kind === 'tram' && !agent.cleared) {
         for (const offset of [-TRAM_CAR_OFFSET, TRAM_CAR_OFFSET]) {
           aleksiTramRoute(agent.progress + offset, TRAM_LANES[agent.lane], tramPose);
           const c = colliderPool[tramColliders.length], s = Math.abs(Math.sin(tramPose.heading)), cos = Math.abs(Math.cos(tramPose.heading));

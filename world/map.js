@@ -24,6 +24,7 @@ export function createMap(definition, build) {
       mode: definition.mode ?? 'arena',
       runner: definition.runner,
       spawn: definition.spawn,
+      bounds: definition.bounds,
       openingCameoRoute: definition.openingCameoRoute,
       pedestrianRoutes: definition.pedestrianRoutes ?? [],
       targets: content.targets ?? [],

@@ -1,6 +1,6 @@
 // Encounter choices are made by the simulation, never by the render loop.
 // A seeded RNG therefore reproduces the same run and pause consumes no rolls.
-export function createEncounters({ random, variety, tramChance, roadworks }) {
+export function createEncounters({ random, variety, tramChance, roadworks, roadworkDensity = 1, tramRushFactor = .5 }) {
   const roll = (a, b) => a + Math.max(0, Math.min(1, random())) * (b - a);
   const pick = values => values[Math.min(values.length - 1, Math.floor(roll(0, values.length)))];
   let pattern = 'flow', until = 45, pack = 0;
@@ -12,14 +12,17 @@ export function createEncounters({ random, variety, tramChance, roadworks }) {
       pattern = pick(choices.filter(value => value !== pattern)); until = distance + roll(65, 105); pack = 0;
     },
     row() {
-      if (!variety) return { pattern: 'flow', lead: 3.2, riderSpeed: 5.2, roadworkChance: .25, tramChance };
+      if (!variety) return {
+        pattern: 'flow', lead: 3.2, riderSpeed: 5.2,
+        roadworkChance: Math.min(.88, .25 * roadworkDensity), tramChance,
+      };
       const rush = pattern === 'rush';
       return {
         pattern,
         lead: rush ? roll(2.2, 2.7) : roll(2.45, 3.6),
         riderSpeed: rush ? roll(8.2, 10.5) : roll(4.3, 7.6),
-        roadworkChance: pattern === 'worksite' ? .65 : rush ? 0 : .22,
-        tramChance: pattern === 'trams' ? Math.max(.7, tramChance) : rush ? tramChance * .5 : tramChance,
+        roadworkChance: Math.min(.88, (pattern === 'worksite' ? .65 : rush ? 0 : .22) * roadworkDensity),
+        tramChance: pattern === 'trams' ? Math.max(.7, tramChance) : rush ? tramChance * tramRushFactor : tramChance,
       };
     },
     delay(distance) {

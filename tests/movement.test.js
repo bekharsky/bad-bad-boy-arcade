@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { SKATE_SPEED_MULTIPLIER } from '../arena-boosts.js';
 import { movePlayer } from '../movement.js';
 
 function setup({ heading = 0, codes = [], touch = { x: 0, z: 0 }, firing = false } = {}) {
@@ -163,18 +164,22 @@ test('direct joystick preserves analog speed and takes priority over keyboard in
   assert.ok(Math.abs(slow.player.z) < 1e-10);
 });
 
-test('speed skates add 35 percent to screen-relative travel and expire without a jump', () => {
-  const normal = setup({ touch: { x: 0, z: -1 } });
-  const skates = setup({ touch: { x: 0, z: -1 } });
-  skates.input.speedMultiplier = 1.35;
-  skates.step(60); normal.step(60);
-  assert.ok(Math.abs(skates.player.z / normal.player.z - 1.35) < 1e-10);
-  assert.equal(skates.player.x, 0);
-  skates.input.speedMultiplier = 1;
-  skates.step();
-  assert.ok(skates.player.moveSpeed > normal.player.moveSpeed);
-  skates.step(60);
-  assert.ok(Math.abs(skates.player.moveSpeed - normal.player.moveSpeed) < .001);
+test('speed skates double acceleration and travel with or without firing, then ease out', () => {
+  for (const firing of [false, true]) {
+    const normal = setup({ touch: { x: 0, z: -1 }, firing });
+    const skates = setup({ touch: { x: 0, z: -1 }, firing });
+    skates.input.speedMultiplier = SKATE_SPEED_MULTIPLIER;
+    skates.step(); normal.step();
+    assert.ok(Math.abs(skates.player.moveSpeed / normal.player.moveSpeed - 2) < 1e-10);
+    skates.step(59); normal.step(59);
+    assert.ok(Math.abs(skates.player.z / normal.player.z - 2) < 1e-10);
+    assert.equal(skates.player.x, 0);
+    skates.input.speedMultiplier = 1;
+    skates.step();
+    assert.ok(skates.player.moveSpeed > normal.player.moveSpeed);
+    skates.step(60);
+    assert.ok(Math.abs(skates.player.moveSpeed - normal.player.moveSpeed) < .001);
+  }
 });
 
 test('Tank turning accelerates smoothly, reverses promptly and stops without drift', () => {

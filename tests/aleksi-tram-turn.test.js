@@ -66,7 +66,8 @@ test('bending trams have no phantom straight-lane collision and generated traffi
     run.state.distance = 635; run.state.elapsed = 60; run.state.traffic.push({ id: -1, kind: 'tram', lane, progress: 700, speed: 7.5, alive: true, hit: false, passed: false });
     const result = run.update(.1), tram = run.state.traffic.find(a => a.id === -1);
     const expected = aleksiTramRoute(tram.progress, TRAM_LANES[lane]);
-    assert.equal(result.hits, 0); assert.equal(tram.x, expected.x); assert.equal(tram.z, run.state.distance + expected.z);
+    assert.equal(result.crash, null); assert.equal(result.hits, 0);
+    assert.equal(tram.x, expected.x); assert.equal(tram.z, run.state.distance + expected.z);
   }
   for (const throttle of [-1, 0, 1]) {
     let seed = 42;

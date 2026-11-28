@@ -23,6 +23,7 @@ export function createMapManager(scene, definitions, playerRadius = .4) {
     get runner() { return active?.runner; },
     get targets() { return active?.targets ?? []; },
     get spawn() { return active.spawn; },
+    get bounds() { return active.bounds; },
     get openingCameoRoute() { return active.openingCameoRoute; },
     get pedestrianRoutes() { return active.pedestrianRoutes; },
     pickupCapacity(kind) {

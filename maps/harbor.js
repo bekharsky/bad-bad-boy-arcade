@@ -306,8 +306,13 @@ function buildHarbor(scene) {
     wreaths: harborWreaths,
     strands: harborLights,
     groundFigures: {
-      trees: [{ x: -14, z: -14, scale: .62 }],
-      deer: [{ x: 16, z: -14, scale: .54, rotationY: Math.PI / 2 }],
+      trees: [{ x: -14, z: -14, scale: .72 }, { x: 20.7, z: 11.5, scale: .69 }],
+      deer: [
+        { x: -9.3, z: -10.5, scale: .85 }, { x: -6.55, z: -10.5, scale: .8 },
+        { x: 13.7, z: -11.7, scale: .76, rotationY: Math.PI / 2 },
+      ],
+      sleighs: [{ x: -12.3, z: -10.5, scale: .89 }],
+      gifts: [{ x: -13.1, z: -11.65, scale: .6, rotationY: .25 }, { x: 21.5, z: 10.5, scale: .61 }],
     },
   });
   for (const [x, z] of [[-9, 13.7], [9.2, 13.7], [9.2, 3.3], [-10, -25.6], [7, -25.6]]) planter(x, z);
@@ -344,8 +349,12 @@ function buildHarbor(scene) {
   }
   // Physical bollards and painted edges communicate the playable boundary.
   for (let n = -26; n <= 26; n += 2) for (const s of [-1, 1]) {
-    part('cylinder', '#697c7d', n, 0.28, s * 28.2, 0.13, 0.56, 0.13);
-    part('cylinder', '#697c7d', s * 28.2, 0.28, n, 0.13, 0.56, 0.13);
+    for (const [x, z] of [[n, s * 28.2], [s * 28.2, n]]) {
+      part('cylinder', '#405358', x, .1, z, .34, .2, .34);
+      part('cylinder', '#29464b', x, .54, z, .22, .78, .22);
+      part('cylinder', '#e3d3aa', x, .64, z, .26, .14, .26);
+      part('cylinder', '#354e53', x, .98, z, .28, .12, .28);
+    }
   }
   // The city stands on an island: a quay edge meets water on every side.
   for (const z of [-29, 41]) part('box', '#697e80', -4, -.18, z, 92, .55, .35);

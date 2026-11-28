@@ -50,10 +50,14 @@ export function createArenaCameos(scene, world, random = Math.random) {
     const available = pool.filter(actor => !actor.alive);
     if (!available.length) return;
     const routeAvailable = route => {
+      if (!Array.isArray(route) || route.length < 2) return false;
+      if (route.some(([x, z]) => !world.canStandAt(x, z, WALK_CLEARANCE))) return false;
+      for (let i = 1; i < route.length; i++) {
+        const [x, z] = route[i - 1], [nextX, nextZ] = route[i];
+        if (!world.lineClear(x, z, nextX, nextZ, WALK_CLEARANCE)) return false;
+      }
       const [[x, z], [nextX, nextZ]] = route, [endX, endZ] = route.at(-1);
-      if (Math.hypot(player.x - x, player.z - z) < 6
-        || !world.canStandAt(x, z, WALK_CLEARANCE)
-        || !world.lineClear(x, z, nextX, nextZ, WALK_CLEARANCE)) return false;
+      if (Math.hypot(player.x - x, player.z - z) < 6) return false;
       return actors.every(actor => {
         const [otherX, otherZ] = actor.route.at(-1);
         return Math.hypot(actor.x - x, actor.z - z) >= GUEST_SPACING
