@@ -14,7 +14,13 @@
   --coral: #ff5b63;
 }
 
-* { box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+*, *::before, *::after {
+  box-sizing: border-box;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  user-select: none !important;
+  -webkit-touch-callout: none !important;
+}
 html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #11131b; }
 body { -webkit-font-smoothing: antialiased; }
 button { font: inherit; }
@@ -246,8 +252,9 @@ h1, h2 { margin: 14px 0 12px; color: var(--ink); font: 800 clamp(38px, 6vw, 58px
 .fire-button.aiming-up .spray-icon { background: #dcefff; color: #132a40; box-shadow: 0 0 22px #c4e7ff7a; }
 
 .orientation-hint { display: none; }
+.orientation-hint-icon { width: 30px; height: 30px; flex: 0 0 auto; color: var(--gold); }
 @media (pointer: coarse) and (orientation: portrait) {
-  #start-screen .orientation-hint { display: block; position: absolute; right: 20px; bottom: max(16px, calc(env(safe-area-inset-bottom) + 10px)); left: 20px; margin: 0; color: #fff4dcc7; text-align: center; font: 500 12px/1.4 Inter, sans-serif; text-shadow: 0 1px 6px #11131b; }
+  #start-screen .orientation-hint { display: flex; align-items: center; justify-content: center; gap: 11px; position: absolute; right: 20px; bottom: max(16px, calc(env(safe-area-inset-bottom) + 10px)); left: 20px; width: min(360px, calc(100% - 40px)); min-height: 54px; margin: 0 auto; padding: 8px 14px; border: 1px solid #fff0c24a; border-radius: 999px; background: #11131bcc; color: #fff4dcc7; text-align: left; font: 600 12px/1.4 Inter, sans-serif; text-shadow: 0 1px 6px #11131b; }
 }
 
 @media (any-pointer: coarse) {

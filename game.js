@@ -13,7 +13,6 @@ import { chooseWeather, createWeather } from './world/weather.js';
 import { createMapTransition } from './world/map-transition.js';
 import { createTransitionRenderer } from './world/transition-renderer.js';
 import { createSleighParts } from './models/sleigh.js';
-import { prepareDaciaDuster } from './models/dacia-duster.js';
 import { createSleighAssembly } from './sleigh-assembly.js';
 import { createSleighCache, randomSleighCachePoint, sleighGuardPosts } from './sleigh-search.js';
 import { createArenaBoosts } from './arena-boosts.js';
@@ -21,6 +20,7 @@ import { loadEnemyModels, createEnemy, animateEnemy, disposeEnemy } from './enem
 import { createSpraySystem } from './spray-system.js';
 import { createBiteEffects } from './bites.js';
 import { createBurstEffects } from './burst-effects.js';
+import { createDusterExplosion } from './duster-explosion.js';
 import { createMedkits } from './medkits.js';
 import { createTouchControls } from './touch-controls.js';
 import { movePlayer } from './movement.js';
@@ -256,8 +256,7 @@ function hitEnemy(enemy, direction, impact) {
       world.refresh();
       bankedScore += 500;
       updateScore();
-      burst(enemy.x, .92, enemy.z, 0xff7135, 32, null, 3.8);
-      burst(enemy.x, 1.05, enemy.z, 0xffd34e, 18, null, 2.7);
+      dusterExplosion.burst(enemy.x, .55, enemy.z);
       showToast('DUSTER DESTROYED +500');
       blip(105, .28);
     }
@@ -292,6 +291,7 @@ const arenaCombat = createArenaCombat({
   },
 });
 const effects = createBurstEffects(scene);
+const dusterExplosion = createDusterExplosion(scene);
 const biteEffects = createBiteEffects(scene);
 const medkits = createMedkits(scene, world);
 const arenaBoosts = createArenaBoosts(scene, world);
@@ -315,6 +315,7 @@ const SKATE_SPEED_MULTIPLIER = 1.35;
 const RESTART_PENALTY = 100;
 let playing = false;
 let gameTime = 0;
+let dusterDemoPending = query.get('demo') === 'duster-explosion';
 let score = 0;
 let bankedScore = 0;
 let restartPenalty = 0;
@@ -537,10 +538,6 @@ async function loadModels() {
   try {
     status.textContent = 'Loading the hero and barnacle geese…';
     loadEnemyModels();
-    const dusterReady = prepareDaciaDuster().catch(error => {
-      console.warn('Could not load the Renault Duster model:', error);
-      return null;
-    });
     const gltf = await loadHero(message => { status.textContent = message; });
     player.rig = createHero(gltf.scene);
     player.model = player.rig.mesh;
@@ -548,7 +545,6 @@ async function loadModels() {
     player.body.add(player.model);
     placePlayerAtSpawn(showSenatePreview);
     frameMenuPreview();
-    await dusterReady;
     // These hidden representatives retain enemy programs across districts,
     // including runs that start on a track without any arena enemies.
     const enemyPrograms = new THREE.Group();
@@ -1016,12 +1012,20 @@ function update(dt) {
   // Finish the final bite's splash even after the round ends.
   biteEffects.update(dt);
   effects.update(dt, playing && isRunner() && !runnerCrash ? player.moveSpeed : 0);
+  dusterExplosion.update(dt);
   if (runnerCrash > 0) {
     runnerCrash = Math.max(0, runnerCrash - dt);
     if (runnerCrash === 0) endGame(false, { crashed: true });
     return;
   }
   if (!playing) return;
+  if (dusterDemoPending && world.id === 'harbor') {
+    const duster = world.targets.find(target => target.kind === 'dacia-duster' && target.alive && target.modelRoot);
+    if (duster) {
+      dusterDemoPending = false;
+      hitEnemy(duster, null, { damage: duster.hp });
+    }
+  }
   if (isRunner()) { runnerSession.update(dt); return; }
   searchTime += dt;
   reinforceGeese();
@@ -1372,6 +1376,7 @@ function clearArena() {
   arenaCameos.clear();
   for (const enemy of enemies) if (enemy.alive) disposeEnemy(enemy);
   effects.clear();
+  dusterExplosion.clear();
   enemies.length = 0;
 }
 

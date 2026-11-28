@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const MODEL_URL = new URL('../assets/renault-duster.glb', import.meta.url);
 const PAINT_COLOR = '#153b68';
-const PAINT_MATERIALS = new Set(['Material#4']);
+const PAINT_MATERIALS = new Set(['Material#4', 'PaletteMaterial005']);
 const MODEL_SCALE = new THREE.Vector3(.75, .9, .81);
 const MODEL_YAW = Math.PI; // The source model points down -Z; the map model points +Z.
 const MODEL_HALF_LENGTH = 5.325 * MODEL_SCALE.z / 2;
@@ -27,42 +27,26 @@ export function prepareDaciaDuster() {
 
 function cloneModel(source) {
   const model = source.clone(true);
-  const geometryCopies = new Map();
   const materialCopies = new Map();
-  const textureCopies = new Map();
   const paintMaterials = [];
 
   function copyMaterial(material) {
     if (!material) return material;
+    if (!PAINT_MATERIALS.has(material.name)) return material;
     if (materialCopies.has(material)) return materialCopies.get(material);
     const copy = material.clone();
     materialCopies.set(material, copy);
-    for (const [key, value] of Object.entries(material)) {
-      if (!value?.isTexture) continue;
-      let texture = textureCopies.get(value);
-      if (!texture) {
-        texture = value.clone();
-        textureCopies.set(value, texture);
-      }
-      copy[key] = texture;
-    }
-    if (PAINT_MATERIALS.has(copy.name)) {
+    if (copy.name === 'Material#4') {
       copy.color.set(PAINT_COLOR);
       copy.roughness = .58;
       copy.metalness = .08;
-      paintMaterials.push({ material: copy, emissive: copy.emissive.clone(), intensity: copy.emissiveIntensity });
     }
+    paintMaterials.push({ material: copy, emissive: copy.emissive.clone(), intensity: copy.emissiveIntensity });
     return copy;
   }
 
   model.traverse(node => {
     if (!node.isMesh) return;
-    let geometry = geometryCopies.get(node.geometry);
-    if (!geometry) {
-      geometry = node.geometry.clone();
-      geometryCopies.set(node.geometry, geometry);
-    }
-    node.geometry = geometry;
     node.material = Array.isArray(node.material)
       ? node.material.map(copyMaterial)
       : copyMaterial(node.material);
