@@ -1,6 +1,84 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-const paintColor = '#667f60';
+const MODEL_URL = new URL('../assets/renault-duster.glb', import.meta.url);
+const PAINT_COLOR = '#153b68';
+const PAINT_MATERIALS = new Set(['Material#4']);
+const MODEL_SCALE = new THREE.Vector3(.75, .9, .81);
+const MODEL_YAW = Math.PI; // The source model points down -Z; the map model points +Z.
+const MODEL_HALF_LENGTH = 5.325 * MODEL_SCALE.z / 2;
+const MODEL_HALF_WIDTH = 2.48 * MODEL_SCALE.x / 2;
+const MODEL_HEIGHT = 1.91 * MODEL_SCALE.y;
+
+let modelPromise;
+
+export function prepareDaciaDuster() {
+  if (!modelPromise) {
+    modelPromise = (async () => {
+      const [{ MeshoptDecoder }] = await Promise.all([import('meshoptimizer/decoder')]);
+      const loader = new GLTFLoader();
+      loader.setMeshoptDecoder(MeshoptDecoder);
+      const gltf = await loader.loadAsync(MODEL_URL.href);
+      return gltf.scene;
+    })();
+  }
+  return modelPromise;
+}
+
+function cloneModel(source) {
+  const model = source.clone(true);
+  const geometryCopies = new Map();
+  const materialCopies = new Map();
+  const textureCopies = new Map();
+  const paintMaterials = [];
+
+  function copyMaterial(material) {
+    if (!material) return material;
+    if (materialCopies.has(material)) return materialCopies.get(material);
+    const copy = material.clone();
+    materialCopies.set(material, copy);
+    for (const [key, value] of Object.entries(material)) {
+      if (!value?.isTexture) continue;
+      let texture = textureCopies.get(value);
+      if (!texture) {
+        texture = value.clone();
+        textureCopies.set(value, texture);
+      }
+      copy[key] = texture;
+    }
+    if (PAINT_MATERIALS.has(copy.name)) {
+      copy.color.set(PAINT_COLOR);
+      copy.roughness = .58;
+      copy.metalness = .08;
+      paintMaterials.push({ material: copy, emissive: copy.emissive.clone(), intensity: copy.emissiveIntensity });
+    }
+    return copy;
+  }
+
+  model.traverse(node => {
+    if (!node.isMesh) return;
+    let geometry = geometryCopies.get(node.geometry);
+    if (!geometry) {
+      geometry = node.geometry.clone();
+      geometryCopies.set(node.geometry, geometry);
+    }
+    node.geometry = geometry;
+    node.material = Array.isArray(node.material)
+      ? node.material.map(copyMaterial)
+      : copyMaterial(node.material);
+  });
+
+  const bounds = new THREE.Box3().setFromObject(model);
+  const center = bounds.getCenter(new THREE.Vector3());
+  model.position.set(-center.x, -bounds.min.y, -center.z);
+
+  const placement = new THREE.Group();
+  placement.name = 'Dacia Duster model placement';
+  placement.rotation.y = MODEL_YAW;
+  placement.scale.copy(MODEL_SCALE);
+  placement.add(model);
+  return { placement, paintMaterials };
+}
 
 export function createDaciaDuster(parent, { x = 7, z = -14.5, rotation = Math.PI / 2 } = {}) {
   const root = new THREE.Group();
@@ -9,113 +87,37 @@ export function createDaciaDuster(parent, { x = 7, z = -14.5, rotation = Math.PI
   root.rotation.y = rotation;
   parent.add(root);
 
-  const paint = new THREE.MeshStandardMaterial({ color: paintColor, roughness: .68, metalness: .04 });
-  const trim = new THREE.MeshStandardMaterial({ color: '#303b3b', roughness: .82 });
-  const tire = new THREE.MeshStandardMaterial({ color: '#202728', roughness: .95 });
-  const glass = new THREE.MeshStandardMaterial({ color: '#294e58', roughness: .27, metalness: .1, side: THREE.DoubleSide });
-  const chrome = new THREE.MeshStandardMaterial({ color: '#b7beb2', roughness: .36, metalness: .42 });
-  const lamp = new THREE.MeshStandardMaterial({ color: '#f7dda0', emissive: '#876328', emissiveIntensity: .16, roughness: .32 });
-  const tailLamp = new THREE.MeshStandardMaterial({ color: '#b94637', emissive: '#41130f', emissiveIntensity: .18, roughness: .42 });
-  const materials = [paint, trim, tire, glass, chrome, lamp, tailLamp];
-
-  function mesh(geometry, material, px, py, pz, castShadow = true) {
-    const object = new THREE.Mesh(geometry, material);
-    object.position.set(px, py, pz);
-    object.castShadow = castShadow;
-    object.receiveShadow = true;
-    root.add(object);
-    return object;
-  }
-
-  function box(material, px, py, pz, sx, sy, sz, castShadow = true) {
-    return mesh(new THREE.BoxGeometry(sx, sy, sz), material, px, py, pz, castShadow);
-  }
-
-  // A sturdy, short-wheelbase SUV silhouette with a high roof and broad bumpers.
-  box(trim, 0, .44, -.05, 1.78, .28, 3.56);
-  box(paint, 0, .89, -.06, 1.86, .72, 3.72);
-  box(paint, 0, 1.25, .92, 1.82, .34, 1.44);
-  box(paint, 0, 1.26, -1.1, 1.8, .42, .86);
-  box(trim, 0, .74, -.05, 1.91, .12, 3.58);
-
-  const cabin = box(paint, 0, 1.66, -.12, 1.62, .82, 1.95);
-  cabin.scale.y = .94;
-  box(paint, 0, 2.075, -.13, 1.68, .16, 1.92);
-
-  // Windscreen panes sit just outside the body so they read clearly at game scale.
-  const windshield = mesh(new THREE.PlaneGeometry(1.48, .62), glass, 0, 1.77, 1.022, false);
-  windshield.rotation.x = -.4;
-  const rearWindow = mesh(new THREE.PlaneGeometry(1.37, .53), glass, 0, 1.75, -1.108, false);
-  rearWindow.rotation.x = .4;
-  for (const side of [-1, 1]) {
-    const sx = side * .824;
-    for (const offset of [-.55, .38]) {
-      const window = box(glass, sx, 1.755, offset, .035, .43, .72, false);
-      window.material = glass;
-    }
-    for (const pillarZ of [-.98, -.05, .85]) box(trim, side * .835, 1.77, pillarZ, .075, .61, .09);
-    box(paint, side * .91, 1.36, -.12, .08, .58, 1.92);
-    box(chrome, side * .963, 1.25, -.12, .025, .035, .43, false);
-    box(trim, side * .93, 1.62, .88, .27, .12, .24);
-    box(glass, side * 1.025, 1.64, .88, .14, .17, .19, false);
-    box(trim, side * .91, 1.03, -.13, .075, .045, .32, false);
-    box(chrome, side * .952, 1.035, -.13, .024, .025, .2, false);
-    for (const wheelZ of [-1.14, 1.13]) {
-      const arch = mesh(new THREE.TorusGeometry(.53, .065, 6, 14, Math.PI), trim, side * .92, .55, wheelZ, true);
-      arch.rotation.y = Math.PI / 2;
-    }
-    for (const wheelZ of [-1.14, 1.13]) {
-      const rubber = mesh(new THREE.CylinderGeometry(.42, .42, .28, 14), tire, side * .91, .52, wheelZ);
-      rubber.rotation.z = Math.PI / 2;
-      const hub = mesh(new THREE.CylinderGeometry(.225, .225, .3, 10), chrome, side * 1.02, .52, wheelZ, false);
-      hub.rotation.z = Math.PI / 2;
-      const hubInset = mesh(new THREE.CylinderGeometry(.09, .09, .305, 8), trim, side * 1.03, .52, wheelZ, false);
-      hubInset.rotation.z = Math.PI / 2;
-    }
-    box(trim, side * .89, 1.08, -.64, .035, .055, .28, false);
-    box(trim, side * .89, 1.08, .39, .035, .055, .28, false);
-  }
-
-  // Dark roof rails, a small front grille and a diamond-like Dacia badge.
-  for (const side of [-1, 1]) {
-    box(trim, side * .61, 2.19, -.16, .075, .08, 1.55);
-    box(chrome, side * .93, 1.55, 1.04, .08, .1, .25, false);
-  }
-  box(trim, 0, 1.02, 1.875, .88, .42, .08, false);
-  for (let i = 0; i < 5; i++) box(chrome, 0, .88 + i * .065, 1.924, .72, .024, .025, false);
-  const badge = mesh(new THREE.CylinderGeometry(.12, .12, .055, 8), chrome, 0, 1.08, 1.94, false);
-  badge.rotation.x = Math.PI / 2;
-  box(lamp, -.66, 1.36, 1.85, .43, .22, .1, false);
-  box(lamp, .66, 1.36, 1.85, .43, .22, .1, false);
-  box(trim, 0, .46, 1.91, 2.02, .2, .26);
-  box(trim, 0, .47, -1.91, 2.02, .2, .25);
-  box(tailLamp, -.72, 1.23, -1.87, .28, .43, .11, false);
-  box(tailLamp, .72, 1.23, -1.87, .28, .43, .11, false);
-
-  const plateCanvas = document.createElement('canvas');
-  plateCanvas.width = 384; plateCanvas.height = 96;
-  const context = plateCanvas.getContext('2d');
-  context.fillStyle = '#e8e6d9'; context.fillRect(0, 0, plateCanvas.width, plateCanvas.height);
-  context.fillStyle = '#263638'; context.textAlign = 'center'; context.textBaseline = 'middle';
-  context.font = 'bold 66px sans-serif'; context.fillText('DUSTER', 192, 49);
-  const plateTexture = new THREE.CanvasTexture(plateCanvas);
-  plateTexture.colorSpace = THREE.SRGBColorSpace;
-  const plateMaterial = new THREE.MeshStandardMaterial({ map: plateTexture, roughness: .76, side: THREE.DoubleSide });
-  materials.push(plateMaterial);
-  mesh(new THREE.PlaneGeometry(.68, .17), plateMaterial, 0, .56, 2.045, false);
-
-  const halfX = Math.abs(Math.sin(rotation)) > .5 ? 2.02 : 1.06;
-  const halfZ = Math.abs(Math.sin(rotation)) > .5 ? 1.06 : 2.02;
-  const collider = { minX: x - halfX, maxX: x + halfX, minZ: z - halfZ, maxZ: z + halfZ, height: 2.25 };
+  const sideways = Math.abs(Math.sin(rotation)) > .5;
+  const collider = {
+    minX: x - (sideways ? MODEL_HALF_LENGTH : MODEL_HALF_WIDTH),
+    maxX: x + (sideways ? MODEL_HALF_LENGTH : MODEL_HALF_WIDTH),
+    minZ: z - (sideways ? MODEL_HALF_WIDTH : MODEL_HALF_LENGTH),
+    maxZ: z + (sideways ? MODEL_HALF_WIDTH : MODEL_HALF_LENGTH),
+    height: MODEL_HEIGHT + .03,
+  };
   const target = {
-    kind: 'dacia-duster', root, x, z, size: 2.1, hitHeight: .92,
+    kind: 'dacia-duster', root, x, z, size: 2.1, hitHeight: MODEL_HEIGHT * .54,
     hp: 28, maxHp: 28, nextJetHit: 0, age: 1, alive: true, airborne: false, hit: 0,
-    collider,
+    collider, paintMaterials: [], modelRoot: null,
+    attachModel(source) {
+      if (target.modelRoot || !root.parent || !target.alive) return;
+      const instance = cloneModel(source);
+      target.modelRoot = instance.placement;
+      target.paintMaterials = instance.paintMaterials;
+      root.add(target.modelRoot);
+    },
     update(dt) {
       target.hit = Math.max(0, target.hit - dt);
       const flashing = target.hit > 0;
-      paint.emissive.set(flashing ? '#f5d48c' : '#000000');
-      paint.emissiveIntensity = flashing ? .38 : 0;
+      for (const paint of target.paintMaterials) {
+        if (flashing) {
+          paint.material.emissive.set('#f5d48c');
+          paint.material.emissiveIntensity = .38;
+        } else {
+          paint.material.emissive.copy(paint.emissive);
+          paint.material.emissiveIntensity = paint.intensity;
+        }
+      }
     },
     reset() {
       target.hp = target.maxHp;
@@ -123,9 +125,19 @@ export function createDaciaDuster(parent, { x = 7, z = -14.5, rotation = Math.PI
       target.hit = 0;
       target.alive = true;
       root.visible = true;
-      paint.emissive.set('#000000');
-      paint.emissiveIntensity = 0;
+      target.update(0);
     },
   };
+
+  if (modelPromise) {
+    modelPromise.then(source => target.attachModel(source), error => {
+      console.warn('Could not load the Renault Duster model:', error);
+    });
+  } else {
+    prepareDaciaDuster().then(source => target.attachModel(source), error => {
+      console.warn('Could not load the Renault Duster model:', error);
+    });
+  }
+
   return target;
 }

@@ -1,5 +1,12 @@
 # Models and credits
 
+## Renault Duster 2015
+
+- **Renault Duster 2015** by **no_lo_seXD**.
+- [Original Sketchfab model](https://sketchfab.com/3d-models/renault-duster-2015-70085280588b440f8e9d6fcff9211c42).
+- Licence: [Creative Commons Attribution 4.0 (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/).
+- Changes: repainted dark blue, simplified from about 154,500 to 92,351 rendered triangles, and optimized with Meshopt geometry compression and WebP textures. The bundled `assets/renault-duster.glb` is about 1.9 MB, down from 8.6 MB.
+
 ## Barnacle goose
 
 - Original procedural model in `goose.js`, including walking, wing and peck animation.

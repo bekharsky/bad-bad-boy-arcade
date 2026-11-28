@@ -13,6 +13,7 @@ import { chooseWeather, createWeather } from './world/weather.js';
 import { createMapTransition } from './world/map-transition.js';
 import { createTransitionRenderer } from './world/transition-renderer.js';
 import { createSleighParts } from './models/sleigh.js';
+import { prepareDaciaDuster } from './models/dacia-duster.js';
 import { createSleighAssembly } from './sleigh-assembly.js';
 import { createSleighCache, randomSleighCachePoint, sleighGuardPosts } from './sleigh-search.js';
 import { createArenaBoosts } from './arena-boosts.js';
@@ -536,6 +537,10 @@ async function loadModels() {
   try {
     status.textContent = 'Loading the hero and barnacle geese…';
     loadEnemyModels();
+    const dusterReady = prepareDaciaDuster().catch(error => {
+      console.warn('Could not load the Renault Duster model:', error);
+      return null;
+    });
     const gltf = await loadHero(message => { status.textContent = message; });
     player.rig = createHero(gltf.scene);
     player.model = player.rig.mesh;
@@ -543,6 +548,7 @@ async function loadModels() {
     player.body.add(player.model);
     placePlayerAtSpawn(showSenatePreview);
     frameMenuPreview();
+    await dusterReady;
     // These hidden representatives retain enemy programs across districts,
     // including runs that start on a track without any arena enemies.
     const enemyPrograms = new THREE.Group();
