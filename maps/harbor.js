@@ -365,7 +365,9 @@ function buildHarbor(scene) {
   }
   const tram = createTram(scene, { z: BOULEVARD_Z, initialWait: 10 });
   const harbor = createHarbor(scene);
-  const duster = createDaciaDuster(scene, { x: 1, z: 4.5, rotation: Math.PI / 2 });
+  // Keep the car clear of the main chase lane so it does not trap enemy packs
+  // between the buildings and the boulevard tracks.
+  const duster = createDaciaDuster(scene, { x: 5.5, z: 4.5, rotation: Math.PI / 2 });
   for (const x of [-26, 9, 26]) obstacle(x, -26.6, 1.3, .62, 5.4);
 
   for (const batch of batches.values()) {
